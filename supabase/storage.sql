@@ -1,6 +1,6 @@
 -- Networkly AI - stockage médias privés
 insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types)
-values ('content-media','content-media',false,104857600,array['image/jpeg','image/png','image/webp','video/mp4','video/quicktime','video/webm'])
+values ('content-media','content-media',false,1073741824,array['image/jpeg','image/png','image/webp','video/mp4','video/quicktime','video/webm'])
 on conflict (id) do nothing;
 
 create policy "Users upload own media" on storage.objects for insert to authenticated
