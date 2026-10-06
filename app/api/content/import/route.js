@@ -4,7 +4,7 @@ export async function POST(req){
   const s=await createServerSupabase();const {data:{user}}=await s.auth.getUser();if(!user)return Response.json({error:"Connexion requise"},{status:401});
   const form=await req.formData();const file=form.get("file");if(!file||typeof file==="string")return Response.json({error:"Fichier requis"},{status:400});
   const allowed=["image/jpeg","image/png","image/webp","video/mp4","video/quicktime","video/webm"];if(!allowed.includes(file.type))return Response.json({error:"Format non accepté"},{status:415});
-  if(file.size>100*1024*1024)return Response.json({error:"Fichier supérieur à 100 Mo"},{status:413});
+  const max=file.type.startsWith("video/")?1024*1024*1024:25*1024*1024;if(file.size>max)return Response.json({error:file.type.startsWith("video/")?"Vidéo limitée à 1 Go":"Image limitée à 25 Mo"},{status:413});
   const ext=(file.name.split(".").pop()||"bin").replace(/[^a-z0-9]/gi,"");const path=`${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
   const {error:up}=await s.storage.from("content-media").upload(path,file,{contentType:file.type,upsert:false});if(up)throw up;
   const networks=String(form.get("networks")||"").split(",").filter(Boolean);
