@@ -24,3 +24,6 @@ create or replace function public.handle_new_user() returns trigger language plp
 begin insert into public.profiles(id,full_name) values(new.id,coalesce(new.raw_user_meta_data->>'full_name','')) on conflict do nothing; return new; end; $$;
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.handle_new_user();
+
+-- IMPORTANT: le statut commercial ne doit jamais être modifiable directement par le client.
+revoke update (plan,payment_provider,provider_customer_id,subscription_id,subscription_status) on public.profiles from authenticated;
