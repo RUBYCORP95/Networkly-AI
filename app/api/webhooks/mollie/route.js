@@ -5,7 +5,7 @@ export async function POST(req){
  try{
   const form=await req.formData();const id=form.get("id");if(!id)return new Response("ok");
   const payment=await getMolliePayment(id);const userId=payment.metadata?.userId;if(!userId)return new Response("ok");
-  const admin=createAdminSupabase();
+  const admin=createAdminSupabase();await admin.from("billing_events").upsert({user_id:userId,provider:"mollie",provider_event_id:String(payment.id||id),event_type:"payment",status:payment.status,amount:Number(payment.amount?.value||0),currency:payment.amount?.currency||"EUR",subscription_id:payment.subscriptionId||null},{onConflict:"provider,provider_event_id,event_type"});
   if(payment.status==="paid"){
    const {data:p}=await admin.from("profiles").select("*").eq("id",userId).single();
    let subscriptionId=p?.subscription_id;
