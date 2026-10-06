@@ -18,6 +18,7 @@ export async function POST(req){
 }
 export async function DELETE(req){
  const s=await createServerSupabase();const {data:{user}}=await s.auth.getUser();if(!user)return Response.json({error:"Connexion requise"},{status:401});
- const id=new URL(req.url).searchParams.get("id");const {data:item}=await s.from("media_library").select("*").eq("id",id).single();if(!item)return Response.json({error:"Introuvable"},{status:404});
- await s.storage.from("content-media").remove([item.media_path]);await s.from("media_library").delete().eq("id",id);return Response.json({ok:true});
+ const id=new URL(req.url).searchParams.get("id");const {data:item}=await s.from("media_library").select("*").eq("id",id).eq("user_id",user.id).single();if(!item)return Response.json({error:"Introuvable"},{status:404});
+ const {count}=await s.from("content_items").select("id",{count:"exact",head:true}).eq("user_id",user.id).eq("media_path",item.media_path).eq("status","planned");if(count>0)return Response.json({error:"Ce média est utilisé par une publication programmée. Supprime ou modifie d’abord cette publication."},{status:409});
+ await s.storage.from("content-media").remove([item.media_path]);await s.from("media_library").delete().eq("id",id).eq("user_id",user.id);return Response.json({ok:true});
 }
