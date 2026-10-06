@@ -31,3 +31,5 @@ nav a{cursor:pointer}input{border:1px solid #dfe2ea;border-radius:10px;padding:1
 .airesult img,.airesult video{width:100%;max-height:560px;object-fit:contain;border-radius:13px;background:#f3f4f7;margin:12px 0}
 .generating{min-height:330px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#777b8d}
 @media(max-width:800px){.aistudio{grid-template-columns:1fr}}
+
+.publishcard>img,.publishcard>video{width:100%;height:210px;object-fit:cover;border-radius:12px;margin-bottom:12px;background:#f2f3f6}.networkstatus{display:grid;gap:7px;margin:14px 0}.networkrow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:7px;padding:9px 10px;border-radius:9px;background:#f5f6f8;font-size:13px}.networkrow strong{text-transform:capitalize}.networkrow.published{background:#edf8f0}.networkrow.failed{background:#fff0f0}.networkrow.retry,.networkrow.publishing{background:#fff7e8}.networkrow small{width:100%;opacity:.7}.networkrow button{display:flex;align-items:center;gap:5px;border:0;background:transparent;cursor:pointer;font-weight:700}
