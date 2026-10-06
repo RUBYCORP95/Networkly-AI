@@ -1,0 +1,2 @@
+import {createServerSupabase} from "../../../lib/supabase/server";
+export async function GET(){const s=await createServerSupabase();const {data:{user}}=await s.auth.getUser();if(!user)return Response.json({error:"Connexion requise"},{status:401});const {data,error}=await s.from("content_items").select("*").order("scheduled_date");if(error)return Response.json({error:"Erreur calendrier"},{status:500});return Response.json({items:data})}
