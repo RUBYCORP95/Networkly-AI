@@ -1,0 +1,1 @@
+export default function Success(){return <div className="authwrap"><div className="authbox"><p className="eyebrow">PAIEMENT</p><h1>Merci 🎉</h1><p>Nous vérifions ton paiement. Ton compte Pro sera activé automatiquement dès confirmation du prestataire.</p><a href="/" className="generate">Retour à Networkly</a></div></div>}
