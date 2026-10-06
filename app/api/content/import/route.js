@@ -10,7 +10,8 @@ export async function POST(req){
   const networks=String(form.get("networks")||"").split(",").filter(Boolean);
   const {data,error}=await s.from("content_items").insert({user_id:user.id,scheduled_date:form.get("date"),scheduled_time:form.get("time")||null,content_type:file.type.startsWith("video/")?"Vidéo":"Publication",platform:networks.join(", "),target_networks:networks,objective:"Contenu personnel",title:file.name,body:String(form.get("caption")||""),status:"planned",publish_mode:publishMode,media_path:path,media_type:file.type,is_ai_generated:false,subtitles_enabled:form.get("subtitles")==="true",subtitle_style:String(form.get("subtitleStyle")||"dynamic")}).select().single();
   if(error){await s.storage.from("content-media").remove([path]);throw error}
-  await s.from("publish_targets").insert(networks.map(provider=>({user_id:user.id,content_id:data.id,provider,status:publishMode==="automatic"?"pending":"pending_approval"})));
+  await s.from("media_library").insert({user_id:user.id,source:"imported",media_path:path,media_type:file.type,original_name:file.name,title:file.name,size_bytes:file.size});
+  if(publishMode!=="draft")await s.from("publish_targets").insert(networks.map(provider=>({user_id:user.id,content_id:data.id,provider,status:publishMode==="automatic"?"pending":"pending_approval"})));
   return Response.json({item:data});
  }catch{return Response.json({error:"Impossible d’enregistrer la publication."},{status:500})}
 }
