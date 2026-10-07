@@ -2,7 +2,7 @@ import {createServerSupabase} from "../../../../lib/supabase/server";
 export async function POST(req){
  try{
   const s=await createServerSupabase();const {data:{user}}=await s.auth.getUser();if(!user)return Response.json({error:"Connexion requise"},{status:401});
-  const {jobId}=await req.json();const {data:job}=await s.from("ai_media_jobs").select("*").eq("id",jobId).eq("user_id",user.id).limit(1);const current=Array.isArray(job)?job[0]:job;if(!current||current.status!=="completed"||!current.output_url)return Response.json({error:"Le média n’est pas encore prêt."},{status:409});
+  const {jobId}=await req.json();const {data:rows}=await s.from("ai_media_jobs").select("*").eq("id",jobId).eq("user_id",user.id).limit(1);const current=Array.isArray(rows)?rows[0]:rows;if(!current||current.status!=="completed"||!current.output_url)return Response.json({error:"Le média n’est pas encore prêt."},{status:409});
   const job=current;const remote=await fetch(job.output_url);if(!remote.ok)throw new Error("Téléchargement du média impossible");
   const blob=await remote.blob();const isVideo=job.media_kind==="video";const ext=isVideo?"mp4":"webp";const type=blob.type||(isVideo?"video/mp4":"image/webp");const path=`${user.id}/library/ai-${job.id}.${ext}`;
   const {error:up}=await s.storage.from("content-media").upload(path,blob,{contentType:type,upsert:true});if(up)throw up;
