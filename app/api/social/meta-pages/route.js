@@ -3,5 +3,5 @@ import {metaPages} from "../../../../lib/social/meta";
 export async function GET(){
  try{const s=await createServerSupabase();const {data:{user}}=await s.auth.getUser();if(!user)return Response.json({error:"Connexion requise"},{status:401});
  const {data:connections,error}=await s.from("social_connections").select("*").eq("user_id",user.id).in("provider",["facebook","instagram"]).eq("connected",true);if(error)throw error;const list=connections||[];const c=list[0];if(!c)return Response.json({pages:[],connected:{facebook:false,instagram:false}});
- const j=await metaPages(c);return Response.json({pages:(j.data||[]).map(p=>({id:p.id,name:p.name,instagram:p.instagram_business_account||null})),connected:{facebook:list.some(x=>x.provider==="facebook"),instagram:list.some(x=>x.provider==="instagram")}});
+ const j=await metaPages(c);const selected=list.find(x=>x.provider==="instagram")?.selected_ig_user_id||c.selected_ig_user_id||null;return Response.json({pages:(j.data||[]).map(p=>({id:p.id,name:p.name,instagram:p.instagram_business_account?{...p.instagram_business_account,selected:p.instagram_business_account.id===selected}:null})),connected:{facebook:list.some(x=>x.provider==="facebook"),instagram:list.some(x=>x.provider==="instagram")}});
  }catch(e){return Response.json({error:e.message},{status:500})}}
