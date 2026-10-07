@@ -6,9 +6,9 @@ function authorized(req){
 }
 export async function POST(req){
  if(!authorized(req))return Response.json({error:"Non autorisé"},{status:401});
- const db=createAdminSupabase();const {data:targets,error}=await db.rpc("claim_publish_targets",{p_limit:20});if(error)return Response.json({error:error.message},{status:500});
- const results=[];
- for(const target of targets||[]){
+ const db=createAdminSupabase();let requestedId=null;try{requestedId=(await req.json())?.contentId||null}catch{}const {data:targets,error}=await db.rpc("claim_publish_targets",{p_limit:20});if(error)return Response.json({error:error.message},{status:500});
+ const claimed=requestedId?(targets||[]).filter(t=>t.content_id===requestedId):(targets||[]);const results=[];
+ for(const target of claimed){
   try{
    const {data:content}=await db.from("content_items").select("*").eq("id",target.content_id).single();
    const {data:connection}=await db.from("social_connections").select("*").eq("user_id",target.user_id).eq("provider",target.provider).eq("connected",true).limit(1).maybeSingle();
@@ -25,5 +25,5 @@ export async function POST(req){
    await db.rpc("refresh_content_publish_status",{p_content_id:target.content_id});results.push({id:target.id,provider:target.provider,status:retry?"retry":"failed",error:e.message});
   }
  }
- const failures=results.filter(x=>x.status!=="published");return Response.json({processed:results.length,results,ok:failures.length===0,error:failures[0]?.error||null},{status:failures.length?502:200});
+ if(requestedId&&!results.length)return Response.json({processed:0,results:[],ok:false,error:"La publication n’a pas été prise en charge par le moteur d’envoi."},{status:502});const failures=results.filter(x=>x.status!=="published");return Response.json({processed:results.length,results,ok:failures.length===0,error:failures[0]?.error||null},{status:failures.length?502:200});
 }
