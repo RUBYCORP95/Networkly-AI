@@ -16,3 +16,6 @@ create table if not exists public.admin_audit_log (
  created_at timestamptz default now()
 );
 alter table public.admin_audit_log enable row level security;
+
+
+insert into public.networkly_migrations(id,description) values ('admin_customer_management','Gestion clients administrateur') on conflict(id) do update set description=excluded.description,applied_at=now();
