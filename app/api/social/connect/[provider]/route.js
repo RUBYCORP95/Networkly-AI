@@ -1,8 +1,8 @@
 import {createServerSupabase} from "../../../../../lib/supabase/server";
 import {makeOAuthState} from "../../../../../lib/social/oauth-state";
 const cfg={
- instagram:{auth:"https://www.facebook.com/v24.0/dialog/oauth",client:"META_APP_ID",scope:"instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement"},
- facebook:{auth:"https://www.facebook.com/v24.0/dialog/oauth",client:"META_APP_ID",scope:"pages_show_list,pages_manage_posts,pages_read_engagement"},
+ instagram:{auth:"https://www.facebook.com/v24.0/dialog/oauth",client:"META_APP_ID",scope:"instagram_basic,instagram_content_publish,instagram_manage_insights,pages_show_list,pages_read_engagement,read_insights"},
+ facebook:{auth:"https://www.facebook.com/v24.0/dialog/oauth",client:"META_APP_ID",scope:"pages_show_list,pages_manage_posts,pages_read_engagement,read_insights"},
  tiktok:{auth:"https://www.tiktok.com/v2/auth/authorize/",client:"TIKTOK_CLIENT_KEY",scope:"user.info.basic,video.publish"}
 };
 export async function GET(req,{params}){
