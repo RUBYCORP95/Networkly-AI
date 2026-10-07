@@ -1,7 +1,11 @@
 import {createAdminSupabase} from "../../../../lib/supabase/admin";
 import {publishTarget} from "../../../../lib/social/runner";
+function authorized(req){
+ const auth=req.headers.get("authorization");
+ return !!process.env.CRON_SECRET&&auth==="Bearer "+process.env.CRON_SECRET;
+}
 export async function POST(req){
- if(req.headers.get("authorization")!=="Bearer "+process.env.CRON_SECRET)return Response.json({error:"Non autorisé"},{status:401});
+ if(!authorized(req))return Response.json({error:"Non autorisé"},{status:401});
  const db=createAdminSupabase();const {data:targets,error}=await db.rpc("claim_publish_targets",{p_limit:20});if(error)return Response.json({error:error.message},{status:500});
  const results=[];
  for(const target of targets||[]){
