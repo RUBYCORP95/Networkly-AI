@@ -13,6 +13,7 @@ export async function POST(req){
   const price=calculatePrice(settings||{},promoCode);
   const {data:profile}=await admin.from("profiles").select("*").eq("id",user.id).single();
   if(profile?.plan==="pro"&&profile?.subscription_status==="active")return Response.json({error:"Un abonnement Pro est déjà actif sur ce compte"},{status:409});
+  if(profile?.subscription_status==="payment_pending")return Response.json({error:"Un paiement est déjà en attente de confirmation"},{status:409});
   if(provider==="mollie"){
    let customerId=profile?.payment_provider==="mollie"?profile.provider_customer_id:null;
    if(!customerId){const customer=await createMollieCustomer({name:profile?.full_name||user.email,email:user.email});customerId=customer.id;await admin.from("profiles").update({payment_provider:"mollie",provider_customer_id:customerId}).eq("id",user.id)}
