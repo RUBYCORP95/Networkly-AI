@@ -6,8 +6,8 @@ function authorized(req){
 }
 export async function POST(req){
  if(!authorized(req))return Response.json({error:"Non autorisé"},{status:401});
- const db=createAdminSupabase();let requestedId=null;try{requestedId=(await req.json())?.contentId||null}catch{}const {data:targets,error}=await db.rpc("claim_publish_targets",{p_limit:20});if(error)return Response.json({error:error.message},{status:500});
- const claimed=requestedId?(targets||[]).filter(t=>t.content_id===requestedId):(targets||[]);const results=[];
+ const db=createAdminSupabase();let requestedId=null;try{requestedId=(await req.json())?.contentId||null}catch{}let targets=[];if(requestedId){const {data,error}=await db.from("publish_targets").select("*").eq("content_id",requestedId).eq("status","pending");if(error)return Response.json({error:error.message},{status:500});targets=data||[]}else{const claimedRpc=await db.rpc("claim_publish_targets",{p_limit:20});if(claimedRpc.error)return Response.json({error:claimedRpc.error.message},{status:500});targets=claimedRpc.data||[]}
+ const claimed=targets;const results=[];
  for(const target of claimed){
   try{
    const {data:content}=await db.from("content_items").select("*").eq("id",target.content_id).single();
