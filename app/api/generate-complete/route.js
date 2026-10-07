@@ -1,0 +1,9 @@
+export async function POST(request){
+ try{
+  const data=await request.json();const p=data.profile||{};const goal=String(data.goal||"").trim();if(goal.length<3)return Response.json({error:"Décris ton objectif."},{status:400});
+  if(!process.env.OPENAI_API_KEY)return Response.json({concept:"Mode démo : concept de publication premium autour de ton objectif.",caption:"Mode démo : configure OPENAI_API_KEY pour générer la légende complète.",visualPrompt:"Visuel social media premium, moderne, vertical, sans texte intégré"});
+  const instruction=`Tu es Networkly AI. Prépare UNE publication complète de marketing de réseau, sans promesse de revenus ou résultat garanti. Objectif: ${goal}. Réseau: ${data.network||"Instagram"}. Ton: ${data.tone||"Naturel"}. Société/activité: ${p.company||""} ${p.activity||""}. Cible: ${p.audience||""}. Retourne uniquement un JSON valide avec trois chaînes: concept, caption, visualPrompt. caption doit être directement publiable avec CTA pertinent. visualPrompt doit décrire uniquement le visuel à générer, sans logo ni texte incrusté.`;
+  const r=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${process.env.OPENAI_API_KEY}`},body:JSON.stringify({model:process.env.OPENAI_MODEL||"gpt-5-mini",input:instruction,text:{format:{type:"json_schema",name:"networkly_complete_post",strict:true,schema:{type:"object",properties:{concept:{type:"string"},caption:{type:"string"},visualPrompt:{type:"string"}},required:["concept","caption","visualPrompt"],additionalProperties:false}}}})});
+  const j=await r.json();if(!r.ok)throw new Error("Erreur du service IA");return Response.json(JSON.parse(j.output_text));
+ }catch(e){return Response.json({error:e.message||"Création impossible"},{status:500})}
+}
