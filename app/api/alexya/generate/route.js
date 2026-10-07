@@ -8,7 +8,7 @@ export async function POST(req){
   const job=kind==="video"
    ?await generateAlexyaVideo({prompt,aspectRatio:b.aspectRatio||"9:16",duration:Number(b.duration)||5,referenceImageUrls:referenceUrl?[referenceUrl]:[]})
    :await generateAlexyaImage({prompt,aspectRatio:b.aspectRatio||"1:1",imageUrls:referenceUrl?[referenceUrl]:[]});
-  const {data,error}=await s.from("ai_media_jobs").insert({user_id:user.id,external_id:job.id,media_kind:kind,prompt,status:job.status||"processing",poll_url:job.poll_url,credits_charged:job.credits_charged||null}).select().single();
-  if(error)throw error;return Response.json({job:data});
+  const {data,error}=await s.from("ai_media_jobs").insert({user_id:user.id,external_id:job.id,media_kind:kind,prompt,status:job.status||"processing",poll_url:job.poll_url,credits_charged:job.credits_charged||null}).select().limit(1);
+  if(error)throw error;const saved=Array.isArray(data)?data[0]:data;if(!saved)throw new Error("La génération a été lancée mais TESAMI n’a pas pu enregistrer son suivi.");return Response.json({job:saved});
  }catch(e){return Response.json({error:e.message||"Generation impossible"},{status:500})}
 }
