@@ -1,5 +1,8 @@
+import {createServerSupabase} from "../../../lib/supabase/server";
+import {requireActiveUser} from "../../../lib/auth/active-user";
 export async function POST(request){
  try{
+  const s=await createServerSupabase();const access=await requireActiveUser(s);if(!access.ok)return Response.json({error:access.error},{status:access.status});
   const data=await request.json();const p=data.profile||{};const goal=String(data.goal||"").trim();if(goal.length<3)return Response.json({error:"Décris ton objectif."},{status:400});
   if(!process.env.OPENAI_API_KEY)return Response.json({concept:"Mode démo : concept de publication premium autour de ton objectif.",caption:"Mode démo : configure OPENAI_API_KEY pour générer la légende complète.",visualPrompt:"Visuel social media premium, moderne, vertical, sans texte intégré"});
   const instruction=`Tu es Networkly AI. Prépare UNE publication complète de marketing de réseau, sans promesse de revenus ou résultat garanti. Objectif: ${goal}. Réseau: ${data.network||"Instagram"}. Ton: ${data.tone||"Naturel"}. Société/activité: ${p.company||""} ${p.activity||""}. Cible: ${p.audience||""}. Retourne uniquement un JSON valide avec trois chaînes: concept, caption, visualPrompt. caption doit être directement publiable avec CTA pertinent. visualPrompt doit décrire uniquement le visuel à générer, sans logo ni texte incrusté.`;
