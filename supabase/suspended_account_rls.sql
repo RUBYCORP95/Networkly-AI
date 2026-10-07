@@ -20,3 +20,6 @@ create policy "Active users delete own library" on public.media_library for dele
 
 drop policy if exists "Users insert own ai jobs" on public.ai_media_jobs;
 create policy "Active users insert own ai jobs" on public.ai_media_jobs for insert with check(auth.uid()=user_id and public.networkly_account_active(auth.uid()));
+
+
+insert into public.networkly_migrations(id,description) values ('suspended_account_rls','Restrictions des comptes suspendus') on conflict(id) do update set description=excluded.description,applied_at=now();
