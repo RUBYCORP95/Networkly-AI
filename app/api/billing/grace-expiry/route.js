@@ -9,7 +9,7 @@ export async function POST(req){
 
  const admin=createAdminSupabase();
  const now=new Date().toISOString();
- const {data,error}=await admin.from("profiles").select("id,payment_provider,provider_customer_id,subscription_id").eq("plan","pro").eq("subscription_status","past_due").lte("grace_period_ends_at",now);
+ const {data,error}=await admin.from("profiles").select("id,payment_provider,provider_customer_id,subscription_id").in("subscription_status",["past_due","grace_expired_cancel_pending"]).lte("grace_period_ends_at",now);
  if(error)return Response.json({error:error.message},{status:500});
 
  const downgraded=[];
