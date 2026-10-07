@@ -8,7 +8,7 @@ const networks=[
  {id:"facebook",label:"Facebook",Icon:Facebook},
  {id:"youtube",label:"YouTube",Icon:Youtube}
 ];
-const periods=["7 jours","30 jours","3 mois","1 an"];
+const periods=["1 jour","7 jours","30 jours","3 mois","1 an"];
 export default function Statistics(){
  const [network,setNetwork]=useState("all"),[period,setPeriod]=useState("30 jours");
  const current=networks.find(n=>n.id===network);
