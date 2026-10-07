@@ -1,6 +1,7 @@
 import {createServerSupabase} from "../../../../lib/supabase/server";
+import {requireActiveUser} from "../../../../lib/auth/active-user";
 export async function POST(req){
- const s=await createServerSupabase();const {data:{user}}=await s.auth.getUser();if(!user)return Response.json({error:"Connexion requise"},{status:401});
+ const s=await createServerSupabase();const access=await requireActiveUser(s);if(!access.ok)return Response.json({error:access.error},{status:access.status});const user=access.user;
  const b=await req.json();if(!b.id||!Array.isArray(b.networks)||!b.networks.length)return Response.json({error:"Choisis au moins un réseau."},{status:400});
  const {data:item}=await s.from("content_items").select("*").eq("id",b.id).eq("user_id",user.id).single();if(!item||item.status!=="draft")return Response.json({error:"Ce contenu n’est pas un brouillon."},{status:409});
  const {data:settings}=await s.from("user_publish_settings").select("publish_mode").eq("user_id",user.id).maybeSingle();const mode=b.publishMode||settings?.publish_mode||"approval";
