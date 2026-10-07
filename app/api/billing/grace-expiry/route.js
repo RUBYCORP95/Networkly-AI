@@ -30,6 +30,7 @@ export async function POST(req){
 
   const {error:updateError}=await admin.from("profiles").update({
    plan:"free",
+   account_status:"suspended",
    subscription_status:providerCancelled?"grace_expired":"grace_expired_cancel_pending",
    updated_at:now
   }).eq("id",x.id);
