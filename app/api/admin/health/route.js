@@ -6,8 +6,8 @@ export async function GET(){
  const a=createAdminSupabase();const checks=[];
  async function table(name){const {error}=await a.from(name).select("*",{head:true,count:"exact"}).limit(1);checks.push({name:"Table "+name,ok:!error,detail:error?.message||"OK"})}
  async function columns(name,cols){const {error}=await a.from(name).select(cols).limit(1);checks.push({name:name+" · "+cols,ok:!error,detail:error?.message||"OK"})}
- await table("profiles");await columns("profiles","account_status,is_admin,onboarding_completed,onboarding_step,payment_failed_at,grace_period_ends_at");
+ await table("networkly_migrations");await table("profiles");await columns("profiles","account_status,is_admin,onboarding_completed,onboarding_step,payment_failed_at,grace_period_ends_at");
  await table("content_items");await columns("content_items","scheduled_at,schedule_timezone,target_networks,publish_mode,is_ai_generated");
  await table("publish_targets");await table("social_connections");await table("media_library");await table("ai_media_jobs");await table("billing_events");await table("admin_customer_notes");await table("admin_audit_log");
- return Response.json({ok:checks.every(x=>x.ok),checks});
+ let migrations=[];const {data:m,error:me}=await a.from("networkly_migrations").select("id,description,applied_at").order("applied_at");if(!me)migrations=m||[];const expected=["onboarding","admin_customer_management","payment_grace_period","scheduled_at","suspended_account_rls"];const applied=new Set(migrations.map(x=>x.id));const missingMigrations=expected.filter(x=>!applied.has(x));return Response.json({ok:checks.every(x=>x.ok)&&missingMigrations.length===0,checks,migrations,missingMigrations});
 }
