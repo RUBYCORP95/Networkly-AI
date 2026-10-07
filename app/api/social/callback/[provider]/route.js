@@ -7,7 +7,7 @@ async function tiktok(code,redirect){
 }
 async function meta(code,redirect){
  const q=new URLSearchParams({client_id:process.env.META_APP_ID,client_secret:process.env.META_APP_SECRET,redirect_uri:redirect,code});
- const r=await fetch("https://graph.facebook.com/v24.0/oauth/access_token?"+q);const j=await r.json();if(!r.ok||j.error)throw new Error(j.error?.message||"Meta OAuth");return {access:j.access_token,expires:j.expires_in,id:null,scopes:[]};
+ const r=await fetch("https://graph.facebook.com/v24.0/oauth/access_token?"+q);const j=await r.json();if(!r.ok||j.error)throw new Error(j.error?.message||"Meta OAuth");const me=await fetch("https://graph.facebook.com/v24.0/me?fields=id,name&access_token="+encodeURIComponent(j.access_token));const mj=await me.json();if(!me.ok||mj.error)throw new Error(mj.error?.message||"Meta user");return {access:j.access_token,expires:j.expires_in,id:mj.id,scopes:[]};
 }
 export async function GET(req,{params}){
  try{
