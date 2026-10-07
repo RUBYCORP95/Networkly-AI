@@ -6,7 +6,7 @@ begin
  if coalesce(array_length(p_ids,1),0)=0 or coalesce(array_length(p_networks,1),0)=0 then raise exception 'missing_input'; end if;
  if p_publish_mode not in ('approval','automatic') then raise exception 'invalid_publish_mode'; end if;
  if exists(select 1 from unnest(p_networks) n where n not in ('instagram','facebook','tiktok')) then raise exception 'invalid_network'; end if;
- update public.content_items set status='planned',platform=array_to_string(p_networks,', '),target_networks=p_networks,publish_mode=p_publish_mode,updated_at=now()
+ update public.content_items set status='planned',platform=array_to_string(p_networks,', '),target_networks=p_networks,publish_mode=p_publish_mode,scheduled_at=((scheduled_date::text||' '||coalesce(scheduled_time,'00:00:00'::time)::text)::timestamp at time zone coalesce(schedule_timezone,'Europe/Paris')),updated_at=now()
  where user_id=v_user and id=any(p_ids) and status='draft';
  get diagnostics v_count=row_count;
  if v_count=0 then raise exception 'no_drafts'; end if;
