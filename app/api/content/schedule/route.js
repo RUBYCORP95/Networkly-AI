@@ -1,4 +1,5 @@
-import {createServerSupabase} from "../../../../lib/supabase/server";\nimport {requireActiveUser} from "../../../../lib/auth/active-user";
+import {createServerSupabase} from "../../../../lib/supabase/server";
+import {requireActiveUser} from "../../../../lib/auth/active-user";
 export async function POST(req){
  try{
   const s=await createServerSupabase();const access=await requireActiveUser(s);if(!access.ok)return Response.json({error:access.error},{status:access.status});const user=access.user;
