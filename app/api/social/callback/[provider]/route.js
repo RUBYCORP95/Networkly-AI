@@ -15,7 +15,8 @@ export async function GET(req,{params}){
   const s=await createServerSupabase();const {data:{user}}=await s.auth.getUser();if(!user)return Response.redirect(new URL("/login",req.url));const state=url.searchParams.get("state");if(!verifyOAuthState(state,user.id,provider))throw new Error("OAuth state invalide");
   const redirect=process.env.NEXT_PUBLIC_APP_URL+"/api/social/callback/"+provider;const t=provider==="tiktok"?await tiktok(code,redirect):await meta(code,redirect);
   const now=Date.now();const row={user_id:user.id,provider,provider_user_id:t.id,open_id:t.id,access_token_encrypted:encryptToken(t.access),refresh_token_encrypted:encryptToken(t.refresh),token_expires_at:t.expires?new Date(now+t.expires*1000).toISOString():null,refresh_expires_at:t.refreshExpires?new Date(now+t.refreshExpires*1000).toISOString():null,scopes:t.scopes,connected:true,updated_at:new Date().toISOString()};
-  const {error}=await s.from("social_connections").upsert(row,{onConflict:"user_id,provider,provider_user_id"});if(error)throw error;
+  const {data:existing,error:readError}=await s.from("social_connections").select("id").eq("user_id",user.id).eq("provider",provider).limit(1);if(readError)throw readError;
+  let error;if(existing?.length){({error}=await s.from("social_connections").update(row).eq("id",existing[0].id))}else{({error}=await s.from("social_connections").insert(row))}if(error)throw error;
   return Response.redirect(new URL("/social?connected="+provider,req.url));
  }catch(e){return Response.redirect(new URL("/social?error="+encodeURIComponent(e.message||"oauth"),req.url))}
 }
