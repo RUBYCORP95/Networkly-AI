@@ -1,1 +1,19 @@
-{"name":"networkly-ai","version":"0.2.0","private":true,"scripts":{"dev":"next dev","build":"next build","start":"next start"},"dependencies":{"@supabase/ssr":"^0.7.0","@supabase/supabase-js":"^2.57.4","lucide-react":"^0.468.0","next":"15.5.4","react":"19.1.0","react-dom":"19.1.0"}}
+{
+  "name": "networkly-ai",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "check": "node --check lib/payments/paypal.js && node --check app/api/webhooks/paypal/route.js && node --check app/api/webhooks/mollie/route.js && node --check app/api/billing/grace-expiry/route.js && node --check app/api/billing/checkout/route.js"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.7.0",
+    "@supabase/supabase-js": "^2.57.4",
+    "lucide-react": "^0.468.0",
+    "next": "15.5.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  }
+}
