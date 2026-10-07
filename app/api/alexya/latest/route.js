@@ -1,4 +1,4 @@
-import {createServerSupabase} from "../../../../../lib/supabase/server";
+import {createServerSupabase} from "../../../../lib/supabase/server";
 export async function GET(){
  try{
   const s=await createServerSupabase();
