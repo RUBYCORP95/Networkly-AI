@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "check": "node --check lib/payments/paypal.js && node --check app/api/webhooks/paypal/route.js && node --check app/api/webhooks/mollie/route.js && node --check app/api/billing/grace-expiry/route.js && node --check app/api/billing/checkout/route.js && node --check app/api/generate/route.js && node --check app/api/generate-complete/route.js && node --check app/api/content/schedule/route.js && node --check app/api/publish/run/route.js && node --check lib/social/runner.js"
+    "check": "node --check lib/payments/paypal.js && node --check app/api/webhooks/paypal/route.js && node --check app/api/webhooks/mollie/route.js && node --check app/api/billing/grace-expiry/route.js && node --check app/api/billing/checkout/route.js && node --check app/api/generate/route.js && node --check app/api/generate-complete/route.js && node --check app/api/content/schedule/route.js && node --check app/api/content/import/route.js && node --check app/api/content/week/route.js && node --check app/api/content/activate/route.js && node --check app/api/content/activate-batch/route.js && node --check app/api/content/manage/route.js && node --check app/api/publish/approve/route.js && node --check app/api/publish/retry/route.js && node --check app/api/publish/run/route.js && node --check lib/social/runner.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
