@@ -7,7 +7,8 @@ export async function POST(req){
   const payment=await getMolliePayment(id);const admin=createAdminSupabase();let userId=payment.metadata?.userId;
   if(!userId&&payment.subscriptionId){const {data:owner}=await admin.from("profiles").select("id").eq("payment_provider","mollie").eq("subscription_id",payment.subscriptionId).maybeSingle();userId=owner?.id}
   if(!userId&&payment.customerId){const {data:owner}=await admin.from("profiles").select("id").eq("payment_provider","mollie").eq("provider_customer_id",payment.customerId).maybeSingle();userId=owner?.id}
-  if(!userId)return new Response("ok");await admin.from("billing_events").upsert({user_id:userId,provider:"mollie",provider_event_id:String(payment.id||id),event_type:"payment",status:payment.status,amount:Number(payment.amount?.value||0),currency:payment.amount?.currency||"EUR",subscription_id:payment.subscriptionId||null},{onConflict:"provider,provider_event_id,event_type"});
+  if(!userId)return new Response("ok");const {data:current}=await admin.from("profiles").select("subscription_id").eq("id",userId).single();await admin.from("billing_events").upsert({user_id:userId,provider:"mollie",provider_event_id:String(payment.id||id),event_type:"payment",status:payment.status,amount:Number(payment.amount?.value||0),currency:payment.amount?.currency||"EUR",subscription_id:payment.subscriptionId||null},{onConflict:"provider,provider_event_id,event_type"});
+  if(payment.subscriptionId&&current?.subscription_id&&payment.subscriptionId!==current.subscription_id)return new Response("ok");
   if(payment.status==="paid"){
    const {data:p}=await admin.from("profiles").select("*").eq("id",userId).single();
    let subscriptionId=p?.subscription_id;
