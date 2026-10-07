@@ -3,7 +3,7 @@ import {useEffect,useState} from "react";
 import {Check,Sparkles,Users,Share2} from "lucide-react";
 export default function Onboarding(){
  const [step,setStep]=useState(1),[profile,setProfile]=useState({full_name:"",company:"",activity:"",audience:"",tone:"Naturel"}),[social,setSocial]=useState([]),[msg,setMsg]=useState("");
- useEffect(()=>{fetch("/api/onboarding").then(r=>r.json()).then(j=>{if(j.profile){setProfile(x=>({...x,...j.profile}));setStep(j.profile.onboarding_step||1)}setSocial(j.social||[])})},[]);
+ useEffect(()=>{fetch("/api/onboarding").then(r=>{if(r.status===401){location.href="/login";return null}return r.json()}).then(j=>{if(!j)return;if(j.profile?.onboarding_completed){location.href="/";return}if(j.profile){setProfile(x=>({...x,...j.profile}));setStep(j.profile.onboarding_step||1)}setSocial(j.social||[])})},[]);
  async function saveProfile(){if(!profile.company&&!profile.activity){setMsg("Indique au moins ton activité ou ta société.");return}const r=await fetch("/api/onboarding",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({step:2,profile})});if(r.ok){setStep(2);setMsg("")}}
  async function nextCreation(){await fetch("/api/onboarding",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({step:3})});setStep(3)}
  async function finish(){await fetch("/api/onboarding",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({completed:true,step:3})});location.href="/ai-media"}
