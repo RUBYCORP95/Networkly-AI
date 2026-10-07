@@ -30,5 +30,16 @@ async function expireGrace(db){
   const {data:u}=await db.auth.admin.getUserById(x.id);if(u?.user?.email)await syncKlaviyoBilling({email:u.user.email,userId:x.id,status:providerCancelled?"grace_expired":"grace_expired_cancel_pending",plan:"free"}).catch(()=>null);
  }return count;
 }
-export async function GET(req){if(!authorized(req))return Response.json({error:"Non autorisé"},{status:401});const db=createAdminSupabase();try{const [published,expired]=await Promise.all([publishDue(db),expireGrace(db)]);return Response.json({ok:true,published:published.length,publishResults:published,expiredGrace:expired})}catch(e){return Response.json({error:e.message||"Cron impossible"},{status:500})}}
+export async function GET(req){
+ if(!authorized(req))return Response.json({error:"Non autorisé"},{status:401});
+ const db=createAdminSupabase();
+ const [publishJob,billingJob]=await Promise.allSettled([publishDue(db),expireGrace(db)]);
+ const published=publishJob.status==="fulfilled"?publishJob.value:[];
+ const expired=billingJob.status==="fulfilled"?billingJob.value:0;
+ const errors={};
+ if(publishJob.status==="rejected")errors.publishing=publishJob.reason?.message||"Publication impossible";
+ if(billingJob.status==="rejected")errors.billing=billingJob.reason?.message||"Traitement facturation impossible";
+ const ok=Object.keys(errors).length===0;
+ return Response.json({ok,partial:!ok&&(publishJob.status==="fulfilled"||billingJob.status==="fulfilled"),published:published.length,publishResults:published,expiredGrace:expired,errors}, {status:ok?200:207});
+}
 export const POST=GET;
