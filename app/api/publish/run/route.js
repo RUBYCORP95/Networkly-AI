@@ -22,8 +22,8 @@ export async function POST(req){
   }catch(e){
    const retry=target.attempts<3;await db.from("publish_targets").update({status:retry?"retry":"failed",last_error:e.message,updated_at:new Date().toISOString()}).eq("id",target.id);
    await db.from("publish_logs").insert({user_id:target.user_id,content_id:target.content_id,provider:target.provider,status:retry?"retry":"failed",error_message:e.message});
-   await db.rpc("refresh_content_publish_status",{p_content_id:target.content_id});results.push({id:target.id,provider:target.provider,status:retry?"retry":"failed"});
+   await db.rpc("refresh_content_publish_status",{p_content_id:target.content_id});results.push({id:target.id,provider:target.provider,status:retry?"retry":"failed",error:e.message});
   }
  }
- return Response.json({processed:results.length,results});
+ const failures=results.filter(x=>x.status!=="published");return Response.json({processed:results.length,results,ok:failures.length===0,error:failures[0]?.error||null},{status:failures.length?502:200});
 }
