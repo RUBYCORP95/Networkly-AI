@@ -1,7 +1,12 @@
 "use client";
 import {useEffect,useState} from "react";
 import {Sparkles,Plus,Trash2,Library,CalendarClock} from "lucide-react";
-function newCard(i,subject=""){return {id:Date.now()+i,title:"Story "+(i+1),prompt:subject?`Story Instagram verticale 9:16, slide ${i+1}, sur : ${subject}`:"",job:null,busy:false,msg:"",credits:null}}
+function storyPrompt(i,subject=""){const roles=[
+"OUVERTURE — crée une accroche visuelle forte qui introduit le sujet et donne envie de voir la suite",
+"DÉVELOPPEMENT — montre une idée, un détail, un conseil ou une scène différente qui apporte de la valeur sans répéter la première story",
+"CONCLUSION / CTA — termine la séquence avec une scène différente et une invitation claire à réagir, répondre ou passer à l’action"
+];const role=roles[i]||`SUITE ${i+1} — fais progresser naturellement l’histoire avec une nouvelle scène, un nouvel angle et sans répéter les cartes précédentes`;return subject?`Story Instagram verticale 9:16. Sujet global : ${subject}. Rôle de cette carte : ${role}. Crée uniquement le visuel de cette carte, cohérent avec la même séquence mais avec une composition et une scène distinctes.`:""}
+function newCard(i,subject=""){return {id:Date.now()+i,title:"Story "+(i+1),prompt:storyPrompt(i,subject),job:null,busy:false,msg:"",credits:null}}
 export default function Stories(){
  const [cards,setCards]=useState([]),[subject,setSubject]=useState(""),[balance,setBalance]=useState(null);
  useEffect(()=>{const q=new URLSearchParams(location.search),s=q.get("subject")||q.get("goal")||"";setSubject(s);setCards([newCard(0,s),newCard(1,s),newCard(2,s)]);fetch("/api/credits").then(r=>r.json()).then(j=>setBalance(j.balance??j.credits??null)).catch(()=>{})},[]);
