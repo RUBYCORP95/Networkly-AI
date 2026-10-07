@@ -10,7 +10,7 @@ export async function POST(req){
    const {data:connection}=await db.from("social_connections").select("*").eq("user_id",target.user_id).eq("provider",target.provider).eq("connected",true).limit(1).maybeSingle();
    if(!content||!connection)throw new Error("Réseau non connecté");
    const {data:signed,error:signError}=await db.storage.from("content-media").createSignedUrl(content.media_path,600);if(signError||!signed?.signedUrl)throw new Error("Média indisponible");
-   const media=await fetch(signed.signedUrl);if(!media.ok)throw new Error("Lecture média impossible");const bytes=await media.arrayBuffer();const type=content.media_type||media.headers.get("content-type")||"application/octet-stream";
+   let bytes=null;let type=content.media_type||"application/octet-stream";if(target.provider==="tiktok"){const media=await fetch(signed.signedUrl);if(!media.ok)throw new Error("Lecture média impossible");bytes=await media.arrayBuffer();type=content.media_type||media.headers.get("content-type")||type}
    const out=await publishTarget({db,target,content,connection,mediaUrl:signed.signedUrl,mediaBytes:bytes,mediaType:type});
    const now=new Date().toISOString();await db.from("publish_targets").update({status:"published",provider_post_id:out.id||null,published_at:now,last_error:null,updated_at:now}).eq("id",target.id);
    await db.from("publish_logs").insert({user_id:target.user_id,content_id:target.content_id,provider:target.provider,status:"published",provider_post_id:out.id||null});
