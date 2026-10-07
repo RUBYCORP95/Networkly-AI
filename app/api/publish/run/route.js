@@ -18,7 +18,7 @@ export async function POST(req){
    const out=await publishTarget({db,target,content,connection,mediaUrl:signed.signedUrl,mediaBytes:bytes,mediaType:type});
    if(!out?.id)throw new Error("Instagram/Meta n’a renvoyé aucun identifiant de publication");const now=new Date().toISOString();await db.from("publish_targets").update({status:"published",provider_post_id:out.id||null,published_at:now,last_error:null,updated_at:now}).eq("id",target.id);
    await db.from("publish_logs").insert({user_id:target.user_id,content_id:target.content_id,provider:target.provider,status:"published",provider_post_id:out.id||null});
-   await db.rpc("refresh_content_publish_status",{p_content_id:target.content_id});results.push({id:target.id,provider:target.provider,status:"published",providerPostId:out.id});
+   await db.rpc("refresh_content_publish_status",{p_content_id:target.content_id});results.push({id:target.id,provider:target.provider,status:"published",providerPostId:out.id,username:out.username||null,permalink:out.permalink||null});
   }catch(e){
    const retry=target.attempts<3;await db.from("publish_targets").update({status:retry?"retry":"failed",last_error:e.message,updated_at:new Date().toISOString()}).eq("id",target.id);
    await db.from("publish_logs").insert({user_id:target.user_id,content_id:target.content_id,provider:target.provider,status:retry?"retry":"failed",error_message:e.message});
