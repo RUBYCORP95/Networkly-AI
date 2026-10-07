@@ -21,7 +21,7 @@ export async function POST(){
    await cancelPayPalSubscription({subscriptionId:p.subscription_id,reason:"Cancelled by customer"});
   }else return Response.json({error:"Prestataire d’abonnement inconnu"},{status:409});
   const now=new Date().toISOString();
-  const {error:updateError}=await admin.from("profiles").update({plan:"free",subscription_status:"cancelled",payment_failed_at:null,grace_period_ends_at:null,updated_at:now}).eq("id",user.id);
+  const {error:updateError}=await admin.from("profiles").update({plan:"free",subscription_status:"cancelled",subscription_id:null,payment_failed_at:null,grace_period_ends_at:null,updated_at:now}).eq("id",user.id);
   if(updateError)throw updateError;
   if(user.email)await syncKlaviyoBilling({email:user.email,userId:user.id,status:"cancelled",plan:"free"}).catch(()=>null);
   return Response.json({ok:true});
