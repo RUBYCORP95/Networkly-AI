@@ -4,6 +4,12 @@ returns setof public.publish_targets
 language plpgsql security definer set search_path=public
 as $$
 begin
+ -- Récupère automatiquement les publications réservées par un worker interrompu.
+ update public.publish_targets set status='retry',last_error='Publication interrompue, nouvelle tentative automatique',updated_at=now()
+ where status='publishing' and updated_at < now()-interval '15 minutes' and attempts < 3;
+ update public.publish_targets set status='failed',last_error='Publication interrompue après plusieurs tentatives',updated_at=now()
+ where status='publishing' and updated_at < now()-interval '15 minutes' and attempts >= 3;
+
  return query
  update public.publish_targets t set status='publishing',attempts=t.attempts+1,updated_at=now()
  where t.id in (
@@ -21,3 +27,5 @@ begin
 end;$$;
 revoke all on function public.claim_publish_targets(integer) from public,anon,authenticated;
 grant execute on function public.claim_publish_targets(integer) to service_role;
+
+insert into public.networkly_migrations(id,description) values ('publish_claim_recovery','Récupération des publications bloquées') on conflict(id) do update set description=excluded.description,applied_at=now();
