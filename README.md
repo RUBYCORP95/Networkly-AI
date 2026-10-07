@@ -50,9 +50,9 @@ Klaviyo est nécessaire pour la synchronisation marketing des inscriptions.
 2. Configurer toutes les variables d'environnement sur l'hébergeur.
 3. Définir `NEXT_PUBLIC_APP_URL` avec l'URL HTTPS de l'application.
 4. Ajouter les callbacks OAuth correspondants dans Meta et TikTok.
-5. Configurer le déclenchement régulier de `/api/publish/run` avec `CRON_SECRET`.
+5. Configurer le déclenchement régulier de `/api/cron/run` avec `CRON_SECRET`. Ce cron unique traite les publications programmées et l'expiration du délai de grâce des paiements.
 6. Exécuter `npm run check` puis `npm run build`.
-7. Depuis un compte administrateur, vérifier `/api/admin/health` avant d'ouvrir les tests utilisateurs.
+7. Depuis un compte administrateur, vérifier `/api/admin/health` avant d'ouvrir les tests utilisateurs. Le diagnostic doit retourner `ok: true` et aucune migration requise manquante.
 
 ## Sécurité
 
