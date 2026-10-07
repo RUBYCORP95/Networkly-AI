@@ -2,10 +2,10 @@
 import {useEffect,useState} from "react";
 import {Sparkles,Plus,Trash2,Library,CalendarClock} from "lucide-react";
 function storyPrompt(i,subject=""){const roles=[
-"OUVERTURE — crée une accroche visuelle forte qui introduit le sujet et donne envie de voir la suite",
-"DÉVELOPPEMENT — montre une idée, un détail, un conseil ou une scène différente qui apporte de la valeur sans répéter la première story",
-"CONCLUSION / CTA — termine la séquence avec une scène différente et une invitation claire à réagir, répondre ou passer à l’action"
-];const role=roles[i]||`SUITE ${i+1} — fais progresser naturellement l’histoire avec une nouvelle scène, un nouvel angle et sans répéter les cartes précédentes`;return subject?`Story Instagram verticale 9:16. Sujet global : ${subject}. Rôle de cette carte : ${role}. Crée uniquement le visuel de cette carte, cohérent avec la même séquence mais avec une composition et une scène distinctes.`:""}
+"OUVERTURE — introduis le sujet et le personnage/objet principal. Établis l’univers visuel qui devra rester identique dans toute la séquence",
+"DÉVELOPPEMENT — poursuis exactement la même histoire, avec le même personnage/objet principal, le même univers, la même palette et le même style. Fais évoluer seulement l’action ou le cadrage",
+"CONCLUSION / CTA — termine la même histoire avec le même personnage/objet principal et la même identité visuelle. La scène doit clairement sembler être la suite des deux cartes précédentes"
+];const role=roles[i]||`SUITE ${i+1} — fais progresser naturellement l’histoire avec une nouvelle scène, un nouvel angle et sans répéter les cartes précédentes`;return subject?`Story Instagram verticale 9:16. Sujet global : ${subject}. Rôle de cette carte : ${role}. Cette carte appartient à UNE SEULE séquence continue. Conserve impérativement les mêmes personnages, leur apparence, les mêmes objets clés, le même lieu ou univers, la même palette, la même lumière et le même style graphique d’une carte à l’autre. Fais évoluer l’action et le cadrage sans repartir sur un nouveau concept.`:""}
 function newCard(i,subject=""){return {id:Date.now()+i,title:"Story "+(i+1),prompt:storyPrompt(i,subject),job:null,busy:false,msg:"",credits:null}}
 export default function Stories(){
  const [cards,setCards]=useState([]),[subject,setSubject]=useState(""),[balance,setBalance]=useState(null);
