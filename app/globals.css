@@ -138,3 +138,19 @@ input:focus,select:focus,textarea:focus{border-color:#a789ff;box-shadow:0 0 0 3p
 .appframe .tesami-logout{display:flex;align-items:center;gap:10px;width:100%;margin-top:12px;padding:12px;border:1px solid #e9ddff;border-radius:12px;background:#faf7ff;color:#6d3cce;font:inherit;font-size:13px;font-weight:750;cursor:pointer;text-align:left;transition:background .15s,border-color .15s}
 .appframe .tesami-logout:hover{background:#eee4ff;border-color:#bea4f9}
 .appframe .tesami-logout:focus-visible{outline:3px solid #b69af7;outline-offset:2px}
+
+/* TESAMI premium sign-out dialog */
+.tesami-modal-backdrop{position:fixed;inset:0;z-index:10000;background:rgba(27,17,56,.55);backdrop-filter:blur(7px);display:grid;place-items:center;padding:20px}
+.tesami-logout-dialog{width:min(440px,100%);background:#fff;border:1px solid #eee8ff;border-radius:26px;padding:32px;text-align:center;box-shadow:0 30px 90px rgba(32,17,82,.27);animation:tesami-dialog-enter .2s ease-out}
+.tesami-dialog-icon{width:64px;height:64px;border-radius:20px;display:grid;place-items:center;margin:0 auto 19px;background:linear-gradient(135deg,#eee7ff,#f9e8ff);color:#7749e6}
+.tesami-logout-dialog h2{margin:0 0 11px;font-size:24px;letter-spacing:-.035em;color:#251b45}
+.tesami-logout-dialog>p{font-size:14px;line-height:1.65;color:#716985;margin:0 0 25px}
+.tesami-dialog-actions{display:flex;gap:10px}
+.tesami-dialog-actions button{flex:1;padding:13px 10px;border-radius:12px;font-weight:750;font-size:13px;cursor:pointer;transition:transform .15s,background .15s}
+.tesami-dialog-actions button:hover:not(:disabled){transform:translateY(-1px)}
+.tesami-dialog-actions button:disabled{opacity:.6;cursor:wait}
+.tesami-dialog-cancel{background:#f5f1ff;border:1px solid #e7defb;color:#6243a7}
+.tesami-dialog-confirm{background:linear-gradient(115deg,#7849e9,#a258ed);border:1px solid transparent;color:white}
+.tesami-logout-dialog .tesami-dialog-error{background:#fff1f3;color:#a72b48;padding:10px;border-radius:10px;margin:0 0 14px}
+@keyframes tesami-dialog-enter{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:460px){.tesami-logout-dialog{padding:24px}.tesami-dialog-actions{flex-direction:column}}
