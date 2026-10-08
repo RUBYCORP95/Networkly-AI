@@ -198,3 +198,15 @@ main.tesami-pricing{display:block!important;grid-template-columns:none!important
 .tesami-weeks-control{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:18px;flex-wrap:wrap}.tesami-weeks-label{font-size:12px;font-weight:700;color:#847992}.tesami-weeks-stepper{display:inline-flex;align-items:center;padding:4px;background:#f5f0ff;border:1px solid #e5d9fb;border-radius:14px}.tesami-weeks-stepper strong{min-width:105px;text-align:center;color:#37215e;font-size:13px;font-weight:800}.tesami-weeks-stepper button{width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:10px;background:#fff;color:#7846df;font-size:20px;font-weight:700;cursor:pointer}.tesami-weeks-stepper button:disabled{opacity:.35;cursor:not-allowed}
 
 .tesami-calendar-period{display:flex;align-items:center;justify-content:center;gap:13px;min-width:0;flex-wrap:wrap}.tesami-calendar-period h2{text-align:center;font-size:clamp(16px,2vw,23px);letter-spacing:-.025em}.tesami-period-arrow{width:34px;height:34px;flex-shrink:0;border:1px solid #e7dcfa;background:#f7f2ff;border-radius:10px;color:#7545d8;font-size:26px;line-height:1;cursor:pointer}.tesami-period-arrow:hover{background:#eae0ff}
+
+.tesami-status-legend{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 16px}
+.tesami-status-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid var(--status-border,#e5e7eb);background:var(--status-bg,#f9fafb);color:var(--status-color,#64748b);border-radius:999px;font-size:11px;font-weight:750}
+.tesami-status-chip i{display:block;width:8px;height:8px;border-radius:50%;background:var(--status-color,#64748b)}
+.status-draft{--status-bg:#f1f3f6;--status-border:#dce0e7;--status-color:#667085}
+.status-scheduled{--status-bg:#eaf2ff;--status-border:#b9d3ff;--status-color:#245fd2}
+.status-approval{--status-bg:#fff3df;--status-border:#f6d59d;--status-color:#a9680b}
+.status-publishing{--status-bg:#f2eaff;--status-border:#d9c4ff;--status-color:#793de0}
+.status-published{--status-bg:#e8f8ed;--status-border:#b2e6c3;--status-color:#168449}
+.status-failed{--status-bg:#ffebec;--status-border:#f5bfc4;--status-color:#c32c3b}
+.tesami-calendar-event[class*="status-"]{background:var(--status-bg)!important;border:1px solid var(--status-border)!important;border-left:4px solid var(--status-color)!important;color:#222b45!important}
+.tesami-event-status{display:inline-block;margin-top:7px;padding:3px 7px;border-radius:6px;background:var(--status-bg);color:var(--status-color);border:1px solid var(--status-border);font-size:10px;font-weight:800}
