@@ -91,3 +91,25 @@ input:focus,select:focus,textarea:focus{border-color:#a789ff;box-shadow:0 0 0 3p
 .authwrap{background:radial-gradient(circle at 50% 0,#eee7ff,transparent 45%),#faf9ff}
 @media(max-width:800px){.appframe aside{display:flex;height:auto;position:static;padding:16px}.appframe aside nav{grid-template-columns:repeat(2,minmax(0,1fr))}.appframe aside nav b{grid-column:1/-1}.appframe aside .brand{margin-bottom:12px}.appframe aside .plan{display:none}}
 @media(prefers-reduced-motion:reduce){.quickactions a,input,select,textarea{transition:none}}
+
+
+/* TESAMI dashboard welcome and quick navigation */
+.tesami-overview{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;margin:0 0 32px}
+.tesami-welcome{background:linear-gradient(120deg,#5830cf 0%,#8544ef 55%,#b950e7 100%);border-radius:23px;padding:30px;color:#fff;position:relative;overflow:hidden;box-shadow:0 16px 36px #6941dc25}
+.tesami-welcome:after{content:"✦";position:absolute;right:25px;top:5px;font-size:130px;color:#ffffff14;pointer-events:none}
+.tesami-sparkle{font-size:11px;font-weight:800;letter-spacing:.14em;color:#f5dcff}
+.tesami-welcome h2{color:#fff;font-size:28px;line-height:1.15;max-width:370px;margin:16px 0 10px}
+.tesami-welcome p{color:#f0e8ff;max-width:410px;font-size:14px;line-height:1.55}
+.tesami-welcome-actions{display:flex;align-items:center;flex-wrap:wrap;gap:15px;margin-top:22px}
+.tesami-welcome-actions a{color:#fff;text-decoration:none;font-weight:700;font-size:13px;position:relative;z-index:1}
+.tesami-welcome-actions a:first-child{background:#fff;color:#663bd9;border-radius:11px;padding:12px 17px}
+.tesami-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.tesami-shortcuts a{display:flex;flex-direction:column;gap:7px;text-decoration:none;color:#22204b;background:#fff;border:1px solid #eae6f8;border-radius:19px;padding:19px;transition:transform .18s,box-shadow .18s}
+.tesami-shortcuts a:hover{transform:translateY(-2px);box-shadow:0 12px 28px #6e49e01a}
+.tesami-shortcuts span{display:grid;place-items:center;width:35px;height:35px;border-radius:11px;background:#f0e9ff;color:#7947ef;font-size:20px}
+.tesami-shortcuts a:nth-child(2) span{background:#eaf2ff;color:#2877ee}
+.tesami-shortcuts a:nth-child(3) span{background:#fff0f4;color:#ec4c82}
+.tesami-shortcuts a:nth-child(4) span{background:#e8faf4;color:#169a79}
+.tesami-shortcuts strong{font-size:14px}.tesami-shortcuts small{font-size:12px;color:#797b96}
+@media(max-width:1050px){.tesami-overview{grid-template-columns:1fr}}
+@media(max-width:520px){.tesami-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}.tesami-welcome{padding:24px}.tesami-welcome h2{font-size:24px}.tesami-shortcuts a{padding:13px}}
