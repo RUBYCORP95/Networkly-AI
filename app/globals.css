@@ -58,3 +58,36 @@ aside{background:var(--dark);padding:30px 22px}.brand{letter-spacing:.08em;font-
 @media(max-width:1050px){.quickactions{grid-template-columns:repeat(2,1fr)}.dashboardcontent{padding:36px 30px}.appframe .grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:800px){.appframe aside{position:static;height:auto}.dashboardcontent{padding:26px 18px}.quickactions{grid-template-columns:1fr 1fr}.appframe .grid{grid-template-columns:1fr}.dashboardheader h1{font-size:31px}}
 @media(max-width:520px){.quickactions{grid-template-columns:1fr}}
+
+
+/* TESAMI 2026 — light lavender visual refresh */
+:root{--ink:#171747;--muted:#737694;--line:#e9e8f6;--paper:#fff;--canvas:#f8f9ff;--accent:#7545f8;--accent-soft:#f0ebff;--dark:#24165b}
+body{background:radial-gradient(circle at 88% 0%,#f1e9ff 0,transparent 32%),var(--canvas);color:var(--ink)}
+aside{background:linear-gradient(180deg,#fff 0%,#f5f3ff 100%);color:#202052;border-right:1px solid #e9e5fa}
+.brand{color:#19194f;letter-spacing:.035em}.brand span{background:linear-gradient(135deg,#7043ff,#c43af4);color:white;border-radius:13px}
+nav b{color:#9a94b5}nav a{color:#555578}nav a:hover{background:#eee9ff;color:#5e35d7}
+.active,.appframe nav a.active{background:linear-gradient(100deg,#6940f6,#954bff)!important;color:#fff!important;box-shadow:0 6px 16px #784af62b}
+.plan{background:linear-gradient(135deg,#f2eaff,#eae9ff);border:1px solid #e5dcff;color:#2e2165}.appframe .plan small,.appframe .plan span{color:#71638d}
+.eyebrow{color:#7545f8!important}
+h1,h2,h3{color:#171747}
+.card,.composer,.admincard,.authbox,.onboardingcard,.contentday,.mediacard{background:#fff;border:1px solid #ebe9f7;box-shadow:0 10px 35px #3d2d8010;border-radius:20px}
+.card:hover,.quickactions a:hover{border-color:#d9caff;box-shadow:0 12px 28px #7654e41b}
+.card svg,.sectiontitle>svg{color:#7950f5}
+.generate,.paypalbtn:not(.paypalbtn),.onboardingfooter .generate{background:linear-gradient(110deg,#6e42fa,#ae41ef);color:white;border:0;box-shadow:0 6px 16px #8652f52b}
+.generate:hover{filter:brightness(1.06)}
+.linkbtn{color:#7045eb}.notice,.result,.pricepreview{background:#f4efff;color:#45327f;border-color:#e6dcff}
+input:focus,select:focus,textarea:focus{border-color:#a789ff;box-shadow:0 0 0 3px #8256f51a}
+.quickactions a{border-color:#eae6f8;background:linear-gradient(135deg,#fff,#fbfaff);box-shadow:0 6px 20px #3d2d8009}
+.quickactions a:nth-child(1) span{background:#ede6ff;color:#6d42f8}
+.quickactions a:nth-child(2) span{background:#ffe8ee;color:#f04375}
+.quickactions a:nth-child(3) span{background:#e4efff;color:#2678ee}
+.quickactions a:nth-child(4) span{background:#f4e6ff;color:#a141e8}
+.quickactions span{background:#efe9ff;color:#7044ee}
+.badges span{background:#f0eaff;color:#7044e8}
+.typepicker button.active{background:#f0eaff;border-color:#b79aff;color:#643bd7}
+.networkdot{background:#f0eaff}.networkdot:after{background:#7545f8}
+.confirmicon,.stepicon{background:#efeaff;color:#7044e8}
+.onboardingsteps .active span{background:#7545f8;border-color:#7545f8}
+.authwrap{background:radial-gradient(circle at 50% 0,#eee7ff,transparent 45%),#faf9ff}
+@media(max-width:800px){.appframe aside{display:flex;height:auto;position:static;padding:16px}.appframe aside nav{grid-template-columns:repeat(2,minmax(0,1fr))}.appframe aside nav b{grid-column:1/-1}.appframe aside .brand{margin-bottom:12px}.appframe aside .plan{display:none}}
+@media(prefers-reduced-motion:reduce){.quickactions a,input,select,textarea{transition:none}}
