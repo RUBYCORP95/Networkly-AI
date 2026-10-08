@@ -133,3 +133,8 @@ input:focus,select:focus,textarea:focus{border-color:#a789ff;box-shadow:0 0 0 3p
 .calendarpage .contentday{border-radius:20px}
 .calendarpage .weekgrid{gap:18px}
 @media(max-width:850px){.tesami-calendar-grid{grid-template-columns:repeat(7,minmax(135px,1fr))!important}.calendarpage{padding:18px}.calendarpage header{flex-wrap:wrap;gap:12px}}
+
+/* Visible account sign-out */
+.appframe .tesami-logout{display:flex;align-items:center;gap:10px;width:100%;margin-top:12px;padding:12px;border:1px solid #e9ddff;border-radius:12px;background:#faf7ff;color:#6d3cce;font:inherit;font-size:13px;font-weight:750;cursor:pointer;text-align:left;transition:background .15s,border-color .15s}
+.appframe .tesami-logout:hover{background:#eee4ff;border-color:#bea4f9}
+.appframe .tesami-logout:focus-visible{outline:3px solid #b69af7;outline-offset:2px}
