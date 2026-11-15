@@ -49,3 +49,20 @@ create policy "lead assignments own select" on public.lead_assignments for selec
 create policy "lead organizations assigned select" on public.lead_organizations for select to authenticated using(exists(select 1 from public.lead_assignments a where a.organization_id=id and a.user_id=auth.uid()));
 -- Assignment and organization writes are reserved for server-side service role.
 -- Suppressions are deliberately inaccessible to client roles.
+
+-- Atomic, idempotent assignment: only one consultant can claim an organization.
+create or replace function public.claim_lead_for_user(p_organization_id uuid,p_user_id uuid,p_daily_quota integer)
+returns boolean language plpgsql security definer set search_path=public as $$
+declare n integer;
+begin
+ if auth.role() <> 'service_role' then raise exception 'service role required'; end if;
+ if p_daily_quota < 1 or p_daily_quota > 20 then return false; end if;
+ perform pg_advisory_xact_lock(hashtext(p_user_id::text));
+ select count(*) into n from public.lead_assignments where user_id=p_user_id and assigned_at >= date_trunc('day',now());
+ if n >= p_daily_quota then return false; end if;
+ if exists(select 1 from public.lead_suppressions where organization_id=p_organization_id) then return false; end if;
+ insert into public.lead_assignments(organization_id,user_id) values(p_organization_id,p_user_id) on conflict(organization_id) do nothing;
+ return found;
+end; $$;
+revoke all on function public.claim_lead_for_user(uuid,uuid,integer) from public,anon,authenticated;
+grant execute on function public.claim_lead_for_user(uuid,uuid,integer) to service_role;
