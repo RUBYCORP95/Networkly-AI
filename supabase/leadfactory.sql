@@ -66,3 +66,18 @@ begin
 end; $$;
 revoke all on function public.claim_lead_for_user(uuid,uuid,integer) from public,anon,authenticated;
 grant execute on function public.claim_lead_for_user(uuid,uuid,integer) to service_role;
+
+-- A consultant can change only the status of their own assigned prospect.
+create or replace function public.update_my_lead_status(p_assignment_id uuid,p_status text)
+returns boolean language plpgsql security invoker set search_path=public as $$
+begin
+ if auth.uid() is null or p_status not in ('new','contacted','interested','converted','closed') then return false; end if;
+ update public.lead_assignments set status=p_status where id=p_assignment_id and user_id=auth.uid();
+ return found;
+end; $$;
+create policy "lead assignments own status update" on public.lead_assignments
+ for update to authenticated using(auth.uid()=user_id) with check(auth.uid()=user_id);
+revoke update on public.lead_assignments from authenticated;
+grant update(status) on public.lead_assignments to authenticated;
+revoke all on function public.update_my_lead_status(uuid,text) from public,anon;
+grant execute on function public.update_my_lead_status(uuid,text) to authenticated;
