@@ -12,6 +12,11 @@ function parseDate(value){
 function normalize(row,now){
  const id=String(row.klaviyo_profile_id||row.profile_id||"").trim().slice(0,120);
  const email=String(row.email||"").trim().toLowerCase();
+ const phone=String(row.phone||row.phone_number||"").trim().slice(0,40);
+ const city=String(row.city||row.location?.city||"").trim().slice(0,120);
+ const department=String(row.department||row.departement||row.location?.region||"").trim().slice(0,120);
+ if(!city&&!department)return {ok:false,reason:"Ville ou département obligatoire"};
+ if(phone.replace(/[^0-9]/g,"").length<8)return {ok:false,reason:"Numéro de téléphone obligatoire (8 chiffres minimum)"};
  const abandoned=parseDate(row.last_abandoned_at);
  const order=parseDate(row.last_order_at);
  const checked=parseDate(row.orders_checked_at);
@@ -28,7 +33,7 @@ function normalize(row,now){
   klaviyo_profile_id:id,email,
   first_name:String(row.first_name||"").trim().slice(0,100)||null,
   last_name:String(row.last_name||"").trim().slice(0,100)||null,
-  phone:String(row.phone||"").trim().slice(0,40)||null,
+  phone,city:city||null,department:department||null,
   last_abandoned_at:abandoned.toISOString(),
   last_order_at:order?.toISOString()||null,
   orders_checked_at:checked.toISOString(),
@@ -46,10 +51,10 @@ async function authorize(){
 export async function GET(){
  const {db,error}=await authorize();if(error)return error;
  const {data,error:queryError,count}=await db.from("lead_private_klaviyo_contacts")
-  .select("id,klaviyo_profile_id,email,first_name,last_name,last_abandoned_at,consent_status,imported_at",
+  .select("id,klaviyo_profile_id,email,phone,city,department,first_name,last_name,last_abandoned_at,consent_status,imported_at",
    {count:"exact"}).order("imported_at",{ascending:false}).limit(30);
  if(queryError)return Response.json({error:"Lecture des contacts privés impossible"},{status:503});
- return Response.json({contacts:data||[],count:count||0,criteria:"abandon >= 60 jours, aucune commande après le panier, historique contrôlé dans les 24 h",source_segment_id:"RbHGeT"},
+ return Response.json({contacts:data||[],count:count||0,criteria:"abandon >= 60 jours, aucune commande ultérieure, contrôle des commandes dans les 24 h, email + téléphone + ville ou département obligatoires",source_segment_id:"RbHGeT"},
   {headers:{"Cache-Control":"no-store"}});
 }
 export async function POST(req){
