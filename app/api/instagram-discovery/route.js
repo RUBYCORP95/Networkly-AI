@@ -42,7 +42,8 @@ export async function POST(request){
    const best=Math.max(...Object.values(scores));
    return best>=2&&scores[language]===best;
   }
-  const items=(recent.data||[]).filter(x=>x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")&&typeof x.permalink==="string"&&x.permalink.startsWith("https://www.instagram.com/")).map(x=>({id:x.id,caption:String(x.caption||"").slice(0,1000),media_type:x.media_type,media_url:x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")?x.media_url:null,permalink:x.permalink,timestamp:x.timestamp})).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).filter(x=>(!excludeBusinesses||!commercialTerms.test(x.caption))&&matchesLanguage(x.caption)&&!seenIds.has(x.id)).slice(0,20);
+  const cutoff=Date.now()-14*24*60*60*1000;
+  const items=(recent.data||[]).filter(x=>x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")&&typeof x.permalink==="string"&&x.permalink.startsWith("https://www.instagram.com/")).map(x=>({id:x.id,caption:String(x.caption||"").slice(0,1000),media_type:x.media_type,media_url:x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")?x.media_url:null,permalink:x.permalink,timestamp:x.timestamp})).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).filter(x=>Number.isFinite(Date.parse(x.timestamp))&&Date.parse(x.timestamp)>=cutoff&&(!excludeBusinesses||!commercialTerms.test(x.caption))&&matchesLanguage(x.caption)&&!seenIds.has(x.id)).slice(0,20);
   return Response.json({hashtag,items,remaining,excludeBusinesses,language,exhausted:items.length===0},{headers:{"Cache-Control":"no-store"}});
  }catch(e){return Response.json({error:"Recherche Instagram indisponible : "+String(e.message||e)},{status:502})}
 }
