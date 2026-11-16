@@ -32,9 +32,12 @@ export async function POST(request){
   const mediaParams={user_id:userId,fields:"id,caption,media_type,media_url,permalink,timestamp",limit:50};
   const recentPages=[];
   let afterCursor=null;
-  for(let page=0;page<5;page++){
+  const cutoff=Date.now()-14*24*60*60*1000;
+  for(let page=0;page<12;page++){
    const batch=await graph(mediaPath,{...mediaParams,...(afterCursor?{after:afterCursor}:{})});
    recentPages.push(...(batch.data||[]));
+   const batchDates=(batch.data||[]).map(x=>Date.parse(x.timestamp)).filter(Number.isFinite);
+   if(batchDates.length&&Math.min(...batchDates)<cutoff)break;
    const nextCursor=batch.paging?.cursors?.after;
    if(!nextCursor||nextCursor===afterCursor||!(batch.data||[]).length)break;
    afterCursor=nextCursor;
@@ -56,8 +59,23 @@ export async function POST(request){
    const best=Math.max(...Object.values(scores));
    return best>=2&&scores[language]===best;
   }
-  const cutoff=Date.now()-14*24*60*60*1000;
-  const items=recentPages.filter(x=>x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")&&typeof x.permalink==="string"&&x.permalink.startsWith("https://www.instagram.com/")).map(x=>({id:x.id,caption:String(x.caption||"").slice(0,1000),media_type:x.media_type,media_url:x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")?x.media_url:null,permalink:x.permalink,timestamp:x.timestamp})).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).filter(x=>Number.isFinite(Date.parse(x.timestamp))&&Date.parse(x.timestamp)>=cutoff&&(!excludeBusinesses||(!commercialTerms.test(x.caption)&&!commercialSignals.test(x.caption)))&&matchesLanguage(x.caption)&&!seenIds.has(x.id)).sort((a,b)=>excludeBusinesses?Number(personalSignals.test(b.caption))-Number(personalSignals.test(a.caption)):0).slice(0,20);
-  return Response.json({hashtag,items,remaining,excludeBusinesses,language,exhausted:items.length===0},{headers:{"Cache-Control":"no-store"}});
+  const candidates=recentPages.filter(x=>x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")&&typeof x.permalink==="string"&&x.permalink.startsWith("https://www.instagram.com/")).map(x=>({id:x.id,caption:String(x.caption||"").slice(0,1000),media_type:x.media_type,media_url:x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")?x.media_url:null,permalink:x.permalink,timestamp:x.timestamp})).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).filter(x=>Number.isFinite(Date.parse(x.timestamp))&&Date.parse(x.timestamp)>=cutoff&&(!excludeBusinesses||(!commercialTerms.test(x.caption)&&!commercialSignals.test(x.caption)))&&matchesLanguage(x.caption)&&!seenIds.has(x.id)).sort((a,b)=>excludeBusinesses?Number(personalSignals.test(b.caption))-Number(personalSignals.test(a.caption)):0);
+  const byDay=new Map();
+  for(const item of candidates){
+   const day=item.timestamp.slice(0,10);
+   if(!byDay.has(day))byDay.set(day,[]);
+   byDay.get(day).push(item);
+  }
+  // Round-robin across calendar days, so today's posts cannot monopolize the cards.
+  const days=[...byDay.keys()].sort((a,b)=>b.localeCompare(a));
+  const items=[];
+  while(items.length<20&&days.some(day=>byDay.get(day).length)){
+   for(const day of days){
+    const item=byDay.get(day).shift();
+    if(item)items.push(item);
+    if(items.length===20)break;
+   }
+  }
+  return Response.json({hashtag,items,remaining,excludeBusinesses,language,availableDays:days,exhausted:items.length===0},{headers:{"Cache-Control":"no-store"}});
  }catch(e){return Response.json({error:"Recherche Instagram indisponible : "+String(e.message||e)},{status:502})}
 }
