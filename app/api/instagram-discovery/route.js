@@ -86,11 +86,11 @@ export async function POST(request){
   // Round-robin across calendar days, so today's posts cannot monopolize the cards.
   const days=[...byDay.keys()].sort((a,b)=>b.localeCompare(a));
   const items=[];
-  while(items.length<20&&days.some(day=>byDay.get(day).length)){
+  while(items.length<5&&days.some(day=>byDay.get(day).length)){
    for(const day of days){
     const item=byDay.get(day).shift();
     if(item)items.push(item);
-    if(items.length===20)break;
+    if(items.length===5)break;
    }
   }
   return Response.json({hashtag,items,remaining,excludeBusinesses,language,availableDays:days,exhausted:items.length===0},{headers:{"Cache-Control":"no-store"}});
