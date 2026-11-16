@@ -28,7 +28,17 @@ export async function POST(request){
   const found=await graph("/ig_hashtag_search",{user_id:userId,q:hashtag});
   const hashtagId=found.data?.[0]?.id;
   if(!hashtagId)return Response.json({items:[],remaining:null,hashtag});
-  const recent=await graph("/"+encodeURIComponent(hashtagId)+"/recent_media",{user_id:userId,fields:"id,caption,media_type,media_url,permalink,timestamp",limit:50});
+  const mediaPath="/"+encodeURIComponent(hashtagId)+"/recent_media";
+  const mediaParams={user_id:userId,fields:"id,caption,media_type,media_url,permalink,timestamp",limit:50};
+  const recentPages=[];
+  let afterCursor=null;
+  for(let page=0;page<5;page++){
+   const batch=await graph(mediaPath,{...mediaParams,...(afterCursor?{after:afterCursor}:{})});
+   recentPages.push(...(batch.data||[]));
+   const nextCursor=batch.paging?.cursors?.after;
+   if(!nextCursor||nextCursor===afterCursor||!(batch.data||[]).length)break;
+   afterCursor=nextCursor;
+  }
   const {data:remaining,error:quotaError}=await supabase.rpc("consume_instagram_discovery");
   if(quotaError)return Response.json({error:quotaError.message},{status:429});
   const commercialTerms=/\b(boutique|shop|store|collection|commande|commander|disponible|livraison|promotion|soldes|prix|achat|acheter|client|produit|marque|entreprise|artisan|création|creation|réservation|reservation|business|smallbusiness|onlineshop|newarrival|order|sale|shipping|brand|handmade|ecommerce|eshop)\b/i;
@@ -43,7 +53,7 @@ export async function POST(request){
    return best>=2&&scores[language]===best;
   }
   const cutoff=Date.now()-14*24*60*60*1000;
-  const items=(recent.data||[]).filter(x=>x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")&&typeof x.permalink==="string"&&x.permalink.startsWith("https://www.instagram.com/")).map(x=>({id:x.id,caption:String(x.caption||"").slice(0,1000),media_type:x.media_type,media_url:x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")?x.media_url:null,permalink:x.permalink,timestamp:x.timestamp})).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).filter(x=>Number.isFinite(Date.parse(x.timestamp))&&Date.parse(x.timestamp)>=cutoff&&(!excludeBusinesses||!commercialTerms.test(x.caption))&&matchesLanguage(x.caption)&&!seenIds.has(x.id)).slice(0,20);
+  const items=recentPages.filter(x=>x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")&&typeof x.permalink==="string"&&x.permalink.startsWith("https://www.instagram.com/")).map(x=>({id:x.id,caption:String(x.caption||"").slice(0,1000),media_type:x.media_type,media_url:x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")?x.media_url:null,permalink:x.permalink,timestamp:x.timestamp})).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).filter(x=>Number.isFinite(Date.parse(x.timestamp))&&Date.parse(x.timestamp)>=cutoff&&(!excludeBusinesses||!commercialTerms.test(x.caption))&&matchesLanguage(x.caption)&&!seenIds.has(x.id)).slice(0,20);
   return Response.json({hashtag,items,remaining,excludeBusinesses,language,exhausted:items.length===0},{headers:{"Cache-Control":"no-store"}});
  }catch(e){return Response.json({error:"Recherche Instagram indisponible : "+String(e.message||e)},{status:502})}
 }
