@@ -85,7 +85,8 @@ export default function LeadFactoryAdmin(){
    setProResult({...total,inProgress:false});
   }catch(e){setProError(e.message||"Import impossible");}finally{setProBusy(false)}
  }
-\n function reset(){setCursor(null);setTotals({checked:0,eligible:0,skipped:0,batches:0});setResult(null);setError("")}
+
+ function reset(){setCursor(null);setTotals({checked:0,eligible:0,skipped:0,batches:0});setResult(null);setError("")}
  const isBatch=result&&typeof result.checked==="number";
  return <main className={styles.page}><div className={styles.wrap}>
  <header className={styles.top}><div><p className={styles.eyebrow}>TESAMI / LEADFACTORY</p><h1 className={styles.heading}>Import Klaviyo</h1><p className={styles.sub}>Retrouvez et analysez les paniers abandonnés depuis au moins 60 jours, sans commande ultérieure.</p></div><a className={styles.back} href="/">← Tableau de bord TESAMI</a></header>
