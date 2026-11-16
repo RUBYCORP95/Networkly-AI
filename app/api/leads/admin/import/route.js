@@ -7,7 +7,7 @@ function normalized(raw,source,index){
  const name=String(raw.name||raw.nom||raw.company||raw.entreprise||"").trim().slice(0,180);
  const city=String(raw.city||raw.ville||"").trim().slice(0,120);
  const website=url(raw.website||raw.site);
- const source_url=url(raw.source_url)||website||(email?"https://leadfactory.invalid/"+encodeURIComponent(email):null);
+ const source_url=url(raw.source_url)||website||(email?"import:email:"+email:null);
  if(!name||!city||!source_url)return null;
  const socials={};for(const network of ["instagram","facebook","tiktok","linkedin","whatsapp"]){const value=url(raw[network]||raw.socials?.[network]);if(value)socials[network]=value}
  return {name,city,sector:String(raw.sector||raw.activite||"autre").slice(0,80),address:String(raw.address||raw.adresse||"").slice(0,240)||null,website,email:/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)?email:null,phone:String(raw.phone||raw.telephone||"").slice(0,40)||null,socials,source_url,verified_at:null};
