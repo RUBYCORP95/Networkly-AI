@@ -10,6 +10,18 @@ export default function Leads(){
  useEffect(()=>{fetch("/api/leads/team").then(r=>r.ok?r.json():null).then(d=>{if(d)setMembership(d.membership)}).catch(()=>{});
  fetch("/api/leads/preferences").then(r=>r.json()).then(d=>{if(d.preferences)setForm(d.preferences);else if(d.error)setNotice(d.error)}).catch(()=>setNotice("Connexion impossible"));
  fetch("/api/leads").then(r=>r.json()).then(d=>{if(d.leads)setLeads(d.leads);else if(d.error)setNotice(d.error)}).catch(()=>setNotice("Connexion impossible"));},[]);
+ useEffect(()=>{
+  const refresh=async()=>{
+   try{
+    const response=await fetch("/api/leads",{cache:"no-store"});
+    if(!response.ok)return;
+    const data=await response.json();
+    if(Array.isArray(data.leads))setLeads(data.leads);
+   }catch{}
+  };
+  const interval=setInterval(refresh,60000);
+  return ()=>clearInterval(interval);
+ },[]);
  async function openContact(id){
   if(expandedContact===id){setExpandedContact(null);return}
   const current=leads.find(a=>a.id===id);if(!current)return;
