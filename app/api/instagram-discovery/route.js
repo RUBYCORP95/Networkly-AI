@@ -47,8 +47,8 @@ export async function POST(request){
   const commercialTerms=/\b(boutique|shop|store|collection|commande|commander|disponible|livraison|promotion|soldes|prix|achat|acheter|client|produit|marque|entreprise|artisan|création|creation|réservation|reservation|business|smallbusiness|onlineshop|newarrival|order|sale|shipping|brand|handmade|ecommerce|eshop)\b/i;
   // Hashtag media does not reliably expose the author's username or full name.
   // Use caption signals only; never claim to have verified account type.
-  const commercialSignals=/(?:\\b(?:boutique|shop|store|eshop|e-shop|ecommerce|shopping|soldes|promo(?:tion)?|code\\s*promo|réduction|reduction|commandez|commander|achetez|acheter|livraison|expédition|expedition|en\\s*stock|disponible|nouvelle\\s*collection|notre\\s*collection|nos\\s*produits|nos\\s*boutiques|notre\\s*boutique|nos\\s*clients|prix|tarif|réservez|reservez|offre\\s*spéciale|offre\\s*speciale|lancement|new\\s*arrival|new\\s*collection|order\\s*now|buy\\s*now|free\\s*shipping|discount|sale|shop\\s*now|link\\s*in\\s*bio|brand|official\\s*store|fashion\\s*week|institut|magasin|showroom|salon\\s*de\\s*coiffure|shopping\\s*center)\\b|\\b(?:\\d{1,4}[.,]\\d{0,2}\\s*(?:€|eur|euros|\\$|usd|£)|(?:€|\\$|£)\\s*\\d{1,4})\\b|#[a-z0-9_]*(?:shop|boutique|store|business|smallbusiness|onlineshop|ecommerce|eshop|shopping|vente|soldes|promo|brand|collection)[a-z0-9_]*)/i;
-  const personalSignals=/(?:\\b(?:je|j'ai|j’aime|j'aime|moi|mon|ma|mes|aujourd'hui|aujourd’hui|hier|ma\\s*vie|mon\\s*look|ma\\s*tenue|mon\\s*voyage|j'adore|j’adore|j'ai\\s*testé|j’ai\\s*testé|my\\s*day|my\\s*life|my\\s*outfit|i\\s*love|i\\s*am|i'm|me\\s*and|my\\s*trip|my\\s*style)\\b)/i;
+  const commercialSignals=/(?:\b(?:boutique|shop|store|eshop|e-shop|ecommerce|shopping|soldes|promo(?:tion)?|code\s*promo|réduction|reduction|commandez|commander|achetez|acheter|livraison|expédition|expedition|en\s*stock|disponible|nouvelle\s*collection|notre\s*collection|nos\s*produits|nos\s*boutiques|notre\s*boutique|nos\s*clients|prix|tarif|réservez|reservez|offre\s*spéciale|offre\s*speciale|lancement|new\s*arrival|new\s*collection|order\s*now|buy\s*now|free\s*shipping|discount|sale|shop\s*now|link\s*in\s*bio|brand|official\s*store|fashion\s*week|institut|magasin|showroom|salon\s*de\s*coiffure|shopping\s*center)\b|\b(?:\d{1,4}[.,]\d{0,2}\s*(?:€|eur|euros|\$|usd|£)|(?:€|\$|£)\s*\d{1,4})\b|#[a-z0-9_]*(?:shop|boutique|store|business|smallbusiness|onlineshop|ecommerce|eshop|shopping|vente|soldes|promo|brand|collection)[a-z0-9_]*)/i;
+  const personalSignals=/(?:\b(?:je|j'ai|j’aime|j'aime|moi|mon|ma|mes|aujourd'hui|aujourd’hui|hier|ma\s*vie|mon\s*look|ma\s*tenue|mon\s*voyage|j'adore|j’adore|j'ai\s*testé|j’ai\s*testé|my\s*day|my\s*life|my\s*outfit|i\s*love|i\s*am|i'm|me\s*and|my\s*trip|my\s*style)\b)/i;
   const languageWords={fr:["le","la","les","des","une","pour","avec","dans","vous","nous","bonjour","merci","mon","mes","notre","sur","est","et","du","de","je","un","pas","qui","aujourd"],en:["the","and","with","for","this","that","your","from","have","just","new","our","you","are","my","in","on","of"],es:["los","las","una","para","con","por","que","del","hola","gracias","nuestro","esta","estoy","muy","como","mis","de","en"],pt:["com","para","uma","que","não","muito","hoje","obrigado","você","nosso","estou","meu","minha","sem","mais","de","em"],de:["und","die","der","das","mit","für","nicht","ich","wir","mein","meine","heute","auf","ein","eine","ist"],it:["con","per","una","che","non","oggi","grazie","ciao","questo","questa","sono","della","nostro","mio","mia","il","gli"]};
   function matchesLanguage(caption){
    if(language==="all")return true;
@@ -66,6 +66,14 @@ export async function POST(request){
    if(!byDay.has(day))byDay.set(day,[]);
    byDay.get(day).push(item);
   }
+  // Favor genuine first-person posts and captions that mention the searched hashtag.
+  const exactTag=new RegExp("(^|\\s)#"+hashtag+"($|[^a-z0-9_])","i");
+  const relevance=item=>{
+   const caption=item.caption||"";
+   const tags=(caption.match(/#[a-z0-9_]+/gi)||[]).length;
+   return (exactTag.test(caption)?5:0)+(personalSignals.test(caption)?4:0)+(caption.length>55?2:0)-Math.max(0,tags-8);
+  };
+  for(const posts of byDay.values())posts.sort((a,b)=>relevance(b)-relevance(a));
   // Round-robin across calendar days, so today's posts cannot monopolize the cards.
   const days=[...byDay.keys()].sort((a,b)=>b.localeCompare(a));
   const items=[];
