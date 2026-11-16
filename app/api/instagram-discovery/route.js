@@ -10,6 +10,7 @@ export async function POST(request){
  if(!token||!userId)return Response.json({error:"La connexion Instagram administrateur n'est pas encore configurée. Ajoutez INSTAGRAM_DISCOVERY_ACCESS_TOKEN et INSTAGRAM_DISCOVERY_IG_USER_ID dans les variables serveur Vercel."},{status:503});
  let body;
  try{body=await request.json()}catch{return Response.json({error:"Requête invalide"},{status:400})}
+ const professionalOnly=body.professionalOnly===true;
  const hashtag=String(body.hashtag||"").trim().replace(/^#/,"").toLowerCase();
  if(!/^[a-z0-9_]{2,50}$/.test(hashtag))return Response.json({error:"Hashtag invalide (lettres sans accents, chiffres et _)"},{status:400});
  const base="https://graph.facebook.com/v27.0";
@@ -28,7 +29,8 @@ export async function POST(request){
   const recent=await graph("/"+encodeURIComponent(hashtagId)+"/recent_media",{user_id:userId,fields:"id,caption,media_type,media_url,permalink,timestamp",limit:25});
   const {data:remaining,error:quotaError}=await supabase.rpc("consume_instagram_discovery");
   if(quotaError)return Response.json({error:quotaError.message},{status:429});
-  const items=(recent.data||[]).filter(x=>x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")&&typeof x.permalink==="string"&&x.permalink.startsWith("https://www.instagram.com/")).map(x=>({id:x.id,caption:String(x.caption||"").slice(0,1000),media_type:x.media_type,media_url:x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")?x.media_url:null,permalink:x.permalink,timestamp:x.timestamp})).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).slice(0,5);
-  return Response.json({hashtag,items,remaining},{headers:{"Cache-Control":"no-store"}});
+  const commercialTerms=/\b(boutique|shop|store|collection|commande|commander|disponible|livraison|promotion|soldes|prix|achat|acheter|client|produit|marque|entreprise|artisan|création|creation|réservation|reservation|business|smallbusiness|onlineshop|newarrival|order|sale|shipping|brand|handmade|ecommerce|eshop)\b/i;
+  const items=(recent.data||[]).filter(x=>x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")&&typeof x.permalink==="string"&&x.permalink.startsWith("https://www.instagram.com/")).map(x=>({id:x.id,caption:String(x.caption||"").slice(0,1000),media_type:x.media_type,media_url:x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")?x.media_url:null,permalink:x.permalink,timestamp:x.timestamp})).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).filter(x=>!professionalOnly||commercialTerms.test(x.caption)).slice(0,5);
+  return Response.json({hashtag,items,remaining,professionalOnly},{headers:{"Cache-Control":"no-store"}});
  }catch(e){return Response.json({error:"Recherche Instagram indisponible : "+String(e.message||e)},{status:502})}
 }
