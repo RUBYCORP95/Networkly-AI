@@ -33,8 +33,12 @@ export async function POST(request){
   const recentPages=[];
   let afterCursor=null;
   const cutoff=Date.now()-14*24*60*60*1000;
-  for(let page=0;page<12;page++){
-   const batch=await graph(mediaPath,{...mediaParams,...(afterCursor?{after:afterCursor}:{})});
+  const searchStarted=Date.now();
+  for(let page=0;page<5;page++){
+   if(page>0&&Date.now()-searchStarted>6500)break;
+   let batch;
+   try{batch=await graph(mediaPath,{...mediaParams,...(afterCursor?{after:afterCursor}:{})});}
+   catch(error){if(recentPages.length)break;throw error;}
    recentPages.push(...(batch.data||[]));
    const batchDates=(batch.data||[]).map(x=>Date.parse(x.timestamp)).filter(Number.isFinite);
    if(batchDates.length&&Math.min(...batchDates)<cutoff)break;
