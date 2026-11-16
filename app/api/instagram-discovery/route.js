@@ -65,8 +65,10 @@ export async function POST(request){
   }
   const candidates=recentPages.filter(x=>x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")&&typeof x.permalink==="string"&&x.permalink.startsWith("https://www.instagram.com/")).map(x=>({id:x.id,caption:String(x.caption||"").slice(0,1000),media_type:x.media_type,media_url:x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")?x.media_url:null,permalink:x.permalink,timestamp:x.timestamp})).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).filter(x=>Number.isFinite(Date.parse(x.timestamp))&&Date.parse(x.timestamp)>=cutoff&&matchesLanguage(x.caption)&&!seenIds.has(x.id)).sort((a,b)=>excludeBusinesses?Number(personalSignals.test(b.caption))-Number(personalSignals.test(a.caption)):0);
   // Keep commercial posts as fallback only when the search has too few personal results.
+  const obviousAds=/(?:\b(?:concours|gagnez|gagner|offert|offre|salon|atelier|inscription|billetterie|commandez|acheter|achetez|shop now|buy now|code promo|livraison gratuite|réservez|reservez|soldes|en stock|disponible|négociable|negociable|prix|tarif|cfa|fcfa)\b|\d+[,.]?\d*\s*(?:€|eur|euros|\$|usd|£|cfa|fcfa))/i;
+  const filteredCandidates=excludeBusinesses?candidates.filter(x=>!commercialSignals.test(x.caption)&&!obviousAds.test(x.caption)):candidates;
   const byDay=new Map();
-  for(const item of candidates){
+  for(const item of filteredCandidates){
    const day=item.timestamp.slice(0,10);
    if(!byDay.has(day))byDay.set(day,[]);
    byDay.get(day).push(item);
