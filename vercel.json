@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/run",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/leads",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/leads/expire",
+      "schedule": "0 * * * *"
     }
   ]
 }

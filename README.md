@@ -57,3 +57,18 @@ Klaviyo est nécessaire pour la synchronisation marketing des inscriptions.
 ## Sécurité
 
 Les secrets API et clés privées restent exclusivement côté serveur. Les comptes suspendus ne peuvent pas créer, programmer, approuver ou relancer des publications. Le moteur de publication automatique exclut également les comptes suspendus.
+
+## TESAMI LeadFactory (branche feature/tesami-leadfactory)
+
+Le module /leads permet de définir la ville, les secteurs, le rayon et le quota quotidien. Les API `/api/leads` et `/api/leads/preferences` utilisent la session Supabase.
+
+1. Appliquer `supabase/leadfactory.sql` dans le SQL Editor Supabase **avant** d'ouvrir le module.
+2. Choisir un fournisseur B2B avec autorisation contractuelle de conserver et d'exploiter les données pour la prospection. Le connecteur attend une API HTTPS renvoyant `{"businesses":[{"name":"Salon Exemple","city":"Paris","sector":"coiffure","source_url":"https://example.org/salon","website":"https://example.org","email":"contact@example.org","phone":"+33100000000","socials":{"instagram":"https://instagram.com/exemple"}}]}`.
+3. Configurer côté serveur `LEADS_PROVIDER_URL` et `LEADS_PROVIDER_API_KEY` (ne jamais les exposer dans le navigateur ni GitHub).
+4. Le cron `/api/cron/leads` est prévu à 07:00 UTC ; il nécessite `CRON_SECRET` et `SUPABASE_SERVICE_ROLE_KEY` déjà utilisés par le projet.
+5. Vérifier les limites du plan Vercel, les coûts fournisseur, les règles RGPD/CNIL et les droits d'usage des données avant activation.
+6. Tester `npm run check` et `npm run build` dans un environnement avec dépendances installées.
+
+En l'absence de fournisseur configuré, le traitement n'attribue aucun prospect et retourne `configured:false`. Aucun scraping non autorisé ni envoi automatique de messages n'est réalisé. Les liens sociaux sont affichés uniquement lorsqu'ils sont fournis par la source ; aucun profil n'est inventé.
+
+**Statut :** développement initial, non déployé et non validé en production.
