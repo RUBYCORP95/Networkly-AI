@@ -34,7 +34,7 @@ export async function POST(request){
   const languageWords={fr:["le","la","les","des","une","pour","avec","dans","vous","nous","bonjour","merci","mon","mes","notre","sur","est","et","du","de","je","un","pas","qui","aujourd"],en:["the","and","with","for","this","that","your","from","have","just","new","our","you","are","my","in","on","of"],es:["los","las","una","para","con","por","que","del","hola","gracias","nuestro","esta","estoy","muy","como","mis","de","en"],pt:["com","para","uma","que","não","muito","hoje","obrigado","você","nosso","estou","meu","minha","sem","mais","de","em"],de:["und","die","der","das","mit","für","nicht","ich","wir","mein","meine","heute","auf","ein","eine","ist"],it:["con","per","una","che","non","oggi","grazie","ciao","questo","questa","sono","della","nostro","mio","mia","il","gli"]};
   function matchesLanguage(caption){
    if(language==="all")return true;
-   const text=String(caption||"").replace(/#[^\\s]+|@[^\\s]+|https?:\\/\\/[^\\s]+/g," ").toLowerCase();
+   const text=String(caption||"").replace(/#[^\s]+|@[^\s]+|https?:\/\/[^\s]+/g," ").toLowerCase();
    const words=text.match(/[a-zà-ÿ]+/g)||[];
    if(words.length<4)return false;
    const scores=Object.fromEntries(Object.entries(languageWords).map(([code,terms])=>[code,words.filter(w=>terms.includes(w)).length]));
