@@ -17,6 +17,9 @@ export async function POST(req){
  if(membership?.status!=="verified")return Response.json({error:"Attribution manuelle réservée aux membres Chogan vérifiés"},{status:403});
  const entitlement=await checkLeadAccess(body.user_id,false,db);
  if(!entitlement.allowed)return Response.json({error:"Le destinataire ne dispose pas d’un accès LeadFactory actif"},{status:403});
+ const {data:previouslyExpired,error:historyError}=await db.from("lead_assignment_expirations").select("assignment_id").eq("organization_id",body.organization_id).eq("user_id",body.user_id).limit(1);
+ if(historyError)return Response.json({error:"Historique des prospects indisponible"},{status:503});
+ if(previouslyExpired?.length)return Response.json({error:"Ce consultant a déjà laissé expirer ce prospect. Choisir un autre membre."},{status:409});
  const {data:blocked}=await db.from("lead_suppressions").select("id").eq("organization_id",body.organization_id).maybeSingle();
  if(blocked)return Response.json({error:"Entreprise exclue de la prospection"},{status:409});
  const {data:assignment,error}=await db.from("lead_assignments").insert({organization_id:body.organization_id,user_id:body.user_id}).select("id").single();
