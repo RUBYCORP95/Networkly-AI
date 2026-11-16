@@ -52,11 +52,44 @@ export default function LeadFactoryAdmin(){
   finally{setImporting(false);setBusy(false);}
  }
  async function loadContacts(page=0,q=search){setContactLoading(true);setError("");try{const supabase=createClient();const {data:{session}}=await supabase.auth.getSession();if(!session?.access_token)throw new Error("Connexion administrateur requise");const response=await fetch(process.env.NEXT_PUBLIC_SUPABASE_URL+"/functions/v1/leadfactory-private-contacts?page="+page+"&search="+encodeURIComponent(q),{headers:{Authorization:"Bearer "+session.access_token,apikey:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}});const data=await response.json();if(!response.ok)throw new Error(data.error||"Erreur de chargement");setContacts(data.contacts||[]);setContactTotal(data.total||0);setContactPage(page);}catch(e){setError(e.message||"Erreur de chargement")}finally{setContactLoading(false)}}
- function reset(){setCursor(null);setTotals({checked:0,eligible:0,skipped:0,batches:0});setResult(null);setError("")}
+
+ const [proFile,setProFile]=useState(null),[proBusy,setProBusy]=useState(false),[proResult,setProResult]=useState(null),[proError,setProError]=useState("");
+ function parseCSV(text){
+  text=text.replace(/^\\uFEFF/,"");const first=text.split(/\\r?\\n/,1)[0]||"";const delimiter=(first.match(/;/g)||[]).length>(first.match(/,/g)||[]).length?";":",";
+  const data=[];let row=[],field="",quoted=false;
+  for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++}else quoted=!quoted;}else if(c===delimiter&&!quoted){row.push(field);field="";}else if((c==="\\n"||c==="\\r")&&!quoted){if(c==="\\r"&&text[i+1]==="\\n")i++;row.push(field);if(row.some(x=>x.trim()))data.push(row);row=[];field="";}else field+=c;}
+  if(quoted)throw new Error("CSV incorrect : guillemets non fermés.");
+  row.push(field);if(row.some(x=>x.trim()))data.push(row);return data;
+ }
+ async function importProfessionals(){
+  if(!proFile)return;setProBusy(true);setProError("");setProResult(null);
+  try{
+   if(proFile.size>8*1024*1024)throw new Error("Fichier trop volumineux (maximum 8 Mo).");
+   const rows=parseCSV(await proFile.text());if(rows.length<2)throw new Error("Le fichier ne contient aucune entreprise.");
+   const norm=s=>String(s||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+   const aliases={source_id:["idprospect","identifiant","id"],company:["entreprise","societe","raison sociale","raisonsociale","company"],sector:["activite","secteur"],first_name:["prenom"],last_name:["nom","nomcontact"],phone:["telephone","tel","mobile"],email:["email","mail","courriel"],address:["adresse"],postal_code:["codepostal","cp"],city:["ville"],department:["departement"],website:["siteinternet","siteweb","website"],source:["source"],notes:["notes","commentaire"]};
+   const cols=rows[0].map(norm);const positions=Object.fromEntries(Object.entries(aliases).map(([k,a])=>[k,cols.findIndex(h=>a.map(norm).includes(h))]));
+   if(positions.company<0)throw new Error("Colonne Entreprise introuvable dans le CSV.");
+   if(positions.source_id<0&&positions.email<0&&positions.phone<0)throw new Error("Ajoute une colonne ID prospect, Email ou Téléphone.");
+   const items=rows.slice(1).filter(r=>r.some(v=>String(v).trim())).map(r=>Object.fromEntries(Object.entries(positions).map(([k,i])=>[k,i<0?"":r[i]||""])));
+   if(items.length>20000)throw new Error("Maximum 20 000 prospects par fichier.");
+   if(!window.confirm("Importer "+items.length+" lignes professionnelles ? Les contacts déjà connus seront ignorés, sans modifier leurs statuts."))return;
+   const supabase=createClient();const {data:{session}}=await supabase.auth.getSession();if(!session?.access_token)throw new Error("Connexion administrateur requise.");
+   const total={imported:0,duplicates:0,invalid:0,processed:0};
+   for(let i=0;i<items.length;i+=100){
+    const response=await fetch(process.env.NEXT_PUBLIC_SUPABASE_URL+"/functions/v1/leadfactory-professionals-import",{method:"POST",headers:{Authorization:"Bearer "+session.access_token,apikey:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,"Content-Type":"application/json"},body:JSON.stringify({rows:items.slice(i,i+100)})});
+    const data=await response.json();if(!response.ok)throw new Error(data.error||"Erreur serveur");
+    for(const k of Object.keys(total))total[k]+=data[k]||0;
+    setProResult({...total,inProgress:true});
+   }
+   setProResult({...total,inProgress:false});
+  }catch(e){setProError(e.message||"Import impossible");}finally{setProBusy(false)}
+ }
+\n function reset(){setCursor(null);setTotals({checked:0,eligible:0,skipped:0,batches:0});setResult(null);setError("")}
  const isBatch=result&&typeof result.checked==="number";
  return <main className={styles.page}><div className={styles.wrap}>
  <header className={styles.top}><div><p className={styles.eyebrow}>TESAMI / LEADFACTORY</p><h1 className={styles.heading}>Import Klaviyo</h1><p className={styles.sub}>Retrouvez et analysez les paniers abandonnés depuis au moins 60 jours, sans commande ultérieure.</p></div><a className={styles.back} href="/">← Tableau de bord TESAMI</a></header>
- <section className={styles.card}><div className={styles.detail}><div><h2 className={styles.sectionTitle}>Connexion et simulation</h2><p className={styles.muted}>Vérifiez votre connexion Klaviyo puis analysez vos contacts, lot par lot.</p></div><span className={styles.status}><span className={styles.dot}></span>Mode simulation sécurisé</span></div>
+ <section className={styles.card}><div className={styles.detail}><div><h2 className={styles.sectionTitle}>Prospects professionnels · Import Excel / CSV</h2><p className={styles.muted}>Dans Excel ou Google Sheets, exportez votre fichier au format CSV (séparateur virgule ou point-virgule). Les prospects déjà importés ne sont jamais réajoutés, même après un nouvel import.</p></div><span className={styles.status}>Anti-doublons actif</span></div><div className={styles.actions}><input aria-label="Fichier CSV des professionnels" type="file" accept=".csv,text/csv" onChange={e=>{setProFile(e.target.files?.[0]||null);setProResult(null);setProError("");}} style={{maxWidth:"100%",alignSelf:"center"}}/><button className={styles.button} type="button" disabled={!proFile||proBusy} onClick={importProfessionals}>{proBusy?"Import en cours…":"Importer les professionnels"}</button></div><p className={styles.muted} style={{marginTop:12}}>Colonnes reconnues : ID prospect, Entreprise, Activité, Prénom, Nom, Téléphone, Email, Adresse, Code postal, Ville, Département, Site internet, Source et Notes. Les statuts et attributions existants sont préservés.</p>{proError&&<p className={styles.notice} role="alert">{proError}</p>}{proResult&&<p className={styles.info} role="status">{proResult.inProgress?"Import en cours · ":"Import terminé · "}{proResult.imported} nouveaux · {proResult.duplicates} doublons ignorés · {proResult.invalid} lignes invalides · {proResult.processed} lignes traitées.</p>}</section>\n <section className={styles.card}><div className={styles.detail}><div><h2 className={styles.sectionTitle}>Connexion et simulation</h2><p className={styles.muted}>Vérifiez votre connexion Klaviyo puis analysez vos contacts, lot par lot.</p></div><span className={styles.status}><span className={styles.dot}></span>Mode simulation sécurisé</span></div>
  <div className={styles.actions}><button className={styles.button+" "+styles.secondary} type="button" disabled={busy} onClick={()=>run("leadfactory-klaviyo-status")}>Tester la connexion Klaviyo</button><button className={styles.button} type="button" disabled={busy} onClick={()=>{reset();run("leadfactory-klaviyo-import")}}>Simuler les 20 premiers profils</button></div>
  {busy&&<p role="status" className={styles.muted} style={{marginTop:16}}>Analyse en cours…</p>}{error&&<p role="alert" className={styles.notice}>{error}</p>}
  {result&&!isBatch&&<p className={styles.info} aria-live="polite">{result.klaviyo_reachable?"✓ Connexion Klaviyo opérationnelle (HTTP "+result.klaviyo_status+")":result.message||"Connexion à vérifier (HTTP "+result.klaviyo_status+")"}</p>}
