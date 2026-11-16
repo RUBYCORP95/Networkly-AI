@@ -28,7 +28,7 @@ export async function POST(request){
   const recent=await graph("/"+encodeURIComponent(hashtagId)+"/recent_media",{user_id:userId,fields:"id,caption,media_type,media_url,permalink,timestamp",limit:25});
   const {data:remaining,error:quotaError}=await supabase.rpc("consume_instagram_discovery");
   if(quotaError)return Response.json({error:quotaError.message},{status:429});
-  const items=(recent.data||[]).filter(x=>typeof x.permalink==="string"&&x.permalink.startsWith("https://www.instagram.com/")).map(x=>({id:x.id,caption:String(x.caption||"").slice(0,1000),media_type:x.media_type,media_url:x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")?x.media_url:null,permalink:x.permalink,timestamp:x.timestamp})).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+  const items=(recent.data||[]).filter(x=>x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")&&typeof x.permalink==="string"&&x.permalink.startsWith("https://www.instagram.com/")).map(x=>({id:x.id,caption:String(x.caption||"").slice(0,1000),media_type:x.media_type,media_url:x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")?x.media_url:null,permalink:x.permalink,timestamp:x.timestamp})).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).slice(0,5);
   return Response.json({hashtag,items,remaining},{headers:{"Cache-Control":"no-store"}});
  }catch(e){return Response.json({error:"Recherche Instagram indisponible : "+String(e.message||e)},{status:502})}
 }
