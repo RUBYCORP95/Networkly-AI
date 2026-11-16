@@ -2,7 +2,7 @@
 -- RLS also protects direct Supabase client reads when the Next.js API is bypassed.
 create or replace function public.can_access_my_leads()
 returns boolean language sql stable security definer set search_path=public as $$
- select auth.uid() is not null and (
+ select auth.uid() is not null and exists (select 1 from public.profiles active_profile where active_profile.id=auth.uid() and active_profile.account_status is distinct from 'suspended') and (
   exists(select 1 from public.profiles p where p.id=auth.uid() and p.is_admin=true and coalesce(p.account_status,'')<>'suspended')
   or exists(select 1 from public.lead_team_memberships m where m.user_id=auth.uid() and m.status='verified')
   or exists(select 1 from public.profiles p where p.id=auth.uid() and p.account_status is distinct from 'suspended'
