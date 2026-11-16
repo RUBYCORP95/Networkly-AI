@@ -1,8 +1,9 @@
 "use client";
-import {useState} from "react";
+import {useState,useRef} from "react";
 import styles from "./leadfactory.module.css";
 import {createClient} from "../../../lib/supabase/client";
 export default function LeadFactoryAdmin(){
+ const stopImport=useRef(false);const [importProgress,setImportProgress]=useState(null);const [importing,setImporting]=useState(false);
  const [busy,setBusy]=useState(false),[result,setResult]=useState(null),[error,setError]=useState("");
  const [contacts,setContacts]=useState([]),[contactTotal,setContactTotal]=useState(0),[contactPage,setContactPage]=useState(0),[search,setSearch]=useState(""),[contactLoading,setContactLoading]=useState(false);const [cursor,setCursor]=useState(null),[totals,setTotals]=useState({checked:0,eligible:0,skipped:0,batches:0});
  async function run(name,nextCursor=null,commit=false){
@@ -20,6 +21,36 @@ export default function LeadFactoryAdmin(){
    if(isImport){setCursor(data.next_cursor||null);if(!commit)setTotals(t=>({checked:t.checked+(data.checked||0),eligible:t.eligible+(data.eligible||0),skipped:t.skipped+(data.skipped||0),batches:t.batches+1}));if(commit)await loadContacts(0,search);}
   }catch(e){setError(e.message||"Erreur inconnue")}finally{setBusy(false)}
  }
+ async function importAll(){
+  if(!window.confirm("Importer tous les profils techniquement éligibles depuis Klaviyo dans l’administration privée ? Les consultants n’y auront pas accès et aucun contact ne sera sollicité."))return;
+  stopImport.current=false;setImporting(true);setBusy(true);setError("");
+  let next=null,seen=new Set(),checked=0,eligible=0,imported=0,excluded=0,batches=0;
+  try{
+   const supabase=createClient();
+   const {data:{session},error:sessionError}=await supabase.auth.getSession();
+   if(sessionError||!session?.access_token)throw new Error("Connexion administrateur requise.");
+   do{
+    if(stopImport.current)break;
+    if(next&&seen.has(next))throw new Error("Pagination Klaviyo répétée : import interrompu pour éviter une boucle.");
+    if(next)seen.add(next);
+    const response=await fetch(process.env.NEXT_PUBLIC_SUPABASE_URL+"/functions/v1/leadfactory-klaviyo-import",{
+     method:"POST",headers:{Authorization:"Bearer "+session.access_token,"Content-Type":"application/json",apikey:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY},
+     body:JSON.stringify({commit:true,...(next?{cursor:next}:{})})
+    });
+    const data=await response.json();
+    if(!response.ok)throw new Error(data.error||data.message||"Erreur d'importation "+response.status);
+    checked+=data.checked||0;eligible+=data.eligible||0;excluded+=data.skipped||0;
+    imported+=data.imported??data.saved??data.upserted??0;
+    batches++;
+    next=data.next_cursor||null;
+    setImportProgress({checked,eligible,excluded,imported,batches,done:!next});
+    if(batches>=1000&&next)throw new Error("Limite de sécurité de 1 000 lots atteinte.");
+   }while(next);
+   await loadContacts(0,"");
+   setSearch("");
+  }catch(e){setError((e.message||"Erreur d'importation")+" — les lots précédents restent enregistrés. Vous pouvez relancer l'import sans doublons.");}
+  finally{setImporting(false);setBusy(false);}
+ }
  async function loadContacts(page=0,q=search){setContactLoading(true);setError("");try{const supabase=createClient();const {data:{session}}=await supabase.auth.getSession();if(!session?.access_token)throw new Error("Connexion administrateur requise");const response=await fetch(process.env.NEXT_PUBLIC_SUPABASE_URL+"/functions/v1/leadfactory-private-contacts?page="+page+"&search="+encodeURIComponent(q),{headers:{Authorization:"Bearer "+session.access_token,apikey:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}});const data=await response.json();if(!response.ok)throw new Error(data.error||"Erreur de chargement");setContacts(data.contacts||[]);setContactTotal(data.total||0);setContactPage(page);}catch(e){setError(e.message||"Erreur de chargement")}finally{setContactLoading(false)}}
  function reset(){setCursor(null);setTotals({checked:0,eligible:0,skipped:0,batches:0});setResult(null);setError("")}
  const isBatch=result&&typeof result.checked==="number";
@@ -31,9 +62,9 @@ export default function LeadFactoryAdmin(){
  {result&&!isBatch&&<p className={styles.info} aria-live="polite">{result.klaviyo_reachable?"✓ Connexion Klaviyo opérationnelle (HTTP "+result.klaviyo_status+")":result.message||"Connexion à vérifier (HTTP "+result.klaviyo_status+")"}</p>}
  </section>
  <section aria-label="Statistiques de simulation"><div className={styles.stats}><div className={styles.stat}><p className={styles.statLabel}>Profils vérifiés</p><p className={styles.statNumber}>{totals.checked}</p></div><div className={styles.stat}><p className={styles.statLabel}>Éligibles techniques</p><p className={styles.statNumber+" "+styles.purple}>{totals.eligible}</p></div><div className={styles.stat}><p className={styles.statLabel}>Profils exclus</p><p className={styles.statNumber}>{totals.skipped}</p></div></div></section>
- <section className={styles.card}><div className={styles.detail}><div><h2 className={styles.sectionTitle}>Progression de l'analyse</h2><p className={styles.muted}>{totals.batches===0?"Lancez une simulation pour afficher les résultats.":totals.batches+" lot(s) analysé(s) • "+totals.checked+" profils examinés"}</p></div>{totals.batches>0&&<span className={styles.status}>Aucun contact importé</span>}</div>
+ <section className={styles.card}><div className={styles.detail}><div><h2 className={styles.sectionTitle}>Progression de l'analyse</h2><p className={styles.muted}>{totals.batches===0?"Lancez une simulation pour afficher les résultats.":totals.batches+" lot(s) analysé(s) • "+totals.checked+" profils examinés"}</p></div>{<span className={styles.status}>{contactTotal} contact(s) en base privée</span>}</div>
  {isBatch&&<div style={{marginTop:20}}><p className={styles.muted}>Dernier lot : <strong>{result.checked} vérifiés</strong> · {result.eligible} éligibles · {result.skipped} exclus</p></div>}
- {isBatch&&<div className={styles.actions}><button type="button" className={styles.button+" "+styles.secondary} disabled={busy} onClick={()=>{if(window.confirm("Importer ce lot de 20 profils dans l’administration privée ? Aucun consultant n’y aura accès."))run("leadfactory-klaviyo-import",totals.batches===1?null:null,true)}}>Importer le premier lot en privé</button></div>}
+ <div className={styles.actions}><button type="button" className={styles.button+" "+styles.secondary} disabled={busy} onClick={importAll}>{importing?"Importation en cours…":"Importer tous les contacts éligibles en privé"}</button>{importing&&<button type="button" className={styles.button+" "+styles.secondary} onClick={()=>{stopImport.current=true}}>Arrêter après ce lot</button>}</div>{importProgress&&<div className={styles.info} role="status" aria-live="polite"><strong>{importProgress.done?"Importation terminée":"Importation en progression"}</strong> · {importProgress.batches} lot(s) · {importProgress.checked} profils vérifiés · {importProgress.eligible} éligibles. Les contacts sont conservés uniquement dans l’administration. <div style={{height:8,background:"#e9e1f8",borderRadius:8,marginTop:10,overflow:"hidden"}}><div style={{height:"100%",width:importProgress.done?"100%":"65%",background:"#6d3de7",borderRadius:8}}/></div></div>}
  {isBatch&&cursor&&<div className={styles.actions}><button className={styles.button} type="button" disabled={busy} onClick={()=>run("leadfactory-klaviyo-import",cursor)}>Analyser les 20 profils suivants →</button></div>}
  {isBatch&&!cursor&&<p className={styles.info}>Tous les lots disponibles ont été parcourus.</p>}
  <div className={styles.info}>🔒 Simulation uniquement : aucune donnée personnelle n'est enregistrée ou distribuée. L'éligibilité technique ne constitue pas un consentement à la prospection par des consultants.</div>
