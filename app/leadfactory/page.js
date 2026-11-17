@@ -5,6 +5,9 @@ import {createClient} from "../../lib/supabase/client";
 export default function LeadFactoryPage(){
  const [state,setState]=useState({loading:true,error:"",status:null,cards:[],revealed:{}});
  const [busy,setBusy]=useState(null);
+ const [adviceOpen,setAdviceOpen]=useState(false);
+ const [adviceType,setAdviceType]=useState("partnership");
+ const [adviceCopied,setAdviceCopied]=useState(false);
  const [cityQuery,setCityQuery]=useState("");
  const [cities,setCities]=useState([]);
  const [selectedCity,setSelectedCity]=useState(null);
@@ -59,6 +62,8 @@ export default function LeadFactoryPage(){
   }catch(e){setState(s=>({...s,error:e.message||"Impossible de révéler le contact"}));}
   finally{setBusy(null);}
  }
+ const adviceTemplates={partnership:{title:"Proposer un partenariat",tip:"Commence par comprendre les besoins de l’établissement et propose un échange sans engagement.",message:"Bonjour, je suis consultant indépendant Chogan et j’accompagne des professionnels qui souhaitent découvrir de nouvelles possibilités de partenariat autour des parfums et des produits du quotidien. Votre établissement m’a intéressé. Seriez-vous disponible pour un court échange afin de voir si une collaboration pourrait avoir du sens pour vous ?"},products:{title:"Présenter les produits",tip:"Propose une découverte adaptée à l’activité, sans affirmer de résultats non vérifiés.",message:"Bonjour, je suis consultant indépendant Chogan. Je propose une gamme de parfums et de produits pour le quotidien qui pourrait éventuellement intéresser votre établissement ou votre clientèle. Est-ce que je peux vous présenter quelques références adaptées à votre activité ?"},consultant:{title:"Devenir consultant",tip:"Présente l’activité comme une possibilité, jamais comme une garantie de revenus.",message:"Bonjour, je suis consultant indépendant Chogan. En complément de votre activité professionnelle, il existe aussi la possibilité de devenir consultant pour découvrir et proposer les produits à votre rythme. Si cela vous intéresse, je peux vous expliquer le fonctionnement, les conditions et le temps à prévoir, sans engagement."}};
+ const currentAdvice=adviceTemplates[adviceType];
  const s=state.status;
  return <main style={{maxWidth:1050,margin:"0 auto",padding:"32px 20px",fontFamily:"inherit"}}>
   <h1>TESAMI LeadFactory</h1>
@@ -84,7 +89,9 @@ export default function LeadFactoryPage(){
    <button disabled style={{padding:"12px 18px",borderRadius:10,cursor:"not-allowed"}} title="La génération sera activée après validation des contrôles de conformité">Générer mes prospects</button>
    <p style={{fontSize:13,opacity:.75}}>Génération temporairement désactivée pendant les vérifications de conformité et les tests.</p>
   </section>}
-  <h2>Mes contacts attribués</h2>
+  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12,marginTop:26}}><h2 style={{margin:0}}>Mes contacts attribués</h2><button onClick={()=>setAdviceOpen(v=>!v)} style={{border:"1px solid #aaa3da",borderRadius:10,padding:"10px 15px",background:"#f1efff",color:"#322078",fontWeight:700,cursor:"pointer"}}>{adviceOpen?"Masquer les conseils":"💬 Conseils pour contacter un professionnel"}</button></div>
+  {adviceOpen&&<section id="leadfactory-advice" style={{margin:"18px 0 24px",padding:22,borderRadius:16,border:"1px solid #ded8f7",background:"#faf9ff",maxWidth:750}}><h3 style={{marginTop:0}}>Comment démarrer la discussion ?</h3><p>Choisis une approche selon l’activité du professionnel. Personnalise le message avant de l’envoyer.</p><div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>{Object.entries(adviceTemplates).map(([key,item])=><button key={key} onClick={()=>{setAdviceType(key);setAdviceCopied(false);}} aria-pressed={adviceType===key} style={{padding:"10px 12px",borderRadius:9,border:"1px solid #c8c0ed",background:adviceType===key?"#39268a":"white",color:adviceType===key?"white":"#30216e",cursor:"pointer"}}>{item.title}</button>)}</div><h4>{currentAdvice.title}</h4><p>{currentAdvice.tip}</p><div style={{padding:16,borderRadius:10,background:"white",border:"1px solid #e2dff0",whiteSpace:"pre-wrap",lineHeight:1.6}}>{currentAdvice.message}</div><button onClick={async()=>{try{await navigator.clipboard.writeText(currentAdvice.message);setAdviceCopied(true);}catch{setAdviceCopied(false);}}} style={{marginTop:12,padding:"11px 16px",background:"#39268a",color:"white",border:0,borderRadius:9,cursor:"pointer"}}>{adviceCopied?"Message copié !":"Copier le message"}</button><p style={{fontSize:13,color:"#58536d"}}>Contacte uniquement les professionnels pour lesquels la prospection est autorisée. Identifie-toi clairement, respecte les refus et les demandes d’opposition. Ne promets pas de revenus.</p></section>}
+
   {!state.loading&&state.cards.length===0&&<p>Aucun contact attribué pour le moment.</p>}
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:16}}>
   {state.cards.map(c=><article key={c.allocation_id} style={{border:"1px solid #d9d9e3",borderRadius:14,padding:18}}>
@@ -92,6 +99,7 @@ export default function LeadFactoryPage(){
    <p>{[c.postal_code,c.city,c.department].filter(Boolean).join(" · ")}</p>
    <p>Distance approximative : {c.distance_km??"—"} km</p>
    <p>À réclamer avant le {new Date(c.expires_at).toLocaleString("fr-FR")}</p>
+   {c.contact_kind!=="klaviyo"&&<button onClick={()=>{setAdviceOpen(true);setAdviceType("partnership");setAdviceCopied(false);document.getElementById("leadfactory-advice")?.scrollIntoView({behavior:"smooth",block:"start"});}} style={{marginBottom:10,padding:"9px 12px",borderRadius:9,border:"1px solid #c8c0ed",background:"#f1efff",color:"#35238a",cursor:"pointer"}}>💬 Idées pour aborder ce pro</button>}
    {state.revealed[c.allocation_id]?<div><p>Téléphone : {state.revealed[c.allocation_id].phone||"Non renseigné"}</p><p>E-mail : {state.revealed[c.allocation_id].email||"Non renseigné"}</p></div>:<button onClick={()=>reveal(c.allocation_id)} disabled={busy===c.allocation_id} style={{padding:"10px 16px",borderRadius:10}}>{busy===c.allocation_id?"Chargement…":"Contacter"}</button>}
   </article>)}
   </div>
