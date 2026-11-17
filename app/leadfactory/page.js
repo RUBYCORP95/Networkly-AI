@@ -64,7 +64,7 @@ export default function LeadFactoryPage(){
   <h1>TESAMI LeadFactory</h1>
   <p>Retrouve tes prospects de proximité. Les coordonnées sont visibles uniquement après avoir cliqué sur « Contacter ».</p>
   {state.loading&&<p>Chargement…</p>}
-  {state.error&&<p role="alert" style={{color:"#b42318"}}>{state.error}</p>}
+  {state.error&&<div role="alert" style={{padding:"16px 18px",border:"1px solid #f4c7c3",borderRadius:12,background:"#fff7f6",margin:"20px 0",maxWidth:520}}><p style={{color:"#b42318",margin:"0 0 12px"}}>{state.error}</p>{state.error.includes("Connecte-toi")&&<a href="/login?next=%2Fleadfactory" style={{display:"inline-block",background:"#35238a",color:"#fff",padding:"12px 20px",borderRadius:10,textDecoration:"none",fontWeight:700}}>Se connecter à TESAMI</a>}</div>}
   {s&&<section style={{padding:20,border:"1px solid #d9d9e3",borderRadius:16,marginBottom:24,maxWidth:640}}>
    <h2>Mon secteur géographique</h2>
    <p>Choisis ta ville et ton rayon de prospection. Les coordonnées sont enregistrées pour ton compte uniquement.</p>
