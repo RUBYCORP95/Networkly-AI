@@ -73,7 +73,7 @@ export default function LeadFactoryPage(){
    <div className={styles.heroBadge}>✦ Prospection de proximité</div>
   </div>
   <div className={styles.stats}>
-   <div className={styles.stat}><div className={styles.statLabel}>Mon abonnement</div><div className={styles.statValue}>{s?.plan||"—"}</div><div className={styles.statNote}>Formule actuelle</div></div>
+   <div className={styles.stat}><div className={styles.statLabel}>Mon abonnement</div><div className={styles.statValue}>{s?.plan||"—"}</div><div className={styles.statNote}>Formule actuelle</div><a className={styles.planChange} href="/plans">↻ Changer d’abonnement</a></div>
    <div className={styles.stat}><div className={styles.statLabel}>Contacts Klaviyo / jour</div><div className={styles.statValue}>{s?klaviyo:"—"}</div><div className={styles.statNote}>Quota maximum</div></div>
    <div className={styles.stat}><div className={styles.statLabel}>Prospects pros / jour</div><div className={styles.statValue}>{s?professional:"—"}</div><div className={styles.statNote}>Quota maximum</div></div>
    <div className={styles.stat}><div className={styles.statLabel}>Mes contacts</div><div className={styles.statValue}>{state.cards.length}</div><div className={styles.statNote}>Actuellement attribués</div></div>
