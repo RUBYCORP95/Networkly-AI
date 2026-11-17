@@ -43,7 +43,7 @@ export default function LeadFactoryPage(){
  }
  async function saveSector(){
   if(!selectedCity||selectedCity.name!==cityQuery){setSectorMessage("Choisis une ville dans les résultats avant d'enregistrer.");return;}
-  if(radius<5||radius>50){setSectorMessage("Le rayon doit être compris entre 5 et 50 km.");return;}
+  if(radius<5||radius>50){setSectorMessage("Le rayon doit être compris entre 5 et 50 km.");return false;}
   setSavingSector(true);setSectorMessage("");
   try{
    const supabase=createClient();const {data:{user},error:authError}=await supabase.auth.getUser();
@@ -53,12 +53,14 @@ export default function LeadFactoryPage(){
    setSectorMessage("Secteur enregistré : "+selectedCity.name+" · "+radius+" km.");
    setProspectSearchMessage("");
    if(!state.limited)await load();
-  }catch(e){setSectorMessage(e.message||"Enregistrement impossible");}finally{setSavingSector(false);}
+   return true;
+  }catch(e){setSectorMessage(e.message||"Enregistrement impossible");return false;}finally{setSavingSector(false);}
  }
  async function searchProspectsInSector(){
   if(!selectedCity||selectedCity.name!==cityQuery){setSectorMessage("Sélectionne une commune dans le menu déroulant.");return;}
   if(radius<5||radius>50){setSectorMessage("Choisis un rayon entre 5 et 50 km.");return;}
-  await saveSector();
+  const saved=await saveSector();
+  if(!saved)return;
   setProspectSearchMessage("La recherche affiche uniquement les prospects déjà attribués à ton compte dans ce secteur. Les nouveaux contacts seront disponibles après activation de la génération réelle.");
   document.getElementById("lf-my-prospects")?.scrollIntoView({behavior:"smooth",block:"start"});
  }
