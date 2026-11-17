@@ -50,9 +50,7 @@ async function locateProfessional(address, postalCode, city) {
   } catch { return null; }
 }
 
-export async function GET(request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== "Bearer " + secret) return respond({ error: "Non autorisé" }, 401);
+async function synchronize() {
   const email = process.env.GOOGLE_SHEETS_SERVICE_ACCOUNT_EMAIL;
   const key = process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, "\n");
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -108,4 +106,25 @@ export async function GET(request) {
     console.error("LeadFactory Google Sheets sync failed:", error instanceof Error ? error.message : "unknown");
     return respond({ error: "Synchronisation impossible ; consulter les journaux serveur" }, 500);
   }
+}
+
+export async function GET(request) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret || request.headers.get("authorization") !== "Bearer " + secret) return respond({ error: "Non autorisé" }, 401);
+  return synchronize();
+}
+
+export async function POST(request) {
+  const token = request.headers.get("authorization")?.replace(/^Bearer /, "");
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const role = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!token || !url || !anon || !role) return respond({ error: "Authentification requise" }, 401);
+  const authClient = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data: auth, error: authError } = await authClient.auth.getUser(token);
+  if (authError || !auth?.user?.id) return respond({ error: "Session invalide" }, 401);
+  const adminDb = createClient(url, role, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data: profile, error: profileError } = await adminDb.from("profiles").select("is_admin").eq("id", auth.user.id).maybeSingle();
+  if (profileError || !profile?.is_admin) return respond({ error: "Accès réservé à l’administration" }, 403);
+  return synchronize();
 }
