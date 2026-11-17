@@ -79,7 +79,7 @@ export default function LeadFactoryPage(){
  const currentAdvice=adviceTemplates[adviceType];
  const s=state.status;
  const klaviyo=s?.quotas?.klaviyo||0, professional=s?.quotas?.professional||0;
- const visibleCards=state.cards.filter(card=>{if(!selectedCity||!Number.isFinite(Number(card.distance_km)))return true;return Number(card.distance_km)<=radius;});
+ const visibleCards=state.cards; // Existing allocations remain owned by the consultant even if their saved sector changes.
  return <div className={styles.page}>
   <div className={styles.hero}>
    <div><div className={styles.eyebrow}>TESAMI · Espace consultant</div><h1>LeadFactory</h1><p>Développe ton réseau local, découvre tes prospects et prépare des prises de contact professionnelles avec les bons outils.</p></div>
@@ -89,7 +89,7 @@ export default function LeadFactoryPage(){
    <div className={styles.stat}><div className={styles.statLabel}>Mon abonnement</div><div className={styles.statValue}>{s?.plan||"—"}</div><div className={styles.statNote}>Formule actuelle</div><a className={styles.planChange} href="/plans">↻ Changer d’abonnement</a></div>
    <div className={styles.stat}><div className={styles.statLabel}>Contacts Klaviyo / jour</div><div className={styles.statValue}>{s?klaviyo:"—"}</div><div className={styles.statNote}>Quota maximum</div></div>
    <div className={styles.stat}><div className={styles.statLabel}>Prospects pros / jour</div><div className={styles.statValue}>{s?professional:"—"}</div><div className={styles.statNote}>Quota maximum</div></div>
-   <div className={styles.stat}><div className={styles.statLabel}>Mes contacts</div><div className={styles.statValue}>{visibleCards.length}</div><div className={styles.statNote}>Attribués dans mon rayon</div></div>
+   <div className={styles.stat}><div className={styles.statLabel}>Mes contacts</div><div className={styles.statValue}>{visibleCards.length}</div><div className={styles.statNote}>Actuellement attribués</div></div>
   </div>
   {state.loading&&<div className={styles.panel} role="status">Chargement de ton espace LeadFactory…</div>}
   {state.error&&<div className={styles.alert} role="alert"><p>{state.error}</p>{state.error.includes("Connecte-toi")&&<a className={styles.loginLink} href="/login?next=%2Fleadfactory">Se connecter à TESAMI</a>}</div>}
