@@ -32,6 +32,24 @@ async function googleToken(email, privateKey) {
   return json.access_token;
 }
 
+async function locateProfessional(address, postalCode, city) {
+  const query = [address, postalCode, city].filter(Boolean).join(" ").trim();
+  if (!query || (!postalCode && !city)) return null;
+  try {
+    const params = new URLSearchParams({ q: query, limit: "1" });
+    const response = await fetch("https://api-adresse.data.gouv.fr/search/?" + params.toString(), { signal: AbortSignal.timeout(5000), cache: "no-store" });
+    if (!response.ok) return null;
+    const result = await response.json();
+    const feature = result.features?.[0];
+    const coordinates = feature?.geometry?.coordinates;
+    if (!Array.isArray(coordinates) || coordinates.length !== 2 || (feature.properties?.score ?? 0) < 0.5) return null;
+    const [longitude, latitude] = coordinates;
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    if (postalCode && feature.properties?.postcode && !String(feature.properties.postcode).startsWith(String(postalCode).slice(0, 2))) return null;
+    return { latitude, longitude };
+  } catch { return null; }
+}
+
 export async function GET(request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== "Bearer " + secret) return respond({ error: "Non autorisé" }, 401);
@@ -53,7 +71,7 @@ export async function GET(request) {
     if (expected.some((h, i) => clean(rows[0]?.[i]) !== h)) return respond({ error: "En-têtes Google Sheets différents du modèle validé" }, 422);
     if (rows.length >= 1001) return respond({ error: "Limite de 999 prospects atteinte : importer par pagination avant de poursuivre" }, 422);
     const db = createClient(url, role, { auth: { persistSession: false, autoRefreshToken: false } });
-    let imported = 0, duplicates = 0, invalid = 0;
+    let imported = 0, duplicates = 0, invalid = 0, geocoded = 0, missingCoordinates = 0;
     for (const row of rows.slice(1)) {
       if (!row.some(v => clean(v))) continue;
       const source_id = clean(row[0], 150) || null;
@@ -78,12 +96,14 @@ export async function GET(request) {
         prospect_status: "À contacter", source: clean(row[13], 200) || "Google Sheets TESAMI",
         notes: clean(row[15], 1000) || null
       };
+      const position = await locateProfessional(record.address, record.postal_code, record.city);
+      if (position) { Object.assign(record, position); geocoded++; } else missingCoordinates++;
       const { error } = await db.from("lead_private_professional_imports").insert(record);
       if (error?.code === "23505") { duplicates++; continue; }
       if (error) throw error;
       imported++;
     }
-    return respond({ ok: true, imported, duplicates, invalid, checked: Math.max(rows.length - 1, 0), source: "Google Sheets BTOB" });
+    return respond({ ok: true, imported, duplicates, invalid, geocoded, missingCoordinates, checked: Math.max(rows.length - 1, 0), source: "Google Sheets BTOB" });
   } catch (error) {
     console.error("LeadFactory Google Sheets sync failed:", error instanceof Error ? error.message : "unknown");
     return respond({ error: "Synchronisation impossible ; consulter les journaux serveur" }, 500);
