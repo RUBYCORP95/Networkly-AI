@@ -37,7 +37,7 @@ async function locateProfessional(address, postalCode, city) {
   if (!query || (!postalCode && !city)) return null;
   try {
     const params = new URLSearchParams({ q: query, limit: "1" });
-    const response = await fetch("https://api-adresse.data.gouv.fr/search/?" + params.toString(), { signal: AbortSignal.timeout(5000), cache: "no-store" });
+    const response = await fetch("https://data.geopf.fr/geocodage/search/?" + params.toString(), { signal: AbortSignal.timeout(5000), cache: "no-store" });
     if (!response.ok) return null;
     const result = await response.json();
     const feature = result.features?.[0];
@@ -69,7 +69,8 @@ async function synchronize() {
     if (expected.some((h, i) => clean(rows[0]?.[i]) !== h)) return respond({ error: "En-têtes Google Sheets différents du modèle validé" }, 422);
     if (rows.length >= 5001) return respond({ error: "Limite de 4999 prospects atteinte : ajouter une pagination avant de poursuivre" }, 422);
     const db = createClient(url, role, { auth: { persistSession: false, autoRefreshToken: false } });
-    let imported = 0, duplicates = 0, invalid = 0, geocoded = 0, missingCoordinates = 0;
+    let imported = 0, duplicates = 0, invalid = 0, geocoded = 0, missingCoordinates = 0, updatedCoordinates = 0;
+    let geocodingBudget = 20; // Avoid serverless timeouts; subsequent syncs complete the backlog.
     for (const row of rows.slice(1)) {
       if (!row.some(v => clean(v))) continue;
       const source_id = clean(row[0], 150) || null;
@@ -77,14 +78,26 @@ async function synchronize() {
       const phone = normalizePhone(row[5]) || null;
       const email = clean(row[6], 254).toLowerCase() || null;
       if (!company || (!source_id && !phone && !email)) { invalid++; continue; }
-      let existing = false;
+      let existing = null;
       for (const [column, value] of [["source_id", source_id], ["email", email], ["phone", phone]]) {
         if (!value) continue;
-        const { data: found, error } = await db.from("lead_private_professional_imports").select("id").eq(column, value).limit(1);
+        const { data: found, error } = await db.from("lead_private_professional_imports").select("id,latitude,longitude").eq(column, value).limit(1);
         if (error) throw error;
-        if (found?.length) { existing = true; break; }
+        if (found?.length) { existing = found[0]; break; }
       }
-      if (existing) { duplicates++; continue; }
+      if (existing) {
+        duplicates++;
+        if ((existing.latitude == null || existing.longitude == null) && geocodingBudget > 0) {
+          geocodingBudget--;
+          const position = await locateProfessional(clean(row[7],400),clean(row[8],30),clean(row[9],150));
+          if (position) {
+            const { error } = await db.from("lead_private_professional_imports").update(position).eq("id", existing.id);
+            if (error) throw error;
+            updatedCoordinates++;
+          } else missingCoordinates++;
+        }
+        continue;
+      }
       const record = {
         source_id, company, sector: clean(row[2], 200) || null,
         first_name: clean(row[3], 120) || null, last_name: clean(row[4], 120) || null,
@@ -94,14 +107,15 @@ async function synchronize() {
         prospect_status: "À contacter", source: clean(row[13], 200) || "Google Sheets TESAMI",
         notes: clean(row[15], 1000) || null
       };
-      const position = await locateProfessional(record.address, record.postal_code, record.city);
+      const position = geocodingBudget > 0 ? await locateProfessional(record.address, record.postal_code, record.city) : null;
+      if (geocodingBudget > 0) geocodingBudget--;
       if (position) { Object.assign(record, position); geocoded++; } else missingCoordinates++;
       const { error } = await db.from("lead_private_professional_imports").insert(record);
       if (error?.code === "23505") { duplicates++; continue; }
       if (error) throw error;
       imported++;
     }
-    return respond({ ok: true, imported, duplicates, invalid, geocoded, missingCoordinates, checked: Math.max(rows.length - 1, 0), source: "Google Sheets BTOB" });
+    return respond({ ok: true, imported, duplicates, invalid, geocoded, updatedCoordinates, missingCoordinates, checked: Math.max(rows.length - 1, 0), source: "Google Sheets BTOB" });
   } catch (error) {
     console.error("LeadFactory Google Sheets sync failed:", error instanceof Error ? error.message : "unknown");
     return respond({ error: "Synchronisation impossible ; consulter les journaux serveur" }, 500);
