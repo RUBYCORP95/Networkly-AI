@@ -20,3 +20,5 @@
 .planChange{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-top:14px;padding:10px 12px;border-radius:10px;background:#642bc7;color:#fff!important;font-size:12px;font-weight:750;text-decoration:none!important;white-space:normal;text-align:center;line-height:1.3;transition:background .15s}
 .planChange:hover{background:#4c209e}
 .planChange:focus-visible{outline:3px solid #b99cff;outline-offset:2px}
+
+.demoPanel{width:100%;margin:22px 0;padding:24px;border:1px solid #d8c9fb;border-radius:20px;background:#f8f4ff;color:#2b1c62}.demoPanel>p{font-size:14px;line-height:1.6;color:#655785}.demoGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px;margin-top:18px}.demoItem{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:16px;background:white;border:1px solid #e4dafa;border-radius:14px}.demoItem>span{font-size:13px;color:#77718d}.demoItem button{margin-top:auto}
