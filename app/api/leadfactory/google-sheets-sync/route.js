@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SHEET_ID = "1_8u7XQknjBcsttXbfjWpMgNuSJs9qiUigGYg_UGijaE";
-const SHEET_RANGE = "'Feuille 1'!A1:P1001";
+const SHEET_RANGE = "'Feuille 1'!A1:P5001";
 const clean = (value, max = 500) => String(value ?? "").trim().slice(0, max);
 const normalizePhone = value => clean(value, 60).replace(/[^0-9+]/g, "");
 const respond = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -67,7 +67,7 @@ async function synchronize() {
     const rows = data.values || [];
     const expected = ["ID prospect","Entreprise","Activité","Prénom","Nom","Téléphone","Email","Adresse","Code postal","Ville","Département","Site internet","Statut prospection","Source","Dernière mise à jour","Notes"];
     if (expected.some((h, i) => clean(rows[0]?.[i]) !== h)) return respond({ error: "En-têtes Google Sheets différents du modèle validé" }, 422);
-    if (rows.length >= 1001) return respond({ error: "Limite de 999 prospects atteinte : importer par pagination avant de poursuivre" }, 422);
+    if (rows.length >= 5001) return respond({ error: "Limite de 4999 prospects atteinte : ajouter une pagination avant de poursuivre" }, 422);
     const db = createClient(url, role, { auth: { persistSession: false, autoRefreshToken: false } });
     let imported = 0, duplicates = 0, invalid = 0, geocoded = 0, missingCoordinates = 0;
     for (const row of rows.slice(1)) {
