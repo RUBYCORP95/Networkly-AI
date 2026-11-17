@@ -70,7 +70,13 @@ async function synchronize() {
     if (rows.length >= 5001) return respond({ error: "Limite de 4999 prospects atteinte : ajouter une pagination avant de poursuivre" }, 422);
     const db = createClient(url, role, { auth: { persistSession: false, autoRefreshToken: false } });
     let imported = 0, duplicates = 0, invalid = 0, geocoded = 0, missingCoordinates = 0, updatedCoordinates = 0;
-    let geocodingBudget = 20; // Avoid serverless timeouts; subsequent syncs complete the backlog.
+    let geocodingBudget = 20; // Avoid serverless timeouts.
+    // Choose a new batch of missing coordinates on each sync, not the first 20 rows repeatedly.
+    const { data: pendingGeocodes, error: pendingError } = await db.from("lead_private_professional_imports")
+      .select("source_id").is("latitude", null).not("source_id", "is", null)
+      .order("source_id", { ascending: true }).limit(20);
+    if (pendingError) throw pendingError;
+    const pendingIds = new Set((pendingGeocodes || []).map(item => item.source_id));
     for (const row of rows.slice(1)) {
       if (!row.some(v => clean(v))) continue;
       const source_id = clean(row[0], 150) || null;
@@ -87,7 +93,7 @@ async function synchronize() {
       }
       if (existing) {
         duplicates++;
-        if ((existing.latitude == null || existing.longitude == null) && geocodingBudget > 0) {
+        if ((existing.latitude == null || existing.longitude == null) && geocodingBudget > 0 && pendingIds.has(source_id)) {
           geocodingBudget--;
           const position = await locateProfessional(clean(row[7],400),clean(row[8],30),clean(row[9],150));
           if (position) {
