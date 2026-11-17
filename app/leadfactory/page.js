@@ -67,11 +67,11 @@ export default function LeadFactoryPage(){
  const currentAdvice=adviceTemplates[adviceType];
  const s=state.status;
  const klaviyo=s?.quotas?.klaviyo||0, professional=s?.quotas?.professional||0;
- return <main className={styles.page}>
-  <header className={styles.hero}>
+ return <div className={styles.page}>
+  <div className={styles.hero}>
    <div><div className={styles.eyebrow}>TESAMI · Espace consultant</div><h1>LeadFactory</h1><p>Développe ton réseau local, découvre tes prospects et prépare des prises de contact professionnelles avec les bons outils.</p></div>
    <div className={styles.heroBadge}>✦ Prospection de proximité</div>
-  </header>
+  </div>
   <div className={styles.stats}>
    <div className={styles.stat}><div className={styles.statLabel}>Mon abonnement</div><div className={styles.statValue}>{s?.plan||"—"}</div><div className={styles.statNote}>Formule actuelle</div></div>
    <div className={styles.stat}><div className={styles.statLabel}>Contacts Klaviyo / jour</div><div className={styles.statValue}>{s?klaviyo:"—"}</div><div className={styles.statNote}>Quota maximum</div></div>
@@ -81,7 +81,7 @@ export default function LeadFactoryPage(){
   {state.loading&&<div className={styles.panel} role="status">Chargement de ton espace LeadFactory…</div>}
   {state.error&&<div className={styles.alert} role="alert"><p>{state.error}</p>{state.error.includes("Connecte-toi")&&<a className={styles.loginLink} href="/login?next=%2Fleadfactory">Se connecter à TESAMI</a>}</div>}
   {s&&<div className={styles.layout}>
-   <section className={styles.panel}>
+   <div className={styles.panel}>
     <h2>📍 Mon secteur géographique</h2><p className={styles.muted}>Choisis ta commune et ton rayon pour cibler les professionnels proches de toi.</p>
     <label className={styles.label} htmlFor="lf-city">Ville ou code postal</label>
     <div className={styles.searchRow}><input className={styles.input} id="lf-city" value={cityQuery} onChange={e=>{setCityQuery(e.target.value);setSelectedCity(null);setCities([]);}} onKeyDown={e=>{if(e.key==="Enter")searchCities();}} placeholder="Ex. Viarmes ou 95270"/><button className={styles.buttonSecondary} onClick={searchCities} disabled={searchingCities||cityQuery.trim().length<2}>{searchingCities?"Recherche…":"Rechercher"}</button></div>
@@ -91,8 +91,8 @@ export default function LeadFactoryPage(){
     <div className={styles.rangeLabels}><span>5 km</span><span>25 km</span><span>50 km</span></div>
     <div style={{marginTop:22}}><button className={styles.button} onClick={saveSector} disabled={savingSector||!selectedCity}>{savingSector?"Enregistrement…":"Enregistrer mon secteur"}</button></div>
     {sectorMessage&&<p className={styles.message} role="status">{sectorMessage}</p>}
-   </section>
-   <section className={styles.panel}>
+   </div>
+   <div className={styles.panel}>
     <h2>🎯 Mes prospects du jour</h2><p className={styles.muted}>Retrouve ici tes quotas et le statut de ta demande quotidienne.</p>
     <div className={styles.quota}><span>Contacts Klaviyo</span><strong>{klaviyo}</strong></div>
     <div className={styles.quota}><span>Prospects professionnels</span><strong>{professional}</strong></div>
@@ -100,11 +100,11 @@ export default function LeadFactoryPage(){
     <p className={styles.muted}>{s.today?.requested?"Demande du jour : "+s.today.status:"Aucune demande aujourd’hui."}</p>
     <button className={styles.button} disabled title="Génération désactivée pendant les vérifications de conformité">Générer mes prospects</button>
     <p className={styles.disabledNote}>Génération momentanément désactivée pendant les tests de conformité et d’attribution exclusive.</p>
-   </section>
+   </div>
   </div>}
   <div className={styles.sectionHeading}><h2>Mes contacts attribués</h2><button className={styles.buttonSecondary} onClick={()=>setAdviceOpen(v=>!v)}>{adviceOpen?"Masquer les conseils":"💬 Conseils pour contacter un pro"}</button></div>
-  {adviceOpen&&<section id="leadfactory-advice" className={styles.advice}><h2>Comment démarrer la discussion ?</h2><p className={styles.muted}>Sélectionne une approche et personnalise le texte selon l’activité du professionnel.</p><div className={styles.adviceTabs}>{Object.entries(adviceTemplates).map(([key,item])=><button key={key} className={adviceType===key?styles.tab+" "+styles.tabActive:styles.tab} onClick={()=>{setAdviceType(key);setAdviceCopied(false);}} aria-pressed={adviceType===key}>{item.title}</button>)}</div><h3>{currentAdvice.title}</h3><p>{currentAdvice.tip}</p><div className={styles.script}>{currentAdvice.message}</div><div style={{marginTop:14}}><button className={styles.button} onClick={async()=>{try{await navigator.clipboard.writeText(currentAdvice.message);setAdviceCopied(true);}catch{setAdviceCopied(false);}}}>{adviceCopied?"Message copié !":"Copier le message"}</button></div><p className={styles.footnote}>Respecte les règles de prospection professionnelle, les refus et les demandes d’opposition. Ne promets pas de revenus.</p></section>}
+  {adviceOpen&&<div id="leadfactory-advice" className={styles.advice}><h2>Comment démarrer la discussion ?</h2><p className={styles.muted}>Sélectionne une approche et personnalise le texte selon l’activité du professionnel.</p><div className={styles.adviceTabs}>{Object.entries(adviceTemplates).map(([key,item])=><button key={key} className={adviceType===key?styles.tab+" "+styles.tabActive:styles.tab} onClick={()=>{setAdviceType(key);setAdviceCopied(false);}} aria-pressed={adviceType===key}>{item.title}</button>)}</div><h3>{currentAdvice.title}</h3><p>{currentAdvice.tip}</p><div className={styles.script}>{currentAdvice.message}</div><div style={{marginTop:14}}><button className={styles.button} onClick={async()=>{try{await navigator.clipboard.writeText(currentAdvice.message);setAdviceCopied(true);}catch{setAdviceCopied(false);}}}>{adviceCopied?"Message copié !":"Copier le message"}</button></div><p className={styles.footnote}>Respecte les règles de prospection professionnelle, les refus et les demandes d’opposition. Ne promets pas de revenus.</p></div>}
   {!state.loading&&state.cards.length===0&&<div className={styles.empty}><div className={styles.emptyIcon}>✉</div><strong>Aucun contact attribué pour le moment</strong><p>Lorsque des prospects te seront attribués, tu les retrouveras ici avec leur secteur et un bouton pour les contacter.</p></div>}
   <div className={styles.cards}>{state.cards.map(card=><article key={card.allocation_id} className={styles.leadCard}><h3>{card.contact_kind==="klaviyo"?"Contact Klaviyo":"Prospect professionnel"}</h3><p>📍 {[card.postal_code,card.city,card.department].filter(Boolean).join(" · ")||"Secteur non précisé"}</p><p>Distance : {card.distance_km??"—"} km</p><p>À contacter avant le {new Date(card.expires_at).toLocaleString("fr-FR")}</p>{card.contact_kind!=="klaviyo"&&<button className={styles.buttonSecondary} onClick={()=>{setAdviceOpen(true);setAdviceType("partnership");setAdviceCopied(false);setTimeout(()=>document.getElementById("leadfactory-advice")?.scrollIntoView({behavior:"smooth"}),0);}}>💬 Idées pour aborder ce pro</button>}<div style={{marginTop:12}}>{state.revealed[card.allocation_id]?<div><p>Téléphone : {state.revealed[card.allocation_id].phone||"Non renseigné"}</p><p>E-mail : {state.revealed[card.allocation_id].email||"Non renseigné"}</p></div>:<button className={styles.button} onClick={()=>reveal(card.allocation_id)} disabled={busy===card.allocation_id}>{busy===card.allocation_id?"Chargement…":"Contacter"}</button>}</div></article>)}</div>
- </main>;
+ </div>;
 }
