@@ -4,7 +4,7 @@ import {createClient} from "../../lib/supabase/client";
 import styles from "./leadfactory.module.css";
 
 export default function LeadFactoryPage(){
- const [state,setState]=useState({loading:true,error:"",status:null,cards:[],revealed:{}});
+ const [state,setState]=useState({loading:true,error:"",status:null,cards:[],revealed:{},limited:false});
  const [busy,setBusy]=useState(null);
  const [demo,setDemo]=useState(false);
  const [adviceOpen,setAdviceOpen]=useState(false);
@@ -26,12 +26,12 @@ export default function LeadFactoryPage(){
     headers:{Authorization:"Bearer "+session.access_token,apikey:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}
    });
    const status=await response.json();
-   if(!response.ok)throw new Error(status.error||"Statut indisponible");
+   if(!response.ok){if(response.status===403){setState(s=>({...s,loading:false,error:"",status:null,cards:[],limited:true}));return;}throw new Error(status.error||"Statut indisponible");}
    const {data:cards,error}=await supabase.rpc("my_lead_allocation_cards");
    if(error)throw error;
    const {data:pref}=await supabase.from("lead_preferences").select("city,radius_km,latitude,longitude").eq("user_id",session.user.id).maybeSingle();
    if(pref){setCityQuery(pref.city||"");setRadius(pref.radius_km||25);if(pref.latitude!=null&&pref.longitude!=null)setSelectedCity({name:pref.city,latitude:pref.latitude,longitude:pref.longitude});}
-   setState(s=>({...s,loading:false,error:"",status,cards:cards||[]}));
+   setState(s=>({...s,loading:false,error:"",status,cards:cards||[],limited:false}));
   }catch(e){setState(s=>({...s,loading:false,error:e.message||"Erreur de chargement"}));}
  },[]);
  useEffect(()=>{load()},[load]);
@@ -50,7 +50,7 @@ export default function LeadFactoryPage(){
    const {error}=await supabase.from("lead_preferences").upsert({user_id:user.id,city:selectedCity.name,radius_km:radius,latitude:selectedCity.latitude,longitude:selectedCity.longitude,updated_at:new Date().toISOString()},{onConflict:"user_id"});
    if(error)throw error;
    setSectorMessage("Secteur enregistré : "+selectedCity.name+" · "+radius+" km.");
-   await load();
+   if(!state.limited)await load();
   }catch(e){setSectorMessage(e.message||"Enregistrement impossible");}finally{setSavingSector(false);}
  }
  async function reveal(id){
@@ -81,7 +81,8 @@ export default function LeadFactoryPage(){
   </div>
   {state.loading&&<div className={styles.panel} role="status">Chargement de ton espace LeadFactory…</div>}
   {state.error&&<div className={styles.alert} role="alert"><p>{state.error}</p>{state.error.includes("Connecte-toi")&&<a className={styles.loginLink} href="/login?next=%2Fleadfactory">Se connecter à TESAMI</a>}</div>}
-  {s&&<div className={styles.layout}>
+  {state.limited&&<div className={styles.betaNotice} role="status"><strong>Bienvenue dans la bêta publique !</strong><p>Tu peux tester gratuitement les dix contacts fictifs, les conseils de prospection et l’interface. Les vrais contacts Klaviyo et professionnels ne sont pas accessibles aux comptes bêta non autorisés.</p><a href="/login?next=%2Fleadfactory">Gérer mon compte</a></div>}
+  {(s||state.limited)&&<div className={styles.layout}>
    <div className={styles.panel}>
     <h2>📍 Mon secteur géographique</h2><p className={styles.muted}>Choisis ta commune et ton rayon pour cibler les professionnels proches de toi.</p>
     <label className={styles.label} htmlFor="lf-city">Ville ou code postal</label>
@@ -97,8 +98,8 @@ export default function LeadFactoryPage(){
     <h2>🎯 Mes prospects du jour</h2><p className={styles.muted}>Retrouve ici tes quotas et le statut de ta demande quotidienne.</p>
     <div className={styles.quota}><span>Contacts Klaviyo</span><strong>{klaviyo}</strong></div>
     <div className={styles.quota}><span>Prospects professionnels</span><strong>{professional}</strong></div>
-    <p className={styles.muted}>Secteur : <strong>{s.sector?.city||"Non renseigné"}</strong> · Rayon : <strong>{s.sector?.radius_km||"—"} km</strong></p>
-    <p className={styles.muted}>{s.today?.requested?"Demande du jour : "+s.today.status:"Aucune demande aujourd’hui."}</p>
+    <p className={styles.muted}>Secteur : <strong>{s?.sector?.city||"Non renseigné"}</strong> · Rayon : <strong>{s?.sector?.radius_km||"—"} km</strong></p>
+    <p className={styles.muted}>{s?.today?.requested?"Demande du jour : "+s.today.status:"Aucune demande aujourd’hui."}</p>
     <button className={styles.button} type="button" onClick={()=>setDemo(v=>!v)}>{demo?"Masquer la démonstration":"Tester la génération (mode démo)"}</button>
     <p className={styles.disabledNote}>Mode bêta : cette démonstration utilise uniquement des contacts fictifs. La distribution de vrais prospects reste désactivée pendant les vérifications.</p>
    </div>
