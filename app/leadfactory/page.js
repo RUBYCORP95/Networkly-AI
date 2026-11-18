@@ -6,6 +6,7 @@ import styles from "./leadfactory.module.css";
 export default function LeadFactoryPage(){
  const [state,setState]=useState({loading:true,error:"",status:null,cards:[],revealed:{},limited:false});
  const [busy,setBusy]=useState(null);
+ const [accessRequest,setAccessRequest]=useState({open:false,identifier:"",status:"",sending:false,error:""});
  const [demo,setDemo]=useState(false);
  const [generatingReal,setGeneratingReal]=useState(false);
  const [generationMessage,setGenerationMessage]=useState("");
@@ -57,6 +58,8 @@ export default function LeadFactoryPage(){
   }catch(e){setState(s=>({...s,loading:false,error:e.message||"Erreur de chargement"}));}
  },[]);
  useEffect(()=>{load()},[load]);
+ useEffect(()=>{if(!state.limited)return;createClient().from("lead_team_memberships").select("status,consultant_identifier").maybeSingle().then(({data})=>{if(data)setAccessRequest(v=>({...v,status:data.status||"",identifier:data.consultant_identifier||""}));});},[state.limited]);
+ async function requestLeadAccess(){setAccessRequest(v=>({...v,sending:true,error:""}));try{const {data,error}=await createClient().rpc("request_my_lead_team_access",{p_consultant_identifier:accessRequest.identifier.trim()});if(error)throw error;setAccessRequest(v=>({...v,sending:false,status:data,open:false}));}catch(e){setAccessRequest(v=>({...v,sending:false,error:e.message||"Demande impossible"}));}}
  async function searchCities(){
   setSearchingCities(true);setSectorMessage("");
   try{const res=await fetch("/api/leadfactory/cities?q="+encodeURIComponent(cityQuery));const data=await res.json();if(!res.ok)throw new Error(data.error||"Recherche impossible");setCities(data.cities||[]);if(!data.cities?.length)setSectorMessage("Aucune ville trouvée. Essaie une autre orthographe ou un code postal.");}
@@ -131,6 +134,7 @@ export default function LeadFactoryPage(){
  const s=state.status;
  const klaviyo=s?.quotas?.klaviyo||0, professional=s?.quotas?.professional||0;
  const visibleCards=state.cards; // Existing allocations remain owned by the consultant even if their saved sector changes.
+ if(state.limited)return <div className={styles.page}><div className={styles.hero}><div><div className={styles.eyebrow}>TESAMI · LeadFactory</div><h1>🔒 LeadFactory</h1><p>L’accès aux leads est verrouillé tant que ton compte n’a pas été autorisé.</p></div></div><div className={styles.panel} style={{maxWidth:620,margin:"30px auto",textAlign:"center",padding:30}}><div style={{fontSize:52,marginBottom:12}}>🔒</div><h2>{accessRequest.status==="pending"?"Demande en attente de validation":"Débloquer mes prospects"}</h2><p>{accessRequest.status==="pending"?"Ta demande a été envoyée. Un administrateur doit confirmer ton accès gratuit aux leads.":"Tu es consultant Chogan ? Clique ci-dessous pour demander ton accès gratuit. Studio IA reste disponible avec ton compte TESAMI."}</p>{accessRequest.status!=="pending"&&<button type="button" className={styles.button} onClick={()=>setAccessRequest(v=>({...v,open:true}))}>Demander mon accès LeadFactory</button>}{accessRequest.open&&<div style={{marginTop:20,textAlign:"left"}}><label>Mon identifiant consultant Chogan<input style={{display:"block",width:"100%",marginTop:8,padding:12}} value={accessRequest.identifier} onChange={e=>setAccessRequest(v=>({...v,identifier:e.target.value}))} placeholder="Identifiant consultant" maxLength={100}/></label>{accessRequest.error&&<p role="alert">{accessRequest.error}</p>}<button className={styles.button} type="button" disabled={accessRequest.sending||accessRequest.identifier.trim().length<2} onClick={requestLeadAccess}>{accessRequest.sending?"Envoi…":"Envoyer ma demande"}</button></div>}</div></div>;
  return <div className={styles.page}>
   <div className={styles.hero}>
    <div><div className={styles.eyebrow}>TESAMI · Espace consultant</div><h1>LeadFactory</h1><p>Développe ton réseau local, découvre tes prospects et prépare des prises de contact professionnelles avec les bons outils.</p></div>
