@@ -7,7 +7,7 @@ export async function POST(request){
  if(!access.ok)return Response.json({error:access.error},{status:access.status});
  const token=process.env.INSTAGRAM_DISCOVERY_ACCESS_TOKEN;
  const userId=process.env.INSTAGRAM_DISCOVERY_IG_USER_ID;
- if(!token||!userId)return Response.json({error:"La connexion Instagram administrateur n'est pas encore configurée. Ajoutez INSTAGRAM_DISCOVERY_ACCESS_TOKEN et INSTAGRAM_DISCOVERY_IG_USER_ID dans les variables serveur Vercel."},{status:503});
+ if(!token||!userId)return Response.json({error:"La recherche Instagram doit être configurée par l’administration de TESAMI."},{status:503});
  let body;
  try{body=await request.json()}catch{return Response.json({error:"Requête invalide"},{status:400})}
  const excludeBusinesses=body.excludeBusinesses!==false;
@@ -21,7 +21,11 @@ export async function POST(request){
   Object.entries({...params,access_token:token}).forEach(([k,v])=>url.searchParams.set(k,String(v)));
   const response=await fetch(url,{cache:"no-store"});
   const json=await response.json();
-  if(!response.ok||json.error)throw new Error(json.error?.message||"Erreur Meta Instagram");
+  if (!response.ok || json.error) {
+   const error = new Error("Erreur Meta Instagram");
+   error.metaCode = Number(json.error?.code);
+   throw error;
+  }
   return json;
  }
  try{
@@ -38,7 +42,7 @@ export async function POST(request){
    if(page>0&&Date.now()-searchStarted>6500)break;
    let batch;
    try{batch=await graph(mediaPath,{...mediaParams,...(afterCursor?{after:afterCursor}:{})});}
-   catch(error){if(recentPages.length)break;throw error;}
+   catch(error){if(recentPages.length&&error.metaCode!==190)break;throw error;}
    recentPages.push(...(batch.data||[]));
    const batchDates=(batch.data||[]).map(x=>Date.parse(x.timestamp)).filter(Number.isFinite);
    if(batchDates.length&&Math.min(...batchDates)<cutoff)break;
@@ -94,5 +98,13 @@ export async function POST(request){
    }
   }
   return Response.json({hashtag,items,remaining,excludeBusinesses,language,availableDays:days,exhausted:items.length===0},{headers:{"Cache-Control":"no-store"}});
- }catch(e){return Response.json({error:"Recherche Instagram indisponible : "+String(e.message||e)},{status:502})}
+ } catch (error) {
+  if (error.metaCode === 190) {
+   return Response.json({
+    code: "instagram_connection_expired",
+    error: "La connexion Instagram de TESAMI doit être renouvelée par l’administration. Cette tentative n’a pas été décomptée.",
+   }, { status: 503 });
+  }
+  return Response.json({ error: "La recherche Instagram est temporairement indisponible. Réessaie dans quelques instants." }, { status: 502 });
+ }
 }
