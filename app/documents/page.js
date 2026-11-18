@@ -16,7 +16,7 @@ export default async function DocumentsPage() {
       <p style={{marginTop:40,fontSize:12,fontWeight:700,letterSpacing:2,color:"#7465a5"}}>RESSOURCES CONSULTANTS</p>
       <h1 style={{fontSize:"clamp(28px,4vw,42px)",margin:"8px 0"}}>Documents & Formations</h1>
       <p style={{color:"#667085",marginBottom:30}}>Retrouve ici les documents partagés par ton équipe, directement depuis TESAMI.</p>
-      <h2 style={{fontSize:21,marginBottom:16}}>Parfums</h2>
+      <div style={{background:"linear-gradient(115deg,#5841ac,#8368d4)",color:"white",borderRadius:18,padding:26,margin:"22px 0 34px"}}><p style={{fontSize:12,letterSpacing:2,fontWeight:700}}>ACADÉMIE TESAMI</p><h2 style={{fontSize:25,margin:"8px 0"}}>Bibliothèque de formations vidéo</h2><p style={{opacity:.9}}>Replays classés par thème, avec recherche et accès direct aux vidéos.</p><Link href="/formations" style={{display:"inline-block",background:"white",color:"#50399e",borderRadius:10,padding:"12px 18px",fontWeight:700,textDecoration:"none",marginTop:12}}>Explorer les formations →</Link></div><h2 style={{fontSize:21,marginBottom:16}}>Parfums</h2>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:18}}>
         {documents.map(doc=><article key={doc.url} style={{background:"white",border:"1px solid #e8e6f0",borderRadius:18,padding:24,boxShadow:"0 4px 20px rgba(20,20,40,.04)"}}>
           <div style={{display:"flex",gap:8,marginBottom:16}}><span style={{background:"#eee9ff",color:"#5a3fb2",borderRadius:20,padding:"5px 11px",fontSize:12,fontWeight:700}}>{doc.category}</span><span style={{background:"#f3f4f6",borderRadius:20,padding:"5px 11px",fontSize:12}}>{doc.type}</span></div>
