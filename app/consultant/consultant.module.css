@@ -1,0 +1,55 @@
+.page {
+  display: block;
+  max-width: 1120px;
+  min-height: 100vh;
+  margin: auto;
+  padding: clamp(18px, 5vw, 52px);
+  color: #201740;
+}
+.page > a { color: #5634a8; font-weight: 650; }
+.page h1 { font-size: clamp(30px, 6vw, 48px); margin: 24px 0 16px; }
+.page h2 { font-size: 21px; margin: 26px 0 12px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); gap: 14px; }
+.card, .panel {
+  background: white;
+  border: 1px solid #ded6f2;
+  border-radius: 16px;
+  padding: 18px;
+}
+.card { display: flex; flex-direction: column; gap: 8px; text-decoration: none; color: inherit; overflow-wrap: anywhere; }
+.card svg { color: #6b42c3; }
+.card:is(:hover, :focus-visible) { border-color: #6b42c3; }
+.card span, .muted { color: #574e69; }
+.form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.form label { display: grid; gap: 5px; flex: 1 1 135px; }
+.form :is(input, select) { width: 100%; min-width: 0; padding: 9px; border: 1px solid #b8adc9; border-radius: 8px; background: white; color: inherit; }
+.page button { padding: 9px 13px; border: 1px solid #6236b8; border-radius: 8px; background: #6236b8; color: white; cursor: pointer; }
+.notice { padding: 12px; border-radius: 8px; background: #eee6fd; }
+.calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-top: 12px; }
+.day, .weekday { min-width: 0; padding: 5px; }
+.day { min-height: 62px; background: white; border: 1px solid #ded6f2; border-radius: 6px; }
+.weekday { font-size: 12px; text-align: center; }
+.busy { background: #e9dfff; }
+.day small { display: block; line-height: 1.2; font-size: 11px; }
+.trips { display: grid; gap: 10px; padding: 0; list-style: none; }
+.trips li { overflow-wrap: anywhere; }
+.trips form { margin-top: 8px; }
+@media (max-width: 480px) {
+  .day { min-height: 44px; padding: 4px; }
+  .day small span { display: none; }
+}
+.teamVisuals { margin: 20px 0 30px; padding: 16px; border: 1px solid #ded6f2; border-radius: 16px; background: white; }
+.teamBanner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  background: linear-gradient(115deg, #3d246e, #6542ad);
+  color: white;
+}
+.teamBanner h2 { color: white; margin: 0; font-size: clamp(18px, 4vw, 26px); }
+.teamVisuals form { margin-top: 16px; }
+.teamVisuals button { padding: 9px 13px; border: 0; border-radius: 8px; background: #6236b8; color: white; cursor: pointer; }
+.teamImage { width: 100%; height: 170px; object-fit: contain; background: #f8f6fc; border-radius: 8px; }
