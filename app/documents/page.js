@@ -1,3 +1,4 @@
+import { requireConsultant } from "../../lib/auth/consultant";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerSupabase } from "../../lib/supabase/server";
@@ -8,9 +9,10 @@ const documents = [
 ];
 export default async function DocumentsPage() {
   const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/documents");
-  return <main style={{minHeight:"100vh",background:"#f7f8fc",padding:"clamp(20px,5vw,56px)",color:"#172033",fontFamily:"inherit"}}>
+  const access = await requireConsultant(supabase);
+  if (access.status === 401) redirect("/login?next=/documents");
+  if (!access.ok) redirect("/");
+  return <main style={{display:"block",minHeight:"100vh",background:"#f7f8fc",padding:"clamp(20px,5vw,56px)",color:"#172033",fontFamily:"inherit"}}>
     <div style={{maxWidth:1040,margin:"0 auto"}}>
       <Link href="/" style={{color:"#6554bd",textDecoration:"none",fontWeight:600}}>← Tableau de bord</Link>
       <p style={{marginTop:40,fontSize:12,fontWeight:700,letterSpacing:2,color:"#7465a5"}}>RESSOURCES CONSULTANTS</p>
