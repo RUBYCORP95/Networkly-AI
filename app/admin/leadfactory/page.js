@@ -53,6 +53,57 @@ export default function LeadFactoryAdmin(){
  }
  async function loadContacts(page=0,q=search){setContactLoading(true);setError("");try{const supabase=createClient();const {data:{session}}=await supabase.auth.getSession();if(!session?.access_token)throw new Error("Connexion administrateur requise");const response=await fetch(process.env.NEXT_PUBLIC_SUPABASE_URL+"/functions/v1/leadfactory-private-contacts?page="+page+"&search="+encodeURIComponent(q),{headers:{Authorization:"Bearer "+session.access_token,apikey:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}});const data=await response.json();if(!response.ok)throw new Error(data.error||"Erreur de chargement");setContacts(data.contacts||[]);setContactTotal(data.total||0);setContactPage(page);}catch(e){setError(e.message||"Erreur de chargement")}finally{setContactLoading(false)}}
 
+ const [approvalConfirm,setApprovalConfirm]=useState(false),[approvingId,setApprovingId]=useState(null);
+ async function approveProfessional(id){
+  if(!approvalConfirm)return;
+  setApprovingId(id);setAuditError("");
+  try{
+   const {data:{session}}=await createClient().auth.getSession();
+   if(!session?.access_token)throw new Error("Session administrateur requise");
+   const res=await fetch("/api/leadfactory/professional-approve",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({id,confirmed:true})});
+   const data=await res.json();if(!res.ok)throw new Error(data.error||"Validation impossible");
+   await runProfessionalAudit();
+  }catch(e){setAuditError(e.message||"Validation impossible")}finally{setApprovingId(null)}
+ }
+ const [auditBusy,setAuditBusy]=useState(false),[audit,setAudit]=useState(null),[auditError,setAuditError]=useState("");
+ async function runProfessionalAudit(){
+  setAuditBusy(true);setAuditError("");
+  try{
+   const {data:{session}}=await createClient().auth.getSession();
+   if(!session?.access_token)throw new Error("Connexion administrateur requise");
+   const res=await fetch("/api/leadfactory/professional-audit",{headers:{Authorization:"Bearer "+session.access_token},cache:"no-store"});
+   const data=await res.json();if(!res.ok)throw new Error(data.error||"Vérification impossible");
+   setAudit(data);
+  }catch(e){setAuditError(e.message||"Erreur de vérification")}finally{setAuditBusy(false)}
+ }
+ const [sheetBusy,setSheetBusy]=useState(false),[sheetResult,setSheetResult]=useState(null),[sheetError,setSheetError]=useState("");
+ async function synchronizeSheet(){
+  setSheetBusy(true);setSheetResult(null);setSheetError("");
+  try{
+   const {data:{session}}=await createClient().auth.getSession();
+   if(!session?.access_token)throw new Error("Connexion administrateur requise.");
+   const response=await fetch("/api/leadfactory/google-sheets-sync",{method:"POST",headers:{Authorization:"Bearer "+session.access_token}});
+   const data=await response.json();
+   if(!response.ok)throw new Error(data.error||"Synchronisation impossible");
+   setSheetResult(data);
+  }catch(error){setSheetError(error.message||"Erreur de synchronisation");}
+  finally{setSheetBusy(false);}
+ }
+ const [geoBusy,setGeoBusy]=useState(false),[geoResult,setGeoResult]=useState(null),[geoError,setGeoError]=useState("");
+ const [geoOffset,setGeoOffset]=useState(0);
+ async function geocodeProfessionals(){
+  setGeoBusy(true);setGeoError("");setGeoResult(null);
+  try{
+   const {data:{session}}=await createClient().auth.getSession();
+   if(!session?.access_token)throw new Error("Connexion administrateur requise.");
+   const response=await fetch("/api/leadfactory/geocode-professionals",{method:"POST",headers:{Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify({offset:geoOffset})});
+   const data=await response.json();
+   if(!response.ok)throw new Error(data.error||"Géolocalisation impossible");
+   setGeoResult(data);
+   setGeoOffset(data.nextOffset??0);
+  }catch(error){setGeoError(error.message||"Erreur de géolocalisation");}
+  finally{setGeoBusy(false);}
+ }
  const [proFile,setProFile]=useState(null),[proBusy,setProBusy]=useState(false),[proResult,setProResult]=useState(null),[proError,setProError]=useState("");
  function parseCSV(text){
   text=text.replace(/^\\uFEFF/,"");const first=text.split(/\\r?\\n/,1)[0]||"";const delimiter=(first.match(/;/g)||[]).length>(first.match(/,/g)||[]).length?";":",";
@@ -89,8 +140,30 @@ export default function LeadFactoryAdmin(){
  function reset(){setCursor(null);setTotals({checked:0,eligible:0,skipped:0,batches:0});setResult(null);setError("")}
  const isBatch=result&&typeof result.checked==="number";
  return <main className={styles.page}><div className={styles.wrap}>
- <header className={styles.top}><div><p className={styles.eyebrow}>TESAMI / LEADFACTORY</p><h1 className={styles.heading}>Import Klaviyo</h1><p className={styles.sub}>Retrouvez et analysez les paniers abandonnés depuis au moins 60 jours, sans commande ultérieure.</p></div><a className={styles.back} href="/">← Tableau de bord TESAMI</a></header>
- <section className={styles.card}><div className={styles.detail}><div><h2 className={styles.sectionTitle}>Prospects professionnels · Import Excel / CSV</h2><p className={styles.muted}>Dans Excel ou Google Sheets, exportez votre fichier au format CSV (séparateur virgule ou point-virgule). Les prospects déjà importés ne sont jamais réajoutés, même après un nouvel import.</p></div><span className={styles.status}>Anti-doublons actif</span></div><div className={styles.actions}><input aria-label="Fichier CSV des professionnels" type="file" accept=".csv,text/csv" onChange={e=>{setProFile(e.target.files?.[0]||null);setProResult(null);setProError("");}} style={{maxWidth:"100%",alignSelf:"center"}}/><button className={styles.button} type="button" disabled={!proFile||proBusy} onClick={importProfessionals}>{proBusy?"Import en cours…":"Importer les professionnels"}</button></div><p className={styles.muted} style={{marginTop:12}}>Colonnes reconnues : ID prospect, Entreprise, Activité, Prénom, Nom, Téléphone, Email, Adresse, Code postal, Ville, Département, Site internet, Source et Notes. Les statuts et attributions existants sont préservés.</p>{proError&&<p className={styles.notice} role="alert">{proError}</p>}{proResult&&<p className={styles.info} role="status">{proResult.inProgress?"Import en cours · ":"Import terminé · "}{proResult.imported} nouveaux · {proResult.duplicates} doublons ignorés · {proResult.invalid} lignes invalides · {proResult.processed} lignes traitées.</p>}</section>\n <section className={styles.card}><div className={styles.detail}><div><h2 className={styles.sectionTitle}>Connexion et simulation</h2><p className={styles.muted}>Vérifiez votre connexion Klaviyo puis analysez vos contacts, lot par lot.</p></div><span className={styles.status}><span className={styles.dot}></span>Mode simulation sécurisé</span></div>
+ <header className={styles.top}><div><p className={styles.eyebrow}>TESAMI / LEADFACTORY</p><h1 className={styles.heading}>Gestion des prospects</h1><p className={styles.sub}>Deux sources distinctes : Klaviyo pour les prospects clients et Google Sheets pour les professionnels. Les contacts restent privés avant attribution autorisée.</p></div><a className={styles.back} href="/">← Tableau de bord TESAMI</a></header>
+ <section className={styles.card} aria-label="Vérification des professionnels">
+ <h2 className={styles.sectionTitle}>Vérification automatique des fiches professionnelles</h2>
+ <p className={styles.muted}>Contrôle les coordonnées, la localisation, la source et les doublons. Une fiche techniquement correcte n'est pas automatiquement autorisée à être distribuée : l'origine et les éventuelles oppositions à la prospection doivent aussi être vérifiées.</p>
+ <div className={styles.actions}><button className={styles.button} type="button" disabled={auditBusy} onClick={runProfessionalAudit}>{auditBusy?"Vérification en cours…":"Vérifier les prospects maintenant"}</button></div>
+ {auditError&&<p className={styles.notice} role="alert">{auditError}</p>}
+ {audit&&<div style={{marginTop:18}}>
+ <div className={styles.stats}>
+ <div className={styles.stat}><p className={styles.statLabel}>Fiches contrôlées</p><p className={styles.statNumber}>{audit.stats.total}</p></div>
+ <div className={styles.stat}><p className={styles.statLabel}>Qualité conforme</p><p className={styles.statNumber}>{audit.stats.qualityReady}</p></div>
+ <div className={styles.stat}><p className={styles.statLabel}>À corriger</p><p className={styles.statNumber}>{audit.stats.needsReview}</p></div>
+ <div className={styles.stat}><p className={styles.statLabel}>Distribuables</p><p className={styles.statNumber}>{audit.stats.distributable}</p></div>
+ </div>
+ <p className={styles.muted}>Doublons possibles : {audit.stats.duplicate} · Géolocalisées : {audit.stats.geocoded} · Sans contact : {audit.stats.missingContact} · Localisation incomplète : {audit.stats.missingLocation}.</p>
+ <label style={{display:"flex",alignItems:"flex-start",gap:10,margin:"14px 0"}}><input type="checkbox" checked={approvalConfirm} onChange={e=>setApprovalConfirm(e.target.checked)}/><span>Je confirme avoir vérifié l'origine de chaque fiche que je valide, la pertinence de la prospection B2B, l'absence d'opposition connue et les obligations applicables. Cette confirmation n'est pas automatique.</span></label>
+ <h3>Critères automatiques</h3><ul>{audit.criteria.map(x=><li key={x}>{x}</li>)}</ul>
+ <p className={styles.notice}>{audit.distributionRule}</p>
+ <div style={{maxHeight:400,overflowY:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr><th align="left">Entreprise</th><th align="left">Ville</th><th align="left">Contrôle</th><th align="left">Distribution</th><th align="left">Action</th></tr></thead><tbody>{audit.records.map(r=><tr key={r.id}><td style={{padding:8}}>{r.company}</td><td>{r.city}</td><td>{r.quality==="ready"?"Qualité conforme":r.reasons.join(" · ")}</td><td>{r.distributable?"Statut autorisé":"Non autorisée"}</td><td>{!r.distributable&&r.quality==="ready"&&<button type="button" disabled={!approvalConfirm||approvingId===r.id} onClick={()=>approveProfessional(r.id)}>{approvingId===r.id?"Validation…":"Valider"}</button>}</td></tr>)}</tbody></table></div>
+ {audit.truncated&&<p className={styles.muted}>Affichage limité aux 300 premières fiches.</p>}
+ </div>}
+ </section>
+ <section className={styles.card}><div className={styles.detail}><div><h2 className={styles.sectionTitle}>Professionnels · Source Google Sheets</h2><p className={styles.muted}>Import sécurisé depuis « syncro BTOB TESAMI ». Les nouveaux contacts restent privés dans l’administration et ne sont jamais attribués automatiquement.</p></div><span className={styles.status}>Accès administrateur</span></div><div className={styles.actions}><button className={styles.button} type="button" disabled={sheetBusy} onClick={synchronizeSheet}>{sheetBusy?"Synchronisation en cours…":"Synchroniser Google Sheets maintenant"}</button><a href="https://docs.google.com/spreadsheets/d/1_8u7XQknjBcsttXbfjWpMgNuSJs9qiUigGYg_UGijaE/edit" target="_blank" rel="noopener noreferrer">Ouvrir le fichier source</a></div>{sheetError&&<p className={styles.notice} role="alert">{sheetError}</p>}{sheetResult&&<p className={styles.info} role="status">Synchronisation terminée : {sheetResult.imported} importés · {sheetResult.duplicates} doublons · {sheetResult.invalid} invalides · {sheetResult.geocoded} nouveaux géolocalisés · {sheetResult.updatedCoordinates||0} existants géolocalisés · {sheetResult.missingCoordinates} sans coordonnées.</p>}</section>
+ <section className={styles.card}><h2 className={styles.sectionTitle}>Géolocalisation des prospects professionnels</h2><p className={styles.muted}>Calcule les positions des contacts privés par lots de 20, sans attribuer de prospect ni modifier son éligibilité. Les fiches sans résultat fiable restent à vérifier.</p><div className={styles.actions}><button className={styles.button} type="button" disabled={geoBusy} onClick={geocodeProfessionals}>{geoBusy?"Géolocalisation en cours…":geoOffset?"Continuer la géolocalisation (20 suivants)":"Géolocaliser 20 prospects"}</button></div>{geoError&&<p className={styles.notice} role="alert">{geoError}</p>}{geoResult&&<p className={styles.info} role="status">{geoResult.geocoded} géolocalisés · {geoResult.unresolved} à vérifier · {geoResult.remaining} sans coordonnées · {geoResult.nextOffset==null?"Fin du passage":"Prochain lot : "+(geoResult.nextOffset+1)+" à "+(geoResult.nextOffset+20)}. Aucune attribution automatique.</p>}</section>
+ <section className={styles.card}><div className={styles.detail}><div><h2 className={styles.sectionTitle}>Professionnels · Import manuel Excel / CSV</h2><p className={styles.muted}>Dans Excel ou Google Sheets, exportez votre fichier au format CSV (séparateur virgule ou point-virgule). Les prospects déjà importés ne sont jamais réajoutés, même après un nouvel import.</p></div><span className={styles.status}>Anti-doublons actif</span></div><div className={styles.actions}><input aria-label="Fichier CSV des professionnels" type="file" accept=".csv,text/csv" onChange={e=>{setProFile(e.target.files?.[0]||null);setProResult(null);setProError("");}} style={{maxWidth:"100%",alignSelf:"center"}}/><button className={styles.button} type="button" disabled={!proFile||proBusy} onClick={importProfessionals}>{proBusy?"Import en cours…":"Importer les professionnels"}</button></div><p className={styles.muted} style={{marginTop:12}}>Colonnes reconnues : ID prospect, Entreprise, Activité, Prénom, Nom, Téléphone, Email, Adresse, Code postal, Ville, Département, Site internet, Source et Notes. Les statuts et attributions existants sont préservés.</p>{proError&&<p className={styles.notice} role="alert">{proError}</p>}{proResult&&<p className={styles.info} role="status">{proResult.inProgress?"Import en cours · ":"Import terminé · "}{proResult.imported} nouveaux · {proResult.duplicates} doublons ignorés · {proResult.invalid} lignes invalides · {proResult.processed} lignes traitées.</p>}</section>\n <section id="klaviyo-leads" className={styles.card} style={{scrollMarginTop:24}}><div className={styles.detail}><div><h2 className={styles.sectionTitle}>Clients · Source Klaviyo — connexion et simulation</h2><p className={styles.muted}>Vérifiez votre connexion Klaviyo puis analysez vos contacts, lot par lot.</p></div><span className={styles.status}><span className={styles.dot}></span>Mode simulation sécurisé</span></div>
  <div className={styles.actions}><button className={styles.button+" "+styles.secondary} type="button" disabled={busy} onClick={()=>run("leadfactory-klaviyo-status")}>Tester la connexion Klaviyo</button><button className={styles.button} type="button" disabled={busy} onClick={()=>{reset();run("leadfactory-klaviyo-import")}}>Simuler les 20 premiers profils</button></div>
  {busy&&<p role="status" className={styles.muted} style={{marginTop:16}}>Analyse en cours…</p>}{error&&<p role="alert" className={styles.notice}>{error}</p>}
  {result&&!isBatch&&<p className={styles.info} aria-live="polite">{result.klaviyo_reachable?"✓ Connexion Klaviyo opérationnelle (HTTP "+result.klaviyo_status+")":result.message||"Connexion à vérifier (HTTP "+result.klaviyo_status+")"}</p>}
