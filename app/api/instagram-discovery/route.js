@@ -1,6 +1,8 @@
 import {createServerSupabase} from "../../../lib/supabase/server";
 import {requireActiveUser} from "../../../lib/auth/active-user";
 
+import {matchingHashtags,relatedHashtags} from "../../../lib/instagram/themes.mjs";
+
 export async function POST(request){
  const supabase=await createServerSupabase();
  const access=await requireActiveUser(supabase);
@@ -19,7 +21,7 @@ export async function POST(request){
  async function graph(path,params){
   const url=new URL(base+path);
   Object.entries({...params,access_token:token}).forEach(([k,v])=>url.searchParams.set(k,String(v)));
-  const response=await fetch(url,{cache:"no-store"});
+  const response=await fetch(url,{cache:"no-store",signal:AbortSignal.timeout(4500)});
   const json=await response.json();
   if (!response.ok || json.error) {
    const error = new Error("Erreur Meta Instagram");
@@ -29,27 +31,32 @@ export async function POST(request){
   return json;
  }
  try{
-  const found=await graph("/ig_hashtag_search",{user_id:userId,q:hashtag});
-  const hashtagId=found.data?.[0]?.id;
-  if(!hashtagId)return Response.json({items:[],remaining:null,hashtag});
-  const mediaPath="/"+encodeURIComponent(hashtagId)+"/recent_media";
-  const mediaParams={user_id:userId,fields:"id,caption,media_type,media_url,permalink,timestamp",limit:50};
-  const recentPages=[];
-  let afterCursor=null;
-  const cutoff=Date.now()-14*24*60*60*1000;
-  const searchStarted=Date.now();
-  for(let page=0;page<5;page++){
-   if(page>0&&Date.now()-searchStarted>6500)break;
-   let batch;
-   try{batch=await graph(mediaPath,{...mediaParams,...(afterCursor?{after:afterCursor}:{})});}
-   catch(error){if(recentPages.length&&error.metaCode!==190)break;throw error;}
-   recentPages.push(...(batch.data||[]));
-   const batchDates=(batch.data||[]).map(x=>Date.parse(x.timestamp)).filter(Number.isFinite);
-   if(batchDates.length&&Math.min(...batchDates)<cutoff)break;
-   const nextCursor=batch.paging?.cursors?.after;
-   if(!nextCursor||nextCursor===afterCursor||!(batch.data||[]).length)break;
-   afterCursor=nextCursor;
+  const theme=relatedHashtags(hashtag);
+  const searchTags=[hashtag,...theme.filter(tag=>tag!==hashtag).slice(0,2)];
+  const cutoff=Date.now()-24*60*60*1000;
+  async function recentMedia(tag,maxPages){
+   const found=await graph("/ig_hashtag_search",{user_id:userId,q:tag});
+   const id=found.data?.[0]?.id;
+   if(!id)return [];
+   const mediaPath="/"+encodeURIComponent(id)+"/recent_media";
+   const fields="id,caption,media_type,media_url,permalink,timestamp";
+   const posts=[];
+   let after;
+   for(let page=0;page<maxPages;page++){
+    let batch;
+    try{batch=await graph(mediaPath,{user_id:userId,fields,limit:50,...(after?{after}:{})});}
+    catch(error){if(posts.length&&error.metaCode!==190)break;throw error;}
+    posts.push(...(batch.data??[]));
+    const next=batch.paging?.next&&batch.paging?.cursors?.after;
+    if(!next||next===after||!batch.data?.length)break;
+    after=next;
+   }
+   return posts;
   }
+  const batches=await Promise.allSettled(searchTags.map((tag,index)=>recentMedia(tag,index===0?2:1)));
+  if(batches[0].status==="rejected")throw batches[0].reason;
+  const recentPages=[...new Map(batches.flatMap(batch=>batch.status==="fulfilled"?batch.value:[])
+   .filter(post=>typeof post.id==="string").map(post=>[post.id,post])).values()];
   const {data:remaining,error:quotaError}=await supabase.rpc("consume_instagram_discovery");
   if(quotaError)return Response.json({error:quotaError.message},{status:429});
   const commercialTerms=/\b(boutique|shop|store|collection|commande|commander|disponible|livraison|promotion|soldes|prix|achat|acheter|client|produit|marque|entreprise|artisan|création|creation|réservation|reservation|business|smallbusiness|onlineshop|newarrival|order|sale|shipping|brand|handmade|ecommerce|eshop)\b/i;
@@ -67,39 +74,27 @@ export async function POST(request){
    const best=Math.max(...Object.values(scores));
    return best>=2&&scores[language]===best;
   }
-  const candidates=recentPages.filter(x=>x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")&&typeof x.permalink==="string"&&x.permalink.startsWith("https://www.instagram.com/")).map(x=>({id:x.id,caption:String(x.caption||"").slice(0,1000),media_type:x.media_type,media_url:x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")?x.media_url:null,permalink:x.permalink,timestamp:x.timestamp})).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).filter(x=>Number.isFinite(Date.parse(x.timestamp))&&Date.parse(x.timestamp)>=cutoff&&matchesLanguage(x.caption)&&!seenIds.has(x.id)).sort((a,b)=>excludeBusinesses?Number(personalSignals.test(b.caption))-Number(personalSignals.test(a.caption)):0);
+  const candidates=recentPages.filter(x=>x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")&&typeof x.permalink==="string"&&x.permalink.startsWith("https://www.instagram.com/")).map(x=>({id:x.id,caption:String(x.caption||"").slice(0,2200),matchingHashtags:matchingHashtags(String(x.caption||""),theme),media_type:x.media_type,media_url:x.media_type==="IMAGE"&&/^https:\/\//.test(x.media_url||"")?x.media_url:null,permalink:x.permalink,timestamp:x.timestamp})).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).filter(x=>Number.isFinite(Date.parse(x.timestamp))&&Date.parse(x.timestamp)>=cutoff&&matchesLanguage(x.caption)&&!seenIds.has(x.id)).sort((a,b)=>excludeBusinesses?Number(personalSignals.test(b.caption))-Number(personalSignals.test(a.caption)):0);
   // Exclude detectable promotional posts even if fewer than five results remain.
   const obviousAds=/(?:\b(?:concours|gagnez|gagner|offert|offre|salon|atelier|inscription|billetterie|commandez|acheter|achetez|shop now|buy now|code promo|livraison gratuite|réservez|reservez|soldes|en stock|disponible|négociable|negociable|prix|tarif|cfa|fcfa)\b|\d+[,.]?\d*\s*(?:€|eur|euros|\$|usd|£|cfa|fcfa))/i;
   // Instagram's hashtag API does not provide a reliable account type. Reject strong
   // editorial, promotional and brand signals instead of presenting them as personal posts.
   const brandOrEditorialSignals=/(?:\\b(?:tom\\s*ford|yk\\s*active|ashley\\s*graham|industrie|industry|mannequin|modeling|magazine|éditorial|editorial|campagne|campaign|publicité|advertising|sponsorisé|sponsored|partenariat\\s*commercial|collaboration\\s*commerciale|ambassadeur|ambassadrice|brand\\s*ambassador|fashion\\s*brand|label|maison\\s*de\\s*mode|nouvelle\\s*gamme|découvrez\\s*notre|decouvrez\\s*notre|bienvenue\\s*dans\\s*l.univers|official|officiel|officielle|communiqué|communique|presse|press\\s*release|lancement|lookbook|catalogue)\\b|#[a-z0-9_]*(?:brand|official|campaign|sponsored|ad|advertising|magazine|lookbook)[a-z0-9_]*)/i;
   const filteredCandidates=excludeBusinesses?candidates.filter(x=>!commercialSignals.test(x.caption)&&!obviousAds.test(x.caption)&&!brandOrEditorialSignals.test(x.caption)):candidates;
-  const byDay=new Map();
-  for(const item of filteredCandidates){
-   const day=item.timestamp.slice(0,10);
-   if(!byDay.has(day))byDay.set(day,[]);
-   byDay.get(day).push(item);
-  }
-  // Favor genuine first-person posts and captions that mention the searched hashtag.
-  const exactTag=new RegExp("(^|\\s)#"+hashtag+"($|[^a-z0-9_])","i");
+  // Count only distinct, known theme hashtags. Use recent, non-spammy captions as tie breakers.
   const relevance=item=>{
-   const caption=item.caption||"";
-   const tags=(caption.match(/#[a-z0-9_]+/gi)||[]).length;
-   const obviousAd=/(?:\b(?:commandez|acheter|achetez|shop now|buy now|code promo|livraison gratuite|inscription|réservez|reservez|atelier|soldes|en stock)\b|\d+[,.]?\d*\s*€)/i.test(caption);
-   const commercial=excludeBusinesses&&(commercialSignals.test(caption)||commercialTerms.test(caption));
-   return (exactTag.test(caption)?5:0)+(personalSignals.test(caption)?5:0)+(caption.length>55?2:0)-Math.max(0,tags-8)-(commercial?12:0)-(excludeBusinesses&&obviousAd?18:0);
+   const tagCount=(item.caption.match(/#[\p{L}\p{M}\p{N}_]+/gu)||[]).length;
+   const personal=personalSignals.test(item.caption);
+   const commercial=excludeBusinesses&&commercialTerms.test(item.caption);
+   return Number(personal)*3 + Number(item.matchingHashtags.includes(hashtag))*2
+    - Math.max(0,tagCount-8) - Number(commercial)*6;
   };
-  for(const posts of byDay.values())posts.sort((a,b)=>relevance(b)-relevance(a));
-  // Round-robin across calendar days, so today's posts cannot monopolize the cards.
-  const days=[...byDay.keys()].sort((a,b)=>b.localeCompare(a));
-  const items=[];
-  while(items.length<5&&days.some(day=>byDay.get(day).length)){
-   for(const day of days){
-    const item=byDay.get(day).shift();
-    if(item)items.push(item);
-    if(items.length===5)break;
-   }
-  }
+  const items=filteredCandidates.sort((a,b)=>
+   b.matchingHashtags.length-a.matchingHashtags.length ||
+   relevance(b)-relevance(a) ||
+   Date.parse(b.timestamp)-Date.parse(a.timestamp)
+  ).slice(0,5);
+  const days=[...new Set(filteredCandidates.map(item=>item.timestamp.slice(0,10)))].sort().reverse();
   return Response.json({hashtag,items,remaining,excludeBusinesses,language,availableDays:days,exhausted:items.length===0},{headers:{"Cache-Control":"no-store"}});
  } catch (error) {
   if (error.metaCode === 190) {
