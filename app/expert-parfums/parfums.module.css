@@ -1,0 +1,52 @@
+.shell {
+  --plum: #51316c;
+  --ink: #21162b;
+  width: min(1140px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 28px 0 64px;
+  color: var(--ink);
+}
+.shell a { color: var(--plum); text-decoration: underline; text-underline-offset: 3px; }
+.nav, .tabs, .notes, .suggestions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.nav { justify-content: space-between; margin-bottom: 20px; }
+.hero {
+  padding: clamp(24px, 7vw, 72px);
+  border-radius: 24px;
+  background: linear-gradient(115deg, #2d193b, #553575);
+  color: white;
+}
+.hero h1 { font-family: Georgia, serif; font-size: clamp(2.2rem, 7vw, 4.25rem); margin: 0; }
+.hero p { color: #f4eafa; margin-bottom: 0; }
+.tabs { margin: 24px 0; }
+.shell button, .share {
+  background: white;
+  border: 1px solid #cbbbd6;
+  border-radius: 10px;
+  color: var(--plum);
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+.shell button[aria-pressed="true"], .shell .primary { background: var(--plum); border-color: var(--plum); color: white; }
+.shell button:disabled { opacity: .55; cursor: default; }
+.shell :is(button, a, input, select, textarea):focus-visible { outline: 3px solid #8c62aa; outline-offset: 3px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 14px; margin-bottom: 18px; }
+.card { border: 1px solid #e5dce9; border-radius: 18px; padding: clamp(16px, 3vw, 26px); background: #fff; overflow-wrap: anywhere; }
+.card + .card { margin-top: 0; }
+.card h2 { margin: 6px 0; }
+.card fieldset { min-width: 0; padding: 0; border: 0; }
+.card legend { font-size: 1.3rem; font-weight: 700; }
+.field { display: grid; gap: 6px; margin: 16px 0; color: var(--ink); font-weight: 600; }
+.field :is(input, select, textarea) { background: #fcf9fd; border: 1px solid #cbbbd6; color: var(--ink); border-radius: 8px; min-width: 0; font: inherit; padding: 10px; }
+.share { display: inline-block; margin: 8px 0 0; }
+.card a + .share { margin-left: 10px; }
+.notes, .match { margin-bottom: 12px; }
+.suggestions { padding: 0; list-style: none; }
+.match { background: #f3edf7; padding: 12px; border-radius: 10px; }
+.match p { margin: 8px 0 0; }
+.pyramid { display: grid; justify-items: center; gap: 4px; text-align: center; }
+.pyramid div { width: 56%; background: #f4ebfa; border-radius: 10px; padding: 12px; }
+.pyramid div:nth-child(2) { width: 78%; background: #e8d7f2; }
+.pyramid div:nth-child(3) { width: 100%; background: #dbc2eb; }
+.pyramid dt { font-weight: 750; }
+.pyramid dd { margin: 4px 0 0; }
