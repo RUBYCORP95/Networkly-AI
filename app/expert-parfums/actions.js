@@ -1,6 +1,7 @@
 "use server";
 
-import { perfumeSession, loadCatalogue } from "../../lib/parfums/server";
+import { loadCatalogue } from "../../lib/parfums/server";
+import { createServerSupabase } from "../../lib/supabase/server";
 import { audiences, levels, normalize, rankPerfumes } from "../../lib/parfums/expert.mjs";
 
 import { parseScentoIndex, scentoSource, searchScentoIndex } from "../../lib/parfums/scento.mjs";
@@ -12,7 +13,6 @@ async function loadScento() {
 }
 
 export async function searchExternalPerfumes(query) {
-  await perfumeSession();
   if (typeof query !== "string" || query.trim().length < 2 || query.length > 120) return { perfumes: [] };
   try {
     return { perfumes: searchScentoIndex(await loadScento(), query) };
@@ -22,7 +22,8 @@ export async function searchExternalPerfumes(query) {
 }
 
 export async function recommend(audience, notes, startingReference, externalId) {
-  const { supabase, user } = await perfumeSession();
+  const supabase = await createServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!Object.hasOwn(audiences, audience) || !Array.isArray(notes) ||
       !notes.length || notes.length > 12 || notes.some(note => typeof note !== "string" || note.length > 120)) {
     return { error: "Choisis entre 1 et 12 notes olfactives." };
@@ -53,6 +54,7 @@ export async function recommend(audience, notes, startingReference, externalId) 
     const [direct] = rankPerfumes([basis], audience, preferences);
     if (direct) results.unshift({ ...direct, direct: true });
   }
+  if (!user) return { results, entry: null, warning: null };
   const { data: entry, error } = await supabase.from("expert_parfums_historique").insert({
     user_id: user.id, public_cible: audience, preferences, reference_depart: basis?.reference,
     resultats: results.map(({ perfume, score }) => ({ reference: perfume.reference, nom: perfume.nom, score })),
