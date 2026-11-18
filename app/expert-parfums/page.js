@@ -19,7 +19,7 @@ export default async function ExpertPage() {
     </nav>
     <header className={styles.hero}>
       <h1>Expert Parfums</h1>
-      <p>Explore les pyramides Olfazeta et trouve les parfums qui contiennent tes notes préférées.</p>
+      <p>Recherche ton parfum parmi 1 479 références multimarques, puis découvre les parfums Olfazeta qui partagent ses notes.</p>
     </header>
     {unavailable ? <p role="alert">Le catalogue est temporairement indisponible.</p> :
       <Expert catalogue={catalogue} history={history ?? []} historyUnavailable={Boolean(error)} />}

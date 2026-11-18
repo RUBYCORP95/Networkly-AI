@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { audiences, levels, normalize, findPerfumes } from "../../lib/parfums/expert.mjs";
 import Fiche from "./Fiche";
-import { recommend } from "./actions";
+import { recommend, searchExternalPerfumes } from "./actions";
 import styles from "./parfums.module.css";
 
 const initialLimit = 24;
@@ -17,6 +17,23 @@ export default function Expert({ catalogue, history, historyUnavailable }) {
   const [audience, setAudience] = useState("tous");
   const [worn, setWorn] = useState("");
   const [basis, setBasis] = useState(null);
+  const [external, setExternal] = useState(null);
+  const [externalSearch, setExternalSearch] = useState(null);
+
+  useEffect(() => {
+    const query = worn.trim();
+    if (basis || external || query.length < 2 || /^(?:n[°ºo]\s*)?\d+[mwu]?$/i.test(query)) return;
+    let active = true;
+    const timer = setTimeout(async () => {
+      try {
+        const response = await searchExternalPerfumes(query);
+        if (active) setExternalSearch({ query, ...response });
+      } catch {
+        if (active) setExternalSearch({ query, perfumes: [], unavailable: true });
+      }
+    }, 350);
+    return () => { active = false; clearTimeout(timer); };
+  }, [worn, basis, external]);
   const [noteQuery, setNoteQuery] = useState("");
   const [notes, setNotes] = useState([]);
   const [results, setResults] = useState(null);
@@ -30,9 +47,21 @@ export default function Expert({ catalogue, history, historyUnavailable }) {
   const suggestions = normalize(worn) ? findPerfumes(catalogue.filter(perfume => perfume.inspiration), worn).slice(0, 8) : [];
   const visibleNotes = noteChoices.filter(note => normalize(note).includes(normalize(noteQuery)));
   const matches = findPerfumes(catalogue, query);
+  const externalQuery = worn.trim();
+  const externalResult = externalSearch?.query === externalQuery ? externalSearch : null;
+  const canSearchExternal = externalQuery.length >= 2 && !/^(?:n[°ºo]\s*)?\d+[mwu]?$/i.test(externalQuery);
+
+  function useExternal(perfume) {
+    setExternal(perfume);
+    setBasis(null);
+    setWorn([perfume.name, perfume.house].join(" · "));
+    setNotes(perfume.notes.slice(0, 12));
+    setResults(null);
+  }
 
   function useBasis(perfume) {
     setBasis(perfume);
+    setExternal(null);
     setWorn(perfume.inspiration);
     setAudience(perfume.public_cible);
     const seen = new Map(Object.keys(levels).flatMap(level => perfume[level]).map(note => [normalize(note), note]));
@@ -41,7 +70,11 @@ export default function Expert({ catalogue, history, historyUnavailable }) {
   }
 
   function toggleNote(note) {
-    setNotes(old => old.includes(note) ? old.filter(item => item !== note) : [...old, note]);
+    setNotes(old => {
+      const key = normalize(note);
+      if (old.some(item => normalize(item) === key)) return old.filter(item => normalize(item) !== key);
+      return old.length >= 12 ? old : [...old, note];
+    });
   }
 
   async function submit(event) {
@@ -50,7 +83,7 @@ export default function Expert({ catalogue, history, historyUnavailable }) {
     setMessage("");
     setResults(null);
     try {
-      const result = await recommend(audience, notes, basis?.reference ?? null);
+      const result = await recommend(audience, notes, basis?.reference ?? null, external?.id ?? null);
       setMessage(result.error || result.warning || "");
       if (!result.error) setResults(result.results);
       if (result.entry) setPast(old => [result.entry, ...old].slice(0, 30));
@@ -79,12 +112,32 @@ export default function Expert({ catalogue, history, historyUnavailable }) {
         <fieldset disabled={pending}>
           <legend>Quel parfum portes-tu déjà ?</legend>
           <label className={styles.field}>Nom du parfum ou référence Olfazeta (facultatif)
-            <input type="search" value={worn} onChange={event => { setWorn(event.target.value); setBasis(null); setNotes([]); setResults(null); }} placeholder="Ex. Sauvage ou 094M" />
+            <input type="search" value={worn} onChange={event => { setWorn(event.target.value); setBasis(null); setExternal(null); setExternalSearch(null); setNotes([]); setResults(null); }} placeholder="Ex. Sauvage ou 094M" />
           </label>
-          {!basis && suggestions.length > 0 && <ul className={styles.suggestions}>{suggestions.map(perfume =>
-            <li key={perfume.reference}><button type="button" onClick={() => useBasis(perfume)}>{perfume.inspiration} · {perfume.reference}</button></li>)}</ul>}
-          {!basis && worn.trim() && suggestions.length === 0 && <p>Ce parfum ne figure pas dans les correspondances du catalogue. Retrouve la bonne version sur <a href="https://www.fragrantica.fr/" target="_blank" rel="noreferrer">Fragrantica</a>, puis sélectionne ci-dessous les notes que tu apprécies.</p>}
+          {!basis && !external && canSearchExternal && <div aria-live="polite">
+            {!externalResult && <p>Recherche dans le catalogue multimarque…</p>}
+            {externalResult?.unavailable && <p>Le catalogue multimarque est temporairement indisponible.</p>}
+            {externalResult?.perfumes.length > 0 && <ul className={styles.suggestions}>{externalResult.perfumes.map(perfume =>
+              <li key={perfume.id}><button type="button" onClick={() => useExternal(perfume)}>
+                {[perfume.name, perfume.house, perfume.concentration, perfume.year].filter(Boolean).join(" · ")}
+              </button></li>)}</ul>}
+            {externalResult && !externalResult.unavailable && !externalResult.perfumes.length && !suggestions.length &&
+              <p>Aucun parfum trouvé. Essaie le nom seul, ou choisis directement les notes que tu aimes.</p>}
+          </div>}
+          {!basis && !external && suggestions.length > 0 && <ul className={styles.suggestions}>{suggestions.map(perfume =>
+            <li key={perfume.reference}><button type="button" onClick={() => useBasis(perfume)}>{perfume.inspiration} · Olfazeta {perfume.reference}</button></li>)}</ul>}
           {basis && <p>Les notes de la référence {basis.reference} ont été présélectionnées. Garde celles que tu apprécies le plus. <Link href={`/expert-parfums/${basis.reference}`}>Voir la fiche Olfazeta</Link></p>}
+          {external && <div className={styles.match}>
+            <strong>{[external.name, external.house, external.concentration, external.year].filter(Boolean).join(" · ")}</strong>
+            <dl className={styles.pyramid}>{Object.entries(levels).map(([stage, label]) =>
+              <div key={stage}><dt>{label}</dt><dd>{external[stage].join(" · ") || "Non documenté"}</dd></div>)}</dl>
+            <p>Sélectionne jusqu’à 12 notes du parfum pour les comparer au catalogue Olfazeta.</p>
+            <div className={styles.notes} aria-label="Notes du parfum de départ">
+              {external.notes.map(note => <button type="button" key={note} aria-pressed={notes.some(item => normalize(item) === normalize(note))}
+                disabled={notes.length >= 12 && !notes.some(item => normalize(item) === normalize(note))} onClick={() => toggleNote(note)}>{note}</button>)}
+            </div>
+            <p><a href={external.url} target="_blank" rel="noreferrer">Données Scento</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a> · Certaines notes sont traduites en français.</p>
+          </div>}
           <label className={styles.field}>Pour qui cherches-tu ?
             <select value={audience} onChange={event => setAudience(event.target.value)}>
               {Object.entries(audiences).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
