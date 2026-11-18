@@ -53,6 +53,18 @@ export default function LeadFactoryAdmin(){
  }
  async function loadContacts(page=0,q=search){setContactLoading(true);setError("");try{const supabase=createClient();const {data:{session}}=await supabase.auth.getSession();if(!session?.access_token)throw new Error("Connexion administrateur requise");const response=await fetch(process.env.NEXT_PUBLIC_SUPABASE_URL+"/functions/v1/leadfactory-private-contacts?page="+page+"&search="+encodeURIComponent(q),{headers:{Authorization:"Bearer "+session.access_token,apikey:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}});const data=await response.json();if(!response.ok)throw new Error(data.error||"Erreur de chargement");setContacts(data.contacts||[]);setContactTotal(data.total||0);setContactPage(page);}catch(e){setError(e.message||"Erreur de chargement")}finally{setContactLoading(false)}}
 
+ const [approvalConfirm,setApprovalConfirm]=useState(false),[approvingId,setApprovingId]=useState(null);
+ async function approveProfessional(id){
+  if(!approvalConfirm)return;
+  setApprovingId(id);setAuditError("");
+  try{
+   const {data:{session}}=await createClient().auth.getSession();
+   if(!session?.access_token)throw new Error("Session administrateur requise");
+   const res=await fetch("/api/leadfactory/professional-approve",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({id,confirmed:true})});
+   const data=await res.json();if(!res.ok)throw new Error(data.error||"Validation impossible");
+   await runProfessionalAudit();
+  }catch(e){setAuditError(e.message||"Validation impossible")}finally{setApprovingId(null)}
+ }
  const [auditBusy,setAuditBusy]=useState(false),[audit,setAudit]=useState(null),[auditError,setAuditError]=useState("");
  async function runProfessionalAudit(){
   setAuditBusy(true);setAuditError("");
@@ -142,9 +154,10 @@ export default function LeadFactoryAdmin(){
  <div className={styles.stat}><p className={styles.statLabel}>Distribuables</p><p className={styles.statNumber}>{audit.stats.distributable}</p></div>
  </div>
  <p className={styles.muted}>Doublons possibles : {audit.stats.duplicate} · Géolocalisées : {audit.stats.geocoded} · Sans contact : {audit.stats.missingContact} · Localisation incomplète : {audit.stats.missingLocation}.</p>
+ <label style={{display:"flex",alignItems:"flex-start",gap:10,margin:"14px 0"}}><input type="checkbox" checked={approvalConfirm} onChange={e=>setApprovalConfirm(e.target.checked)}/><span>Je confirme avoir vérifié l'origine de chaque fiche que je valide, la pertinence de la prospection B2B, l'absence d'opposition connue et les obligations applicables. Cette confirmation n'est pas automatique.</span></label>
  <h3>Critères automatiques</h3><ul>{audit.criteria.map(x=><li key={x}>{x}</li>)}</ul>
  <p className={styles.notice}>{audit.distributionRule}</p>
- <div style={{maxHeight:400,overflowY:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr><th align="left">Entreprise</th><th align="left">Ville</th><th align="left">Contrôle</th><th align="left">Distribution</th></tr></thead><tbody>{audit.records.map(r=><tr key={r.id}><td style={{padding:8}}>{r.company}</td><td>{r.city}</td><td>{r.quality==="ready"?"Qualité conforme":r.reasons.join(" · ")}</td><td>{r.distributable?"Statut autorisé":"Non autorisée"}</td></tr>)}</tbody></table></div>
+ <div style={{maxHeight:400,overflowY:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr><th align="left">Entreprise</th><th align="left">Ville</th><th align="left">Contrôle</th><th align="left">Distribution</th><th align="left">Action</th></tr></thead><tbody>{audit.records.map(r=><tr key={r.id}><td style={{padding:8}}>{r.company}</td><td>{r.city}</td><td>{r.quality==="ready"?"Qualité conforme":r.reasons.join(" · ")}</td><td>{r.distributable?"Statut autorisé":"Non autorisée"}</td><td>{!r.distributable&&r.quality==="ready"&&<button type="button" disabled={!approvalConfirm||approvingId===r.id} onClick={()=>approveProfessional(r.id)}>{approvingId===r.id?"Validation…":"Valider"}</button>}</td></tr>)}</tbody></table></div>
  {audit.truncated&&<p className={styles.muted}>Affichage limité aux 300 premières fiches.</p>}
  </div>}
  </section>
