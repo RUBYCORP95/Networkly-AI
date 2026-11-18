@@ -38,8 +38,8 @@ export async function GET(request){
   }).filter(item=>item.distance_km<=radius).sort((a,b)=>a.distance_km-b.distance_km);
   geocoded=nearby.length;
   eligible=nearby.filter(item=>item.prospect_status==="eligible").length;
-  preview=nearby.slice(0,50).map(item=>({id:item.id,company:item.company,sector:item.sector,city:item.city,department:item.department,distance_km:item.distance_km,validated:item.prospect_status==="eligible"}));
-  return reply({sector:pref.city,radius_km:radius,available:eligible,geocoded,preview,previewLimit:50,ready:eligible>0,assigned:false,adminPreview:true,note:"Aucune attribution. Coordonnées révélées uniquement au clic par un administrateur authentifié."});
+  preview=nearby.map(item=>({id:item.id,company:item.company,sector:item.sector,city:item.city,department:item.department,distance_km:item.distance_km,validated:item.prospect_status==="eligible"}));
+  return reply({sector:pref.city,radius_km:radius,available:eligible,geocoded,preview,previewLimit:nearby.length,ready:eligible>0,assigned:false,adminPreview:true,note:"Aucune attribution. Coordonnées révélées uniquement au clic par un administrateur authentifié."});
  }
  if(ids.length){
   const {data:records,error}=await db.from("lead_private_professional_imports").select("id,company,sector,city,department,prospect_status").in("id",ids);
