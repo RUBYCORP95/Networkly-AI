@@ -14,3 +14,6 @@
 .formations-heading{flex-wrap:wrap;align-items:flex-start}
 .formations-results{flex-wrap:wrap}
 @media(max-width:600px){.formations-page{padding:18px}.formations-toolbar{display:grid;grid-template-columns:minmax(0,1fr)}.formations-sort{max-width:none;width:100%}.formations-grid{grid-template-columns:minmax(0,1fr)}.formations-total{display:none}}
+
+/* Override the global dashboard main grid on this standalone page. */
+main.formations-page{display:block!important;grid-template-columns:none!important;width:100%;min-width:0}
