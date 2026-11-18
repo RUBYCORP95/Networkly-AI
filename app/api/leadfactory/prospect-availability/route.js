@@ -19,11 +19,19 @@ export async function GET(request){
  const {data:candidates,error:candidateError}=await db.rpc("lead_geographic_candidates",{p_user_id:user.id,p_kind:"professional",p_limit:100});
  if(candidateError)return reply({error:"Recherche géographique indisponible"},500);
  const ids=(candidates||[]).map(x=>x.contact_id);
- let eligible=0;
+ const {data:profile,error:profileError}=await db.from("profiles").select("is_admin").eq("id",user.id).maybeSingle();
+ if(profileError)return reply({error:"Vérification des droits impossible"},500);
+ const isAdmin=profile?.is_admin===true;
+ let eligible=0,geocoded=ids.length,preview=[];
  if(ids.length){
-  const {data:records,error}=await db.from("lead_private_professional_imports").select("id").in("id",ids).eq("prospect_status","eligible");
+  const {data:records,error}=await db.from("lead_private_professional_imports").select("id,company,sector,city,department,prospect_status").in("id",ids);
   if(error)return reply({error:"Vérification des prospects impossible"},500);
-  eligible=records?.length||0;
+  const byId=new Map((records||[]).map(x=>[x.id,x]));
+  eligible=(records||[]).filter(x=>x.prospect_status==="eligible").length;
+  if(isAdmin)preview=(candidates||[]).slice(0,50).map(c=>{
+   const item=byId.get(c.contact_id);
+   return item?{company:item.company,sector:item.sector,city:item.city,department:item.department,distance_km:c.distance_km,validated:item.prospect_status==="eligible"}:null;
+  }).filter(Boolean);
  }
- return reply({sector:pref.city,radius_km:pref.radius_km,available:eligible,previewLimit:100,ready:eligible>0,assigned:false,note:"Aucun prospect n'est réservé par cette recherche. Les coordonnées et identités ne sont pas divulguées."});
+ return reply({sector:pref.city,radius_km:pref.radius_km,available:eligible,geocoded,preview,previewLimit:100,ready:eligible>0,assigned:false,adminPreview:isAdmin,note:"Aucun prospect n'est réservé. Les téléphones et e-mails ne sont jamais exposés dans cette recherche."});
 }
