@@ -24,9 +24,9 @@ export async function GET(request){
  const isAdmin=profile?.is_admin===true;
  let eligible=0,geocoded=ids.length,preview=[];
  if(isAdmin){
-  // Admin audit includes unvalidated imported businesses; never return their private contact details.
+  // Administrator-only audit includes contact details. Never return them to consultant accounts.
   const {data:geoRows,error:geoError}=await db.from("lead_private_professional_imports")
-    .select("company,sector,city,department,prospect_status,latitude,longitude")
+    .select("company,sector,city,department,phone,email,prospect_status,latitude,longitude")
     .not("latitude","is",null).not("longitude","is",null).limit(1000);
   if(geoError)return reply({error:"Aperçu géographique indisponible"},500);
   const toRad=n=>n*Math.PI/180;
@@ -38,8 +38,8 @@ export async function GET(request){
   }).filter(item=>item.distance_km<=radius).sort((a,b)=>a.distance_km-b.distance_km);
   geocoded=nearby.length;
   eligible=nearby.filter(item=>item.prospect_status==="eligible").length;
-  preview=nearby.slice(0,50).map(item=>({company:item.company,sector:item.sector,city:item.city,department:item.department,distance_km:item.distance_km,validated:item.prospect_status==="eligible"}));
-  return reply({sector:pref.city,radius_km:radius,available:eligible,geocoded,preview,previewLimit:50,ready:eligible>0,assigned:false,adminPreview:true,note:"Aucune attribution et aucune coordonnée privée divulguée."});
+  preview=nearby.slice(0,50).map(item=>({company:item.company,sector:item.sector,city:item.city,department:item.department,distance_km:item.distance_km,phone:item.phone||null,email:item.email||null,validated:item.prospect_status==="eligible"}));
+  return reply({sector:pref.city,radius_km:radius,available:eligible,geocoded,preview,previewLimit:50,ready:eligible>0,assigned:false,adminPreview:true,note:"Aucune attribution. Coordonnées visibles uniquement par un administrateur authentifié."});
  }
  if(ids.length){
   const {data:records,error}=await db.from("lead_private_professional_imports").select("id,company,sector,city,department,prospect_status").in("id",ids);
