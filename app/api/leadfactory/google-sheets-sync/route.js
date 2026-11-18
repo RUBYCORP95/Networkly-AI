@@ -71,10 +71,17 @@ async function synchronize() {
     const db = createClient(url, role, { auth: { persistSession: false, autoRefreshToken: false } });
     let imported = 0, duplicates = 0, invalid = 0, geocoded = 0, missingCoordinates = 0, updatedCoordinates = 0;
     let geocodingBudget = 20; // Avoid serverless timeouts.
-    // Choose a new batch of missing coordinates on each sync, not the first 20 rows repeatedly.
+    // Rotate through all source rows by UTC day, including failed geocodes.
+    // This avoids retrying the same unresolved addresses on every scheduled run.
+    const { count: sourceCount, error: countError } = await db.from("lead_private_professional_imports")
+      .select("id", { count: "exact", head: true }).not("source_id", "is", null);
+    if (countError) throw countError;
+    const totalPages = Math.max(1, Math.ceil((sourceCount || 0) / geocodingBudget));
+    const dayNumber = Math.floor(Date.now() / 86400000);
+    const page = dayNumber % totalPages;
     const { data: pendingGeocodes, error: pendingError } = await db.from("lead_private_professional_imports")
-      .select("source_id").is("latitude", null).not("source_id", "is", null)
-      .order("source_id", { ascending: true }).limit(20);
+      .select("source_id").not("source_id", "is", null)
+      .order("source_id", { ascending: true }).range(page * geocodingBudget, (page + 1) * geocodingBudget - 1);
     if (pendingError) throw pendingError;
     const pendingIds = new Set((pendingGeocodes || []).map(item => item.source_id));
     for (const row of rows.slice(1)) {
@@ -121,7 +128,7 @@ async function synchronize() {
       if (error) throw error;
       imported++;
     }
-    return respond({ ok: true, imported, duplicates, invalid, geocoded, updatedCoordinates, missingCoordinates, checked: Math.max(rows.length - 1, 0), source: "Google Sheets BTOB" });
+    return respond({ ok: true, imported, duplicates, invalid, geocoded, updatedCoordinates, missingCoordinates, geocodingPage: page + 1, geocodingPages: totalPages, checked: Math.max(rows.length - 1, 0), source: "Google Sheets BTOB" });
   } catch (error) {
     console.error("LeadFactory Google Sheets sync failed:", error instanceof Error ? error.message : "unknown");
     return respond({ error: "Synchronisation impossible ; consulter les journaux serveur" }, 500);
