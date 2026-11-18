@@ -7,6 +7,8 @@ export default function LeadFactoryPage(){
  const [state,setState]=useState({loading:true,error:"",status:null,cards:[],revealed:{},limited:false});
  const [busy,setBusy]=useState(null);
  const [demo,setDemo]=useState(false);
+ const [generatingReal,setGeneratingReal]=useState(false);
+ const [generationMessage,setGenerationMessage]=useState("");
  const [adviceOpen,setAdviceOpen]=useState(false);
  const [adviceType,setAdviceType]=useState("partnership");
  const [adviceCopied,setAdviceCopied]=useState(false);
@@ -77,6 +79,25 @@ export default function LeadFactoryPage(){
   finally{setSearchingProspects(false);}
   document.getElementById("lf-my-prospects")?.scrollIntoView({behavior:"smooth",block:"start"});
  }
+ async function generateRealLeads(){
+  if(state.limited||!state.status||state.status.today?.requested||generatingReal)return;
+  setGeneratingReal(true);setGenerationMessage("");
+  try{
+   const supabase=createClient();
+   const {data:{user},error:authError}=await supabase.auth.getUser();
+   if(authError||!user)throw new Error("Connecte-toi pour générer tes prospects.");
+   const {data:pref,error:prefError}=await supabase.from("lead_preferences").select("radius_km,latitude,longitude").eq("user_id",user.id).maybeSingle();
+   if(prefError||!pref||!Number.isFinite(pref.latitude)||!Number.isFinite(pref.longitude))throw new Error("Enregistre d'abord ta ville et ton rayon.");
+   const {data:started,error:startError}=await supabase.rpc("start_my_lead_daily_request");
+   if(startError)throw startError;
+   const {data:granted,error:allocateError}=await supabase.rpc("allocate_my_daily_leads");
+   if(allocateError)throw allocateError;
+   const result=granted?.[0]||{};
+   setGenerationMessage("Attribution terminée : "+(result.professional_count||0)+" professionnel(s) et "+(result.klaviyo_count||0)+" contact(s) Klaviyo. Les coordonnées se révèlent uniquement en cliquant sur Contacter.");
+   await load();
+  }catch(e){setGenerationMessage(e.message||"Impossible de générer les prospects. Réessaie plus tard.");await load();}
+  finally{setGeneratingReal(false);}
+ }
  async function reveal(id){
   setBusy(id);
   try{
@@ -124,7 +145,8 @@ export default function LeadFactoryPage(){
     <div className={styles.quota}><span>Contacts Klaviyo</span><strong>{klaviyo}</strong></div>
     <div className={styles.quota}><span>Prospects professionnels</span><strong>{professional}</strong></div>
     <p className={styles.muted}>Secteur : <strong>{s?.sector?.city||"Non renseigné"}</strong> · Rayon : <strong>{s?.sector?.radius_km||"—"} km</strong></p>
-    <p className={styles.muted}>{s?.today?.requested?"Demande du jour : "+s.today.status:"Aucune demande aujourd’hui."}</p>
+    <p className={styles.muted}>{s?.today?.requested?"Demande du jour : "+s.today.status:"Aucune demande aujourd’hui."}</p> 
+    {!state.limited&&s&&<div style={{margin:"14px 0"}}><button className={styles.button} type="button" disabled={generatingReal||!!s.today?.requested||!prospectAvailability?.available} onClick={generateRealLeads}>{generatingReal?"Attribution en cours…":s.today?.requested?"Génération déjà effectuée aujourd'hui":"Générer mes vrais prospects"}</button><p className={styles.muted}>{!prospectAvailability?.available?"Recherche ton secteur : le bouton sera disponible lorsque des prospects professionnels validés y seront présents.":"La génération utilise les quotas de ton abonnement et ne peut être demandée qu'une fois par jour."}</p>{generationMessage&&<p className={styles.message} role="status">{generationMessage}</p>}</div>}
     <button className={styles.button} type="button" onClick={()=>setDemo(v=>!v)}>{demo?"Masquer la démonstration":"Tester la génération (mode démo)"}</button>
     <p className={styles.disabledNote}>Mode bêta : cette démonstration utilise uniquement des contacts fictifs. La distribution de vrais prospects reste désactivée pendant les vérifications.</p>
    </div>
