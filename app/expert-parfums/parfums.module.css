@@ -12,11 +12,11 @@
 .hero {
   padding: clamp(24px, 7vw, 72px);
   border-radius: 24px;
-  background: linear-gradient(115deg, #2d193b, #553575);
-  color: white;
+  background: linear-gradient(115deg, #f5ecfb, #e9dcf7);
+  color: var(--ink);
 }
-.hero h1 { font-family: Georgia, serif; font-size: clamp(2.2rem, 7vw, 4.25rem); margin: 0; }
-.hero p { color: #f4eafa; margin-bottom: 0; }
+.hero h1 { color: #34204b; font-family: Georgia, serif; font-size: clamp(2.2rem, 7vw, 4.25rem); margin: 0; }
+.hero p { color: #4e3a60; margin-bottom: 0; }
 .tabs { margin: 24px 0; }
 .shell button, .share {
   background: white;
