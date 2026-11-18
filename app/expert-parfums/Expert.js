@@ -10,7 +10,7 @@ import styles from "./parfums.module.css";
 const initialLimit = 24;
 const formatDate = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Paris" });
 
-export default function Expert({ catalogue, history, historyUnavailable }) {
+export default function Expert({ catalogue, history, historyUnavailable, signedIn = false }) {
   const [view, setView] = useState("conseil");
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(initialLimit);
@@ -96,7 +96,7 @@ export default function Expert({ catalogue, history, historyUnavailable }) {
 
   return <>
     <nav className={styles.tabs} aria-label="Expert Parfums">
-      {Object.entries({ conseil: "Trouver un parfum", catalogue: "Catalogue", historique: "Historique" }).map(([key, label]) =>
+      {Object.entries({ conseil: "Trouver un parfum", catalogue: "Catalogue", ...(signedIn ? { historique: "Historique" } : {}) }).map(([key, label]) =>
         <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)}>{label}</button>)}
     </nav>
     {view === "catalogue" && <section>
@@ -159,6 +159,7 @@ export default function Expert({ catalogue, history, historyUnavailable }) {
         </fieldset>
       </form>
       {message && <p role="alert">{message}</p>}
+      {!signedIn && <p>Accès gratuit sans inscription. <Link href="/login">Connecte-toi à TESAMI</Link> pour conserver ton historique.</p>}
       {results && <section aria-live="polite">
         <h2>Tes recommandations</h2>
         <p>Le score est la part des notes choisies qui figurent dans la pyramide. Chaque note compte une fois.</p>
@@ -167,7 +168,7 @@ export default function Expert({ catalogue, history, historyUnavailable }) {
           <p>Aucune correspondance dans ce filtre. Essaie sans préférence de public ou modifie les notes sélectionnées.</p>}
       </section>}
     </>}
-    {view === "historique" && <section>
+    {signedIn && view === "historique" && <section>
       <h2>Mes recherches récentes</h2>
       {historyUnavailable && <p role="alert">L’historique est temporairement indisponible.</p>}
       {!past.length && !historyUnavailable && <p>Tes prochaines recherches apparaîtront ici.</p>}
