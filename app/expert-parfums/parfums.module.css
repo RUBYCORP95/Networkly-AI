@@ -1,6 +1,7 @@
 .shell {
   --plum: #51316c;
   --ink: #21162b;
+  display: block;
   width: min(1140px, calc(100% - 32px));
   margin: 0 auto;
   padding: 28px 0 64px;
@@ -10,13 +11,16 @@
 .nav, .tabs, .notes, .suggestions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .nav { justify-content: space-between; margin-bottom: 20px; }
 .hero {
+  display: block;
+  margin-bottom: 0;
   padding: clamp(24px, 7vw, 72px);
   border-radius: 24px;
   background: linear-gradient(115deg, #f5ecfb, #e9dcf7);
   color: var(--ink);
 }
 .hero h1 { color: #34204b; font-family: Georgia, serif; font-size: clamp(2.2rem, 7vw, 4.25rem); margin: 0; }
-.hero p { color: #4e3a60; margin-bottom: 0; }
+.hero p { color: #4e3a60; max-width: 56ch; margin: 12px 0 0; }
+.shell section { width: 100%; max-width: none; padding: 0; margin: 24px 0; }
 .tabs { margin: 24px 0; }
 .shell button, .share {
   background: white;
@@ -39,7 +43,7 @@
 .field { display: grid; gap: 6px; margin: 16px 0; color: var(--ink); font-weight: 600; }
 .field :is(input, select, textarea) { background: #fcf9fd; border: 1px solid #cbbbd6; color: var(--ink); border-radius: 8px; min-width: 0; font: inherit; padding: 10px; }
 .share { display: inline-block; margin: 8px 0 0; }
-.card a + .share { margin-left: 10px; }
+.card a + .share { display: table; }
 .notes, .match { margin-bottom: 12px; }
 .suggestions { padding: 0; list-style: none; }
 .match { background: #f3edf7; padding: 12px; border-radius: 10px; }
