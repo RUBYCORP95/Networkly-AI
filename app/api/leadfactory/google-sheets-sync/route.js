@@ -69,7 +69,7 @@ async function synchronize() {
     if (expected.some((h, i) => clean(rows[0]?.[i]) !== h)) return respond({ error: "En-têtes Google Sheets différents du modèle validé" }, 422);
     if (rows.length >= 5001) return respond({ error: "Limite de 4999 prospects atteinte : ajouter une pagination avant de poursuivre" }, 422);
     const db = createClient(url, role, { auth: { persistSession: false, autoRefreshToken: false } });
-    let imported = 0, duplicates = 0, invalid = 0, geocoded = 0, missingCoordinates = 0, updatedCoordinates = 0;
+    let imported = 0, duplicates = 0, invalid = 0, geocoded = 0, missingCoordinates = 0, updatedCoordinates = 0, refreshed = 0;
     let geocodingBudget = 20; // Avoid serverless timeouts.
     // Rotate through all source rows by UTC day, including failed geocodes.
     // This avoids retrying the same unresolved addresses on every scheduled run.
@@ -100,6 +100,27 @@ async function synchronize() {
       }
       if (existing) {
         duplicates++;
+        // Refresh existing source records without altering eligibility, ownership or prospecting status.
+        // Match only on the stable Sheet ID, never on a shared phone/email.
+        if (source_id) {
+          const { data: sameSource, error: sourceError } = await db.from("lead_private_professional_imports")
+            .select("id").eq("source_id", source_id).eq("id", existing.id).maybeSingle();
+          if (sourceError) throw sourceError;
+          if (sameSource) {
+            const changes = {
+              company, sector: clean(row[2], 200) || null,
+              first_name: clean(row[3], 120) || null, last_name: clean(row[4], 120) || null,
+              phone, email, address: clean(row[7], 400) || null,
+              postal_code: clean(row[8], 30) || null, city: clean(row[9], 150) || null,
+              department: clean(row[10], 100) || null, website: clean(row[11], 350) || null,
+              notes: clean(row[15], 1000) || null
+            };
+            const { error: updateError } = await db.from("lead_private_professional_imports")
+              .update(changes).eq("id", existing.id);
+            if (updateError) throw updateError;
+            refreshed++;
+          }
+        }
         if ((existing.latitude == null || existing.longitude == null) && geocodingBudget > 0 && pendingIds.has(source_id)) {
           geocodingBudget--;
           const position = await locateProfessional(clean(row[7],400),clean(row[8],30),clean(row[9],150));
@@ -128,7 +149,7 @@ async function synchronize() {
       if (error) throw error;
       imported++;
     }
-    return respond({ ok: true, imported, duplicates, invalid, geocoded, updatedCoordinates, missingCoordinates, geocodingPage: page + 1, geocodingPages: totalPages, checked: Math.max(rows.length - 1, 0), source: "Google Sheets BTOB" });
+    return respond({ ok: true, imported, duplicates, refreshed, invalid, geocoded, updatedCoordinates, missingCoordinates, geocodingPage: page + 1, geocodingPages: totalPages, checked: Math.max(rows.length - 1, 0), source: "Google Sheets BTOB" });
   } catch (error) {
     console.error("LeadFactory Google Sheets sync failed:", error instanceof Error ? error.message : "unknown");
     return respond({ error: "Synchronisation impossible ; consulter les journaux serveur" }, 500);
