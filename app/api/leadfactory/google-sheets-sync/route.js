@@ -149,7 +149,35 @@ async function synchronize() {
       if (error) throw error;
       imported++;
     }
-    return respond({ ok: true, imported, duplicates, refreshed, invalid, geocoded, updatedCoordinates, missingCoordinates, geocodingPage: page + 1, geocodingPages: totalPages, checked: Math.max(rows.length - 1, 0), source: "Google Sheets BTOB" });
+    // Automatic quality review, without treating a public business listing as consent.
+    // Never override manual eligibility, refusals or other prospecting decisions.
+    const { data: auditRows, error: auditError } = await db.from("lead_private_professional_imports")
+      .select("id,company,phone,email,postal_code,city,latitude,longitude,source,prospect_status")
+      .limit(5000);
+    if (auditError) throw auditError;
+    const phones = new Map(), emails = new Map();
+    for (const item of auditRows || []) {
+      const phoneKey = normalizePhone(item.phone);
+      const emailKey = clean(item.email,254).toLowerCase();
+      if (phoneKey) phones.set(phoneKey,(phones.get(phoneKey)||0)+1);
+      if (emailKey) emails.set(emailKey,(emails.get(emailKey)||0)+1);
+    }
+    const audit = {checked:(auditRows||[]).length,qualityReady:0,needsReview:0,missingLocation:0,duplicateContact:0,missingContact:0,missingProvenance:0,notAuthorizedForDistribution:0};
+    for (const item of auditRows || []) {
+      const phoneKey=normalizePhone(item.phone),emailKey=clean(item.email,254).toLowerCase();
+      const missingLocation=!Number.isFinite(item.latitude)||!Number.isFinite(item.longitude)||!item.city||!item.postal_code;
+      const duplicateContact=(phoneKey&&(phones.get(phoneKey)||0)>1)||(emailKey&&(emails.get(emailKey)||0)>1);
+      const missingContact=!phoneKey&&!emailKey;
+      const missingProvenance=!clean(item.source);
+      if(missingLocation)audit.missingLocation++;
+      if(duplicateContact)audit.duplicateContact++;
+      if(missingContact)audit.missingContact++;
+      if(missingProvenance)audit.missingProvenance++;
+      if(!missingLocation&&!duplicateContact&&!missingContact&&!missingProvenance&&item.company)audit.qualityReady++;
+      else audit.needsReview++;
+      if(item.prospect_status!=="eligible")audit.notAuthorizedForDistribution++;
+    }
+    return respond({ ok: true, imported, duplicates, refreshed, invalid, geocoded, updatedCoordinates, missingCoordinates, audit, geocodingPage: page + 1, geocodingPages: totalPages, checked: Math.max(rows.length - 1, 0), source: "Google Sheets BTOB" });
   } catch (error) {
     console.error("LeadFactory Google Sheets sync failed:", error instanceof Error ? error.message : "unknown");
     return respond({ error: "Synchronisation impossible ; consulter les journaux serveur" }, 500);
