@@ -21,7 +21,9 @@ export default async function ConsultantReview({ searchParams }) {
     ? db.from("lead_team_decisions").select("id,user_id,consultant_identifier,sponsor_code,applicant_name,decision,decided_at,admin_id", { count: "exact" }).order("decided_at", { ascending: false }).order("id")
     : db.from("lead_team_memberships").select("user_id,consultant_identifier,sponsor_code,applicant_name,status,created_at,updated_at", { count: "exact" }).order("updated_at", { ascending: false }).order("user_id");
   if (!history && filter === "pending") query = query.eq("status", "pending");
-  const { data, error, count } = await query.range((page - 1) * size, page * size - 1);
+  const pendingQuery = db.from("lead_team_memberships").select("user_id", { count: "exact", head: true }).eq("status", "pending");
+  const [{ data, error, count }, pending] = await Promise.all([query.range((page - 1) * size, page * size - 1), pendingQuery]);
+  const pendingCount = pending.error ? "" : " (" + pending.count + ")";
   const rows = data ?? [];
   const identities = await Promise.all([...new Set(rows.flatMap(row => [row.user_id, row.admin_id].filter(Boolean)))].map(async id => {
     const { data } = await db.auth.admin.getUserById(id);
@@ -39,7 +41,7 @@ export default async function ConsultantReview({ searchParams }) {
     <Link href="/admin">← Administration</Link>
     <h1>Validation des consultants</h1>
     <nav className={styles.orderNavigation} aria-label="Demandes consultant">
-      <Link className={styles.crmAction} href="?status=pending" aria-current={!history && filter === "pending" ? "page" : undefined}>En attente</Link>
+      <Link className={styles.crmAction} href="?status=pending" aria-current={!history && filter === "pending" ? "page" : undefined}>En attente{pendingCount}</Link>
       <Link className={styles.crmAction} href="?status=all" aria-current={!history && filter === "all" ? "page" : undefined}>Toutes les demandes</Link>
       <Link className={styles.crmAction} href="?view=history" aria-current={history ? "page" : undefined}>Historique des décisions</Link>
     </nav>
