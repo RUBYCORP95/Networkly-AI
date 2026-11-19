@@ -179,7 +179,13 @@ export default async function MallettesPage({ searchParams }) {
           <h2 id="available-cases-title">Mallettes disponibles · {availableCases.length} sur {cases.length}</h2>
           <p>Du {formatDate(from)} au {formatDate(to)} inclus.</p>
           {availableCases.length === 0 ? <p>Aucune mallette n’est libre pendant toute cette période.</p> :
-            <ul>{availableCases.map(item => <li key={item.id}>{caseLabel(item)}</li>)}</ul>}
+            <ul className={styles.trips}>{availableCases.map(item => <li key={item.id}>
+              <form action={updateCase} className={styles.form}>
+                <CaseFields id={item.id} from={from} to={to} />
+                <strong>{caseLabel(item)}</strong>
+                <button name="operation" value="archive" aria-label={"Retirer " + caseLabel(item) + " du parc"}>Retirer du parc</button>
+              </form>
+            </li>)}</ul>}
         </section>
       </>}
     </main>
