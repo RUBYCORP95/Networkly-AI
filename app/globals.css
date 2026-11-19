@@ -210,3 +210,45 @@ main.tesami-pricing{display:block!important;grid-template-columns:none!important
 .status-failed{--status-bg:#ffebec;--status-border:#f5bfc4;--status-color:#c32c3b}
 .tesami-calendar-event[class*="status-"]{background:var(--status-bg)!important;border:1px solid var(--status-border)!important;border-left:4px solid var(--status-color)!important;color:#222b45!important}
 .tesami-event-status{display:inline-block;margin-top:7px;padding:3px 7px;border-radius:6px;background:var(--status-bg);color:var(--status-color);border:1px solid var(--status-border);font-size:10px;font-weight:800}
+
+/* Keep the dashboard and admin navigation usable on narrow and short screens. */
+.appframe {
+  grid-template-columns: 250px minmax(0, 1fr);
+  align-items: start;
+}
+.appframe > aside {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.appframe > aside nav { min-width: 0; }
+.appframe > aside nav a {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.appframe > aside nav a svg { flex-shrink: 0; }
+.appframe .dashboardcontent, .appframe .dashboardcontent > *,
+.adminpage, .admincard { min-width: 0; }
+.appframe .dashboardcontent, .admincard { overflow-wrap: anywhere; }
+.admincard .customertable { max-width: 100%; overflow-x: auto; }
+
+@media (max-width: 800px) {
+  .appframe { grid-template-columns: minmax(0, 1fr); }
+  .appframe > aside {
+    height: auto;
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+  .appframe > aside nav { display: grid; }
+  .adminpage { padding: 20px 14px; }
+}
+
+@media (max-width: 520px) {
+  .appframe .dashboardcontent { padding: 20px 14px 40px; }
+  .appframe .dashboardcontent .fields, .adminpage .fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admincard { padding: 16px; }
+}
