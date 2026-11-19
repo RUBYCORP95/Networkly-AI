@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createAdminSupabase } from "../../../lib/supabase/admin";
 import { availableOrderLink, orderLinkHash } from "../../../lib/crm/order-link";
 import { priceOrder, readLines } from "../../../lib/crm/order";
+import { SellerDetails } from "../../consultant/clients/OrderReceipt";
 import OrderForm from "../../consultant/clients/OrderForm";
 import styles from "../../consultant/consultant.module.css";
 
@@ -34,6 +35,7 @@ export default async function PublicOrder({ params, searchParams }) {
   return <main className={styles.page}>
     <h1>Bon de commande</h1>
     {link ? <>
+      <section className={styles.panel}><h2>Ton consultant</h2><SellerDetails seller={link.seller} /></section>
       <p>Ajoute tes produits, ajuste les quantités, puis envoie ton bon à ton consultant.</p>
       {query.erreur && <p role="alert">Le bon n’a pas été envoyé. Vérifie la disponibilité des produits et réessaie.</p>}
       <OrderForm token={token} fixedShipping={link.shipping_cents} submitAction={submitOrder.bind(null, token)} />

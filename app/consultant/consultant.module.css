@@ -53,3 +53,17 @@
 .teamVisuals form { margin-top: 16px; }
 .teamVisuals button { padding: 9px 13px; border: 0; border-radius: 8px; background: #6236b8; color: white; cursor: pointer; }
 .teamImage { width: 100%; height: 170px; object-fit: contain; background: #f8f6fc; border-radius: 8px; }
+.receiptHeader { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+.receiptDetails { border-block: 1px solid #ded6f2; margin-block: 14px; padding-block: 12px; }
+.receiptDetails summary { color: #5634a8; cursor: pointer; font-weight: 700; }
+.receiptMeta, .receiptTotals { display: grid; gap: 8px; }
+.receiptMeta > div, .receiptTotals > div, .receiptLines li {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.receiptMeta dd, .receiptTotals dd { margin: 0; overflow-wrap: anywhere; white-space: pre-line; }
+.receiptLines { list-style: none; padding: 0; }
+.receiptLines li, .receiptTotals > div:last-child { border-top: 1px solid #ded6f2; padding-block: 8px; }

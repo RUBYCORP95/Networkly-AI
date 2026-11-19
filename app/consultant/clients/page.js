@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { formatDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
-import { addFollowup, saveClient, updateFollowup, updateOrder } from "./actions";
-import { formatEuros } from "../../../lib/crm/money.mjs";
+import { addFollowup, saveClient, saveSeller, updateFollowup, updateOrder } from "./actions";
+import { orderStatuses, paymentStatuses, sellerFields } from "../../../lib/crm/order-receipt.mjs";
+import OrderReceipt from "./OrderReceipt";
 import ShareOrder from "./ShareOrder";
 import OrderForm from "./OrderForm";
 import styles from "../consultant.module.css";
@@ -13,6 +14,8 @@ const notices = new Map([
   ["client", "Fiche client enregistrée."],
   ["followup", "Relance programmée."],
   ["catalogue", "Un produit ou un prix du catalogue est indisponible. Relance la recherche."],
+  ["seller_required", "Enregistre d’abord tes coordonnées professionnelles."],
+  ["seller", "Coordonnées professionnelles enregistrées."],
   ["order", "Commande enregistrée."],
   ["updated", "Relance mise à jour."],
 ]);
@@ -50,9 +53,27 @@ function FollowupTable({ title, rows, today }) {
   </section>;
 }
 
-const orderStatuses = [
-  ["pending", "En attente"], ["confirmed", "Confirmée"], ["completed", "Terminée"], ["cancelled", "Annulée"],
-];
+const emailStatuses = new Map([
+  ["not_requested", "Récapitulatif prévu à la confirmation"],
+  ["missing_email", "E-mail client manquant"],
+  ["queued", "E-mail en file d’attente"], ["sending", "E-mail en cours d’envoi"],
+  ["sent", "E-mail accepté par Brevo"], ["failed", "Échec de l’envoi de l’e-mail"],
+]);
+
+function SellerForm({ seller }) {
+  return <section>
+    <h2>Coordonnées sur les bons de commande</h2>
+    <p>Ces coordonnées professionnelles seront visibles sur tes bons et dans les e-mails clients.</p>
+    <form action={saveSeller} className={styles.form}>
+      {sellerFields.map(([key, label, maxLength]) => <label key={key}>{label}
+        {key === "address" ? <textarea name={key} maxLength={maxLength} defaultValue={seller?.[key]} /> :
+          <input name={key} type={key === "email" ? "email" : key === "phone" ? "tel" : "text"}
+            required={key === "name" || key === "email"} maxLength={maxLength} defaultValue={seller?.[key]} />}
+      </label>)}
+      <button>Enregistrer mes coordonnées</button>
+    </form>
+  </section>;
+}
 
 function OrderHistory({ orders, clientId }) {
   return <section>
@@ -60,20 +81,15 @@ function OrderHistory({ orders, clientId }) {
     {orders.error ? <p role="alert">L’historique est temporairement indisponible.</p> : <>
       {orders.data.length === 0 ? <p>Aucune commande pour ce client.</p> : <ul className={styles.trips}>
         {orders.data.map(order => <li key={order.id} className={styles.panel}>
-          <strong>{formatDate(parisDate(new Date(order.created_at)))} · {order.total_cents === null ? "Montant à confirmer" : formatEuros(order.total_cents + order.shipping_cents)}</strong>
-          {order.items.length ? <ul>{order.items.map(item => <li key={item.id}>
-            {item.quantity} × {item.title}{item.format && " · " + item.format}{item.reference && " · Réf. " + item.reference} · {formatEuros(item.unit_cents)} / unité
-          </li>)}</ul> : <p style={{ whiteSpace: "pre-wrap" }}>{order.details}</p>}
-          <p>Sous-total produits {order.total_cents === null ? "à confirmer" : formatEuros(order.total_cents)} · Livraison {formatEuros(order.shipping_cents)}</p>
+          <OrderReceipt order={order} />
+          <p>{emailStatuses.get(order.email_state)}</p>
           <form action={updateOrder} className={styles.form}>
             <input name="id" type="hidden" value={order.id} />
             <label>Statut<select name="status" defaultValue={order.status}>
               {orderStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select></label>
             <label>Paiement<select name="payment_status" defaultValue={order.payment_status}>
-              <option value="pending">En attente</option>
-              <option value="paid">Payé</option>
-              <option value="later">À payer plus tard</option>
+              {paymentStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select></label>
             <label>Livraison (€)<input name="shipping" type="number" min={0} max={999999.99} step="0.01" defaultValue={(order.shipping_cents / 100).toFixed(2)} /></label>
             <button>Mettre à jour</button>
@@ -94,15 +110,16 @@ export default async function ClientsPage({ searchParams }) {
   const params = await searchParams;
   const today = parisDate();
   const db = await createServerSupabase();
-  const [customers, reminders] = await Promise.all([
+  const [customers, seller, reminders] = await Promise.all([
     db.from("crm_clients").select("id,name,email,phone,birth_date,birthday_notification").order("name"),
+    db.from("crm_seller_profiles").select("name,business,email,phone,address,registration").maybeSingle(),
     db.from("crm_followups").select("id,client_id,due_date,notification,completed_at").order("due_date"),
   ]);
   const clients = customers.data ?? [];
   const names = new Map(clients.map(customer => [customer.id, customer.name]));
   const selected = clients.find(customer => customer.id === params.client);
   const orders = selected ? await db.from("crm_orders")
-    .select("id,details,total_cents,shipping_cents,items,status,payment_status,created_at").eq("client_id", selected.id)
+    .select("id,details,total_cents,shipping_cents,items,status,payment_status,created_at,buyer,seller,email_state").eq("client_id", selected.id)
     .order("created_at", { ascending: false }).order("id", { ascending: false }) : null;
   const active = (reminders.data ?? []).filter(item => !item.completed_at && names.has(item.client_id))
     .map(item => ({...item, name: names.get(item.client_id), date: item.due_date}));
@@ -121,6 +138,7 @@ export default async function ClientsPage({ searchParams }) {
       <FollowupTable title="En retard" rows={rows.filter(item => item.date < today)} today={today} />
       <FollowupTable title="Aujourd’hui" rows={rows.filter(item => item.date === today)} today={today} />
       <FollowupTable title="À venir" rows={rows.filter(item => item.date > today)} today={today} />
+      {seller.error ? <p role="alert">Les coordonnées professionnelles sont temporairement indisponibles.</p> : <SellerForm seller={seller.data} />}
       <section>
         <h2>Fichier clients</h2>
         {clients.length === 0 ? <p>Aucune fiche client.</p> : <div className={styles.cards}>

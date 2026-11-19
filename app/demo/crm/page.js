@@ -3,7 +3,20 @@
 import { useState } from "react";
 import { afterDays, demoSettings, formatDate, isDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
 import { formatEuros, parseCents } from "../../../lib/crm/money.mjs";
+import OrderReceipt from "../../consultant/clients/OrderReceipt";
 import styles from "../../consultant/consultant.module.css";
+
+const sampleSeller = { name: "Alex Morgan", business: "Atelier des senteurs",
+  email: "atelier@example.test", phone: "01 00 00 00 00", address: "1 rue des Exemples, 75000 Paris",
+  registration: "Identifiant de démonstration" };
+const sampleBuyer = { name: "Camille Martin", email: "camille@example.test" };
+const sampleProduct = { id: "151W", title: "Parfum Olfazeta", reference: "151W", format: "70 ml", unit_cents: 3500 };
+const previousOrders = [
+  { id: "demo00000012", created_at: "2026-11-12T10:00Z", total_cents: 3400, shipping_cents: 500,
+    items: [{...sampleProduct, unit_cents: 2500, quantity: 1}, {id: "recharge-demo", title: "Recharge de démonstration", format: "15 ml", unit_cents: 900, quantity: 1}] },
+  { id: "demo00000005", created_at: "2026-10-05T10:00Z", total_cents: 2500, shipping_cents: 0,
+    items: [{...sampleProduct, unit_cents: 2500, quantity: 1}] },
+].map(order => ({...order, seller: sampleSeller, buyer: sampleBuyer, status: "completed", payment_status: "paid"}));
 
 export default function CrmDemo() {
   const [birthDate, setBirthDate] = useState(demoSettings.birthDate);
@@ -38,7 +51,7 @@ export default function CrmDemo() {
       </div>
       <p>Total · {Number.isNaN(shippingCents) ? "Montant invalide" : formatEuros(quantity * 3500 + shippingCents)}</p>
       <button disabled={!Number.isInteger(quantity) || quantity < 1 || quantity > 999 || Number.isNaN(shippingCents)}
-        onClick={() => setOrder({ quantity, total: quantity * 3500 + shippingCents, payment: "pending" })}>
+        onClick={() => setOrder({ id: "demo00000019", created_at: new Date().toISOString(), seller: sampleSeller, buyer: sampleBuyer, status: "pending", payment_status: "pending", total_cents: quantity * 3500, shipping_cents: shippingCents, items: [{ ...sampleProduct, quantity }] })}>
         Simuler l’envoi du bon
       </button>
     </section>
@@ -46,13 +59,13 @@ export default function CrmDemo() {
       <h2>Historique des commandes</h2>
       <ul className={styles.trips}>
         {order && <li className={styles.panel}>
-          <strong>{order.quantity} × 151W · {formatEuros(order.total)}</strong>
-          <div className={styles.form}><label>Paiement<select value={order.payment} onChange={e => setOrder({ ...order, payment: e.target.value })}>
+          <OrderReceipt order={order} />
+          <p>E-mail récapitulatif prévu après validation.</p>
+          <div className={styles.form}><label>Paiement<select value={order.payment_status} onChange={e => setOrder({ ...order, payment_status: e.target.value })}>
             <option value="pending">En attente</option><option value="paid">Payé</option><option value="later">À payer plus tard</option>
           </select></label></div>
         </li>}
-        <li className={styles.panel}><strong>12 novembre 2026 · 39,00 € · Terminée</strong><p>1 parfum et 1 recharge · Sous-total 34,00 € · Livraison 5,00 €</p></li>
-        <li className={styles.panel}><strong>5 octobre 2026 · 25,00 € · Terminée</strong><p>1 parfum</p></li>
+        {previousOrders.map(previous => <li key={previous.id} className={styles.panel}><OrderReceipt order={previous} /></li>)}
       </ul>
     </section>
     <section>

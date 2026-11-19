@@ -7,6 +7,7 @@ import { isDate, parisDate } from "../../../lib/crm/dates.mjs";
 
 import { priceOrder, readLines } from "../../../lib/crm/order";
 import { randomBytes, createHash } from "node:crypto";
+import { sellerFields } from "../../../lib/crm/order-receipt.mjs";
 import { parseCents } from "../../../lib/crm/money.mjs";
 
 const path = "/consultant/clients";
@@ -87,6 +88,8 @@ export async function addOrder(form) {
     details = "Bon de commande catalogue";
   }
   if (!details || details.length > 4000 || Number.isNaN(total) || total > 99999999) finish("invalid", id);
+  const { data: seller } = await client.from("crm_seller_profiles").select("name").maybeSingle();
+  if (!seller) finish("seller_required", id);
   const { error } = await client.from("crm_orders").insert({
     client_id: id, details, total_cents: total, shipping_cents: shipping, items,
   });
@@ -113,10 +116,24 @@ export async function createOrderLink(form) {
   const shipping = parseCents(form.get("shipping")) ?? 0;
   if (!uuid.test(id) || Number.isNaN(shipping)) return { error: "Vérifie les frais de livraison." };
 
+  const { data: customer } = await client.from("crm_clients").select("email").eq("id", id).maybeSingle();
+  if (!customer?.email) return { error: "Ajoute l’e-mail du client à sa fiche avant de partager le bon." };
+  const { data: seller } = await client.from("crm_seller_profiles").select("name").maybeSingle();
+  if (!seller) return { error: "Enregistre d’abord tes coordonnées professionnelles." };
+
   const token = randomBytes(32).toString("base64url");
   const token_hash = createHash("sha256").update(token).digest("hex");
   const { error } = await client.from("crm_order_links").insert({
     token_hash, client_id: id, shipping_cents: shipping,
   });
   return error ? { error: "Le lien n’a pas pu être créé." } : { token };
+}
+
+export async function saveSeller(form) {
+  const client = await consultantClient();
+  const values = Object.fromEntries(sellerFields.map(([key]) => [key, String(form.get(key) ?? "").trim()]));
+  if (!values.name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email) ||
+      sellerFields.some(([key, , limit]) => values[key].length > limit)) finish("invalid");
+  const { error } = await client.from("crm_seller_profiles").upsert(values, { onConflict: "owner_id" });
+  finish(error ? "error" : "seller");
 }
