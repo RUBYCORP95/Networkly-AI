@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Bell, Package, Settings, Users } from "lucide-react";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { formatDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
 import { addFollowup, saveClient, saveSeller, updateFollowup, updateOrder } from "./actions";
@@ -113,10 +114,12 @@ export default async function ClientsPage({ searchParams }) {
   const params = await searchParams;
   const today = parisDate();
   const db = await createServerSupabase();
-  const [customers, seller, reminders] = await Promise.all([
-    db.from("crm_clients").select("id,name,email,phone,birth_date,birthday_notification").order("name"),
+  const [customers, seller, reminders, activeFollowups, orderCount] = await Promise.all([
+    db.from("crm_clients").select("id,name,email,phone,birth_date,birthday_notification", { count: "exact" }).order("name").order("id"),
     db.from("crm_seller_profiles").select("name,business,email,phone,address,registration").maybeSingle(),
     db.from("crm_followups").select("id,client_id,due_date,notification,completed_at").order("due_date"),
+    db.from("crm_followups").select("id", { count: "exact", head: true }).is("completed_at", null),
+    db.from("crm_orders").select("id", { count: "exact", head: true }),
   ]);
   const clients = customers.data ?? [];
   const names = new Map(clients.map(customer => [customer.id, customer.name]));
@@ -132,18 +135,36 @@ export default async function ClientsPage({ searchParams }) {
   const rows = [...active, ...birthdays].sort((a, b) => a.date.localeCompare(b.date));
   const dueNotifications = rows.filter(item => item.notification && item.date <= today).length;
 
-  return <main className={styles.page}>
+  const settings = params.view === "settings";
+  const stats = [[Users, "Clients", customers.count], [Bell, "Relances ouvertes", activeFollowups.count], [Package, "Commandes", orderCount.count]];
+
+  return <main className={`${styles.page} ${styles.crmPage}`}>
     <Link href="/consultant">← Espace Consultant</Link>
-    <h1>{selected?.name ?? "Mes clients et rappels"}</h1>
-    {selected && <p><Link href="/consultant/clients">← Tous les clients</Link></p>}
+    <header className={styles.crmHeader}>
+      <h1>{settings ? "Paramètres du CRM" : selected?.name ?? "Mes clients"}</h1>
+      {settings || selected ? <Link href="/consultant/clients">← Tous les clients</Link> :
+        <Link className={styles.crmAction} href="?view=settings"><Settings size={17} aria-hidden="true" /> Paramètres</Link>}
+    </header>
     {notices.has(params.result) && <p className={styles.notice} role="status">{notices.get(params.result)}</p>}
-    {customers.error || reminders.error ? <p role="alert">Le CRM est temporairement indisponible.</p> : <>
+    {settings ? (seller.error ? <p role="alert">Les coordonnées professionnelles sont temporairement indisponibles.</p> :
+      <div className={styles.panel}><SellerForm seller={seller.data} /></div>) :
+    customers.error || reminders.error ? <p role="alert">Le CRM est temporairement indisponible.</p> : <>
       {dueNotifications > 0 && <p className={styles.notice} role="status">{dueNotifications} notification(s) TESAMI à consulter.</p>}
+      {!selected && <>
+        <dl className={styles.crmStats}>
+          {stats.map(([Icon, label, count]) => <div className={styles.crmStat} key={label}>
+            <span className={styles.crmAvatar} aria-hidden="true"><Icon size={19} /></span>
+            <dt>{label}</dt><dd>{count ?? "—"}</dd>
+          </div>)}
+        </dl>
+        <CustomerList customers={clients.map(({ id, name, email }) => ({ id, name, email }))} />
+      </>}
+      {!selected && <div className={styles.crmReminders}>
       <FollowupTable title="En retard" rows={rows.filter(item => item.date < today)} today={today} />
       <FollowupTable title="Aujourd’hui" rows={rows.filter(item => item.date === today)} today={today} />
       <FollowupTable title="À venir" rows={rows.filter(item => item.date > today)} today={today} />
-      {seller.error ? <p role="alert">Les coordonnées professionnelles sont temporairement indisponibles.</p> : <SellerForm seller={seller.data} />}
-      <CustomerList customers={clients} />
+      </div>}
+      {selected && <p><Link href="?view=settings">Paramètres professionnels</Link></p>}
       {selected && <section id="fiche" key={selected.id}>
         <h2>Coordonnées du client</h2>
         <CustomerForm customer={selected} today={today} />
@@ -159,10 +180,10 @@ export default async function ClientsPage({ searchParams }) {
         <ul>{reminders.data.filter(item => item.client_id === selected.id && item.completed_at)
           .map(item => <li key={item.id}>Relance du {formatDate(item.due_date)} · effectuée le {formatDate(parisDate(new Date(item.completed_at)))}</li>)}</ul>
       </section>}
-      <section>
+      {!selected && <section className={styles.panel}>
         <h2>Ajouter un client</h2>
         <CustomerForm today={today} />
-      </section>
+      </section>}
     </>}
   </main>;
 }
