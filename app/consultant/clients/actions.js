@@ -142,3 +142,13 @@ export async function saveSeller(form) {
   const { error } = await client.from("crm_seller_profiles").upsert(values, { onConflict: "owner_id" });
   finish(error ? "error" : "seller");
 }
+
+export async function createRegistrationLink() {
+  const client = await consultantClient();
+  const {data: seller} = await client.from("crm_seller_profiles").select("name").maybeSingle();
+  if (!seller) return {error: "Enregistre d’abord tes coordonnées professionnelles dans les paramètres du CRM."};
+  const token = randomBytes(32).toString("base64url");
+  const token_hash = createHash("sha256").update(token).digest("hex");
+  const {error} = await client.from("crm_registration_links").insert({token_hash});
+  return error ? {error: "Le lien n’a pas pu être créé."} : {token};
+}

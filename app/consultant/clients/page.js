@@ -3,10 +3,11 @@ import { Bell, Mail, Package, Settings, Users } from "lucide-react";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { formatDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
 import { addFollowup, saveClient, saveSeller, updateFollowup, updateOrder } from "./actions";
-import { orderStatuses, paymentStatuses, receiptNumber, receiptText, sellerFields } from "../../../lib/crm/order-receipt.mjs";
+import { orderStatuses, paymentStatuses, receiptNumber, receiptEmailText, sellerFields } from "../../../lib/crm/order-receipt.mjs";
 import CustomerList from "./CustomerList";
 import OrderReceipt from "./OrderReceipt";
 import ShareOrder from "./ShareOrder";
+import ShareRegistration from "./ShareRegistration";
 import OrderForm from "./OrderForm";
 import styles from "../consultant.module.css";
 
@@ -73,7 +74,7 @@ function SellerForm({ seller }) {
 function orderEmailDraft(order, recipient) {
   const address = encodeURIComponent(recipient).replace(/%40/g, "@");
   const subject = encodeURIComponent("Votre bon de commande " + receiptNumber(order.id));
-  const body = encodeURIComponent(receiptText(order).replace(/\n/g, "\r\n"));
+  const body = encodeURIComponent(receiptEmailText(order).replace(/\n/g, "\r\n"));
   return `mailto:${address}?subject=${subject}&body=${body}`;
 }
 
@@ -236,6 +237,7 @@ export default async function ClientsPage({ searchParams }) {
       </section>}
       {!selected && <section className={styles.panel}>
         <h2>Ajouter un client</h2>
+        <ShareRegistration />
         <CustomerForm today={today} />
       </section>}
     </>}
