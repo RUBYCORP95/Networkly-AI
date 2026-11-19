@@ -65,15 +65,16 @@ export async function updateCase(form) {
   if (typeof id !== "string" || !/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(id)) finish("invalid", from, to);
 
   const name = String(form.get("name") ?? "").trim();
-  const color = String(form.get("color") ?? "").toLowerCase();
+  const samples = form.get("samples_to_replace");
   let changes;
   if (operation === "archive") changes = { archived_at: new Date().toISOString() };
   else if (operation === "restore") changes = { archived_at: null };
-  else if (operation === "details" && name && name.length <= 80 && /^#[0-9a-f]{6}$/.test(color)) {
+  else if (operation === "details" && name && name.length <= 80) {
     if (size !== "" && !["small", "large"].includes(size)) finish("invalid", from, to);
-    changes = { name, color, size: size || null };
-  }
-  else finish("invalid", from, to);
+    changes = { name, size: size || null };
+  } else if (operation === "samples" && typeof samples === "string" && samples.length <= 1000) {
+    changes = { samples_to_replace: samples.trim() };
+  } else finish("invalid", from, to);
 
   const { data, error } = await client.from("travelling_cases").update(changes)
     .eq("id", id).select("id").maybeSingle();

@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic";
 const notices = new Map([
   ["archive", "Mallette retirée du parc actif. Son historique est conservé."],
   ["restore", "Mallette réactivée."],
-  ["details", "Nom, couleur et taille de la mallette enregistrés."],
+  ["samples", "Échantillons à changer enregistrés."],
+  ["details", "Nom et taille de la mallette enregistrés."],
   ["size", "Taille de la mallette mise à jour."],
   ["inactive", "Cette mallette est archivée ou indisponible."],
   ["added", "Mallette ajoutée."],
@@ -61,7 +62,7 @@ export default async function MallettesPage({ searchParams }) {
     .select("id,case_id,destination,starts_on,ends_on").eq("cancelled", false)
     .lte("starts_on", end).gte("ends_on", start).order("starts_on").order("id");
   const [casesResult, monthResult, periodResult] = await Promise.all([
-    client.from("travelling_cases").select("id,name,size,color,archived_at").order("name").order("id"),
+    client.from("travelling_cases").select("id,name,size,samples_to_replace,archived_at").order("name").order("id"),
     fetchTrips(first, last),
     fetchTrips(from, to),
   ]);
@@ -98,13 +99,12 @@ export default async function MallettesPage({ searchParams }) {
           <p>{availableCases.length} sur {cases.length} disponible(s) pendant toute la période du {formatDate(from)} au {formatDate(to)} inclus.</p>
           <div className={styles.cards}>
             {cases.map(item => <div className={styles.card} key={item.id}>
-              <strong>{item.color && <span aria-hidden="true" className={styles.caseColor} style={{ backgroundColor: item.color }} />}{caseLabel(item)}</strong>
+              <strong>{caseLabel(item)}</strong>
               <span>{unavailable.has(item.id) ? "Indisponible sur cette période" : "Disponible sur cette période"}</span>
               <form action={updateCase} className={styles.form}>
                 <CaseFields id={item.id} from={from} to={to} />
                 <input type="hidden" name="operation" value="details" />
                 <label>Nom<input name="name" maxLength={80} defaultValue={item.name} required /></label>
-                <label>Couleur<input name="color" type="color" defaultValue={item.color ?? "#5634a8"} /></label>
                 <label>Taille<CaseSize size={item.size} optional /></label>
                 <button>Enregistrer les modifications</button>
               </form>
@@ -173,7 +173,7 @@ export default async function MallettesPage({ searchParams }) {
         {archivedCases.length > 0 && <details className={styles.panel}>
           <summary>Mallettes archivées ({archivedCases.length})</summary>
           <ul className={styles.trips}>{archivedCases.map(item => <li key={item.id}>
-            <strong>{item.color && <span aria-hidden="true" className={styles.caseColor} style={{ backgroundColor: item.color }} />}{caseLabel(item)}</strong>
+            <strong>{caseLabel(item)}</strong>
             <form action={updateCase} className={styles.form}>
               <CaseFields id={item.id} from={from} to={to} />
               <input type="hidden" name="operation" value="restore" />
@@ -188,8 +188,17 @@ export default async function MallettesPage({ searchParams }) {
             <ul className={styles.trips}>{availableCases.map(item => <li key={item.id}>
               <form action={archiveCase} className={styles.form}>
                 <CaseFields id={item.id} from={from} to={to} />
-                <strong>{item.color && <span aria-hidden="true" className={styles.caseColor} style={{ backgroundColor: item.color }} />}{caseLabel(item)}</strong>
+                <strong>{caseLabel(item)}</strong>
                 <button aria-label={"Retirer " + caseLabel(item) + " du parc"}>Retirer du parc</button>
+              </form>
+              <form action={updateCase} className={styles.form}>
+                <CaseFields id={item.id} from={from} to={to} />
+                <input type="hidden" name="operation" value="samples" />
+                <label>Échantillons à changer
+                  <textarea name="samples_to_replace" maxLength={1000} rows={3}
+                    defaultValue={item.samples_to_replace} placeholder="Références ou noms des échantillons" />
+                </label>
+                <button>Enregistrer les échantillons</button>
               </form>
             </li>)}</ul>}
         </section>
