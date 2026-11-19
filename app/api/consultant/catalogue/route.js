@@ -27,13 +27,16 @@ export async function GET(request) {
     const access = await requireConsultant(await createServerSupabase());
     if (!access.ok) return Response.json({ error: access.error }, { status: access.status });
   }
+  const mode = params.get("mode");
   const query = params.get("q")?.trim();
   if (!query || query.length > 240) return Response.json({ error: "Recherche invalide." }, { status: 400 });
 
   try {
-    const [handles] = await Promise.all([findProducts(query), requireEuroCatalogue()]);
+    const [handles] = await Promise.all([findProducts(query, mode), requireEuroCatalogue()]);
     const items = (await Promise.all(handles.map(getVariants))).flat();
-    return Response.json({ items: rankByArticleCode(items, query) }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ items: mode === "code"
+      ? rankByArticleCode(items.filter(item => item.reference.toUpperCase().startsWith(query.toUpperCase())), query)
+      : mode === "name" ? items : rankByArticleCode(items, query) }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return Response.json({ error: "Le catalogue Parfum Inspiration est indisponible." }, { status: 502 });
   }
