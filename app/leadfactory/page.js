@@ -44,16 +44,22 @@ export default function LeadFactoryPage(){
    const {data:{session}}=await supabase.auth.getSession();
    if(!session?.access_token)throw new Error("Connecte-toi à TESAMI pour consulter tes prospects.");
    const response=await fetch(process.env.NEXT_PUBLIC_SUPABASE_URL+"/functions/v1/leadfactory-daily-status",{
+    signal:AbortSignal.timeout(12000),
     headers:{Authorization:"Bearer "+session.access_token,apikey:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}
    });
    const status=await response.json();
    if(!response.ok){if(response.status===403){setState(s=>({...s,loading:false,error:"",status:null,cards:[],limited:true}));return;}throw new Error(status.error||"Statut indisponible");}
-   const {data:cards,error}=await supabase.rpc("my_lead_allocation_cards");
+   // Le statut principal est disponible même si la liste des contacts est lente.
+   setState(s=>({...s,loading:false,error:"",status,cards:s.cards,limited:false}));
+   const {data:cards,error}=await Promise.race([
+     supabase.rpc("my_lead_allocation_cards"),
+     new Promise((_,reject)=>setTimeout(()=>reject(new Error("Le chargement des contacts prend trop de temps. Réessaie.")),12000))
+   ]);
    if(error)throw error;
-   const {data:pref}=await supabase.from("lead_preferences").select("city,radius_km,latitude,longitude").eq("user_id",session.user.id).maybeSingle();
+   const {data:pref}=await supabase.from("lead_preferences").select("city,radius_km,latitude,longitude").eq("user_id",session.user.id).maybeSingle().abortSignal(AbortSignal.timeout(12000));
    if(pref){setCityQuery(pref.city||"");setRadius(pref.radius_km||25);if(pref.latitude!=null&&pref.longitude!=null)setSelectedCity({name:pref.city,latitude:pref.latitude,longitude:pref.longitude});}
    setState(s=>({...s,loading:false,error:"",status,cards:cards||[],limited:false}));
-  }catch(e){setState(s=>({...s,loading:false,error:e.message||"Erreur de chargement"}));}
+  }catch(e){setState(s=>({...s,loading:false,error:e.name==="TimeoutError"?"Le chargement prend trop de temps. Réessaie.":e.message||"Erreur de chargement"}));}
  },[]);
  useEffect(()=>{load()},[load]);
  useEffect(()=>{if(!state.limited)return;createClient().from("lead_team_memberships").select("status,consultant_identifier").maybeSingle().then(({data})=>{if(data)setAccessRequest(v=>({...v,status:data.status||"",identifier:data.consultant_identifier||""}));});},[state.limited]);
@@ -115,6 +121,7 @@ export default function LeadFactoryPage(){
  const visibleCards=state.cards; // Existing allocations remain owned by the consultant even if their saved sector changes.
  if(state.limited)return <div className={styles.page}><div className={styles.hero}><div><div className={styles.eyebrow}>TESAMI · LeadFactory</div><h1>🔒 LeadFactory</h1><a href="/">Retour au tableau de bord</a><p>L’accès aux leads est verrouillé tant que ton compte n’a pas été autorisé.</p></div></div><div className={styles.panel} style={{maxWidth:620,margin:"30px auto",textAlign:"center",padding:30}}><div style={{fontSize:52,marginBottom:12}}>🔒</div><h2>{accessRequest.status==="pending"?"Demande en attente de validation":"Débloquer mes prospects"}</h2><p>{accessRequest.status==="pending"?"Ta demande a été envoyée. Un administrateur doit confirmer ton accès gratuit aux leads.":"Tu es consultant Chogan ? Clique ci-dessous pour demander ton accès gratuit. Studio IA reste disponible avec ton compte TESAMI."}</p>{accessRequest.status!=="pending"&&<button type="button" className={styles.button} onClick={()=>setAccessRequest(v=>({...v,open:true}))}>Demander mon accès LeadFactory</button>}{accessRequest.open&&<div style={{marginTop:20,textAlign:"left"}}><label>Mon identifiant consultant Chogan<input style={{display:"block",width:"100%",marginTop:8,padding:12}} value={accessRequest.identifier} onChange={e=>setAccessRequest(v=>({...v,identifier:e.target.value}))} placeholder="Identifiant consultant" maxLength={100}/></label>{accessRequest.error&&<p role="alert">{accessRequest.error}</p>}<button className={styles.button} type="button" disabled={accessRequest.sending||accessRequest.identifier.trim().length<2} onClick={requestLeadAccess}>{accessRequest.sending?"Envoi…":"Envoyer ma demande"}</button></div>}</div></div>;
  return <div className={styles.page}>
+  <a href="/consultant" style={{display:"inline-block",marginBottom:16}}>← Retour à l’espace Consultant</a>
   <div className={styles.hero}>
    <div><div className={styles.eyebrow}>TESAMI · Espace consultant</div><h1>LeadFactory</h1><p>Développe ton réseau local, découvre tes prospects et prépare des prises de contact professionnelles avec les bons outils.</p></div>
    <div className={styles.heroBadge}>✦ Prospection de proximité <button type="button" className={styles.heroDemoButton} onClick={()=>setDemo(v=>!v)}>{demo?"Fermer la démo":"Essayer la démo"}</button></div>
@@ -126,7 +133,7 @@ export default function LeadFactoryPage(){
    <div className={styles.stat}><div className={styles.statLabel}>Mes contacts</div><div className={styles.statValue}>{visibleCards.length}</div><div className={styles.statNote}>Actuellement attribués</div></div>
   </div>
   {state.loading&&<div className={styles.panel} role="status">Chargement de ton espace LeadFactory…</div>}
-  {state.error&&<div className={styles.alert} role="alert"><p>{state.error}</p>{state.error.includes("Connecte-toi")&&<a className={styles.loginLink} href="/login?next=%2Fleadfactory">Se connecter à TESAMI</a>}</div>}
+  {state.error&&<div className={styles.alert} role="alert"><p>{state.error}</p><button type="button" className={styles.button} onClick={load}>Réessayer le chargement</button>{state.error.includes("Connecte-toi")&&<a className={styles.loginLink} href="/login?next=%2Fleadfactory">Se connecter à TESAMI</a>}</div>}
   {state.limited&&<div className={styles.betaNotice} role="status"><strong>Bienvenue dans la bêta publique !</strong><p>Tu peux tester gratuitement les dix contacts fictifs, les conseils de prospection et l’interface. Les vrais contacts Klaviyo et professionnels ne sont pas accessibles aux comptes bêta non autorisés.</p><a href="/login?next=%2Fleadfactory">Gérer mon compte</a></div>}
   {(s||state.limited)&&<div className={styles.layout}>
    <div className={styles.panel}>
