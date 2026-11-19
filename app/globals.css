@@ -279,3 +279,42 @@ main.tesami-pricing{display:block!important;grid-template-columns:none!important
   text-decoration: none;
   font-weight: 700;
 }
+
+.adminpage .customertable { margin-top: 18px; }
+.adminpage .customertable table { width: 100%; border-collapse: collapse; text-align: left; }
+.adminpage .customertable th,
+.adminpage .customertable td { padding: 12px 14px; border-bottom: 1px solid #ebe7f6; vertical-align: middle; }
+.adminpage .customertable th { background: #f5f1ff; color: #39305d; font-size: 13px; }
+.adminpage .customertable tbody tr:hover { background: #faf8ff; }
+.admin-account-identity .customerlink { color: #352477; text-decoration: none; }
+.admin-account-identity .customerlink:hover { text-decoration: underline; }
+.admin-account-identity small { display: block; margin-top: 4px; color: #635c76; }
+.admin-account-status {
+  display: inline-block;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #efeaf9;
+  color: #453a65;
+  font-size: 13px;
+}
+
+@media (max-width: 620px) {
+  .admin-accounts table, .admin-accounts tbody { display: block; }
+  .admin-accounts thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .admin-accounts tbody tr {
+    display: block;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    border: 1px solid #ebe7f6;
+    border-radius: 12px;
+  }
+  .adminpage .admin-accounts td { display: block; padding: 5px 0; border: 0; }
+  .adminpage .admin-accounts td[data-label] { display: flex; justify-content: space-between; gap: 12px; }
+  .admin-accounts td[data-label]::before { content: attr(data-label); color: #635c76; }
+}
