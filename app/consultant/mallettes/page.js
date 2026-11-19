@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import styles from "../consultant.module.css";
-import { addCase, bookTrip, cancelTrip } from "./actions";
+import { addCase, bookTrip, cancelTrip, updateCase } from "./actions";
 import { overlaps, validDate } from "./dates";
 
 export const metadata = { title: "Mallettes voyageuses · TESAMI" };
 
 const notices = new Map([
+  ["archive", "Mallette retirée du parc actif. Son historique est conservé."],
+  ["restore", "Mallette réactivée."],
+  ["size", "Taille de la mallette mise à jour."],
+  ["inactive", "Cette mallette est archivée ou indisponible."],
   ["added", "Mallette ajoutée."],
   ["booked", "Déplacement enregistré."],
   ["cancelled", "Déplacement annulé. La mallette est libérée pour cette période."],
@@ -16,6 +20,23 @@ const notices = new Map([
 ]);
 const monthFormat = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" });
 const weekdays = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+const sizes = { small: "Petite", large: "Grande" };
+
+function CaseSize({ size }) {
+  return <select name="size" defaultValue={size ?? ""} required>
+    <option value="" disabled>Choisir une taille</option>
+    {Object.entries(sizes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+  </select>;
+}
+
+function CaseFields({ id, from, to }) {
+  return <>
+    <input type="hidden" name="id" value={id} />
+    <input type="hidden" name="from" value={from} />
+    <input type="hidden" name="to" value={to} />
+  </>;
+}
 
 function formatDate(date) {
   return date.split("-").reverse().join("/");
@@ -38,17 +59,21 @@ export default async function MallettesPage({ searchParams }) {
     .select("id,case_id,destination,starts_on,ends_on").eq("cancelled", false)
     .lte("starts_on", end).gte("ends_on", start).order("starts_on").order("id");
   const [casesResult, monthResult, periodResult] = await Promise.all([
-    client.from("travelling_cases").select("id,name").order("name").order("id"),
+    client.from("travelling_cases").select("id,name,size,archived_at").order("name").order("id"),
     fetchTrips(first, last),
     fetchTrips(from, to),
   ]);
   const failed = casesResult.error || monthResult.error || periodResult.error;
-  const cases = casesResult.data ?? [];
+  const allCases = casesResult.data ?? [];
+  const cases = allCases.filter(item => !item.archived_at);
+  const archivedCases = allCases.filter(item => item.archived_at);
+  const activeIds = new Set(cases.map(item => item.id));
   const trips = monthResult.data ?? [];
-  const caseNames = new Map(cases.map((item, index) => [item.id,
-    cases.some(other => other.id !== item.id && other.name === item.name)
+  const caseNames = new Map(allCases.map((item, index) => [item.id,
+    allCases.some(other => other.id !== item.id && other.name === item.name)
       ? `${item.name} · Mallette ${index + 1}` : item.name]));
-  const unavailable = new Set((periodResult.data ?? []).filter(trip => caseNames.has(trip.case_id)).map(trip => trip.case_id));
+  const caseLabel = item => caseNames.get(item.id) + (item.size ? " · " + sizes[item.size] : "");
+  const unavailable = new Set((periodResult.data ?? []).filter(trip => activeIds.has(trip.case_id)).map(trip => trip.case_id));
   const availableCases = cases.filter(item => !unavailable.has(item.id));
   const notice = notices.get(params.status);
 
@@ -71,8 +96,14 @@ export default async function MallettesPage({ searchParams }) {
           <p>{availableCases.length} sur {cases.length} disponible(s) pendant toute la période du {formatDate(from)} au {formatDate(to)} inclus.</p>
           <div className={styles.cards}>
             {cases.map(item => <div className={styles.card} key={item.id}>
-              <strong>{caseNames.get(item.id)}</strong>
+              <strong>{caseLabel(item)}</strong>
               <span>{unavailable.has(item.id) ? "Indisponible sur cette période" : "Disponible sur cette période"}</span>
+              <form action={updateCase} className={styles.form}>
+                <CaseFields id={item.id} from={from} to={to} />
+                <label>Taille<CaseSize size={item.size} /></label>
+                <button name="operation" value="size">Enregistrer la taille</button>
+                <button name="operation" value="archive" formNoValidate>Archiver</button>
+              </form>
             </div>)}
           </div>
         </section>
@@ -84,7 +115,7 @@ export default async function MallettesPage({ searchParams }) {
             {Array.from({ length: days }, (_, index) => {
               const day = index + 1;
               const date = month + "-" + String(day).padStart(2, "0");
-              const count = new Set(trips.filter(trip => caseNames.has(trip.case_id) && overlaps(trip, date, date))
+              const count = new Set(trips.filter(trip => activeIds.has(trip.case_id) && overlaps(trip, date, date))
                 .map(trip => trip.case_id)).size;
               const available = cases.length - count;
               return <div key={day} className={styles.day + (count ? " " + styles.busy : "")}>
@@ -115,6 +146,7 @@ export default async function MallettesPage({ searchParams }) {
           <h2>Ajouter une mallette</h2>
           <form action={addCase} className={styles.form}>
             <label>Nom de la mallette<input name="name" maxLength={80} required /></label>
+            <label>Taille<CaseSize /></label>
             <button>Ajouter</button>
           </form>
         </section>
@@ -122,7 +154,7 @@ export default async function MallettesPage({ searchParams }) {
           <h2>Planifier un déplacement</h2>
           <form action={bookTrip} className={styles.form}>
             <label>Mallette<select name="case_id" required>
-              {cases.map(item => <option key={item.id} value={item.id}>{caseNames.get(item.id)}</option>)}
+              {cases.map(item => <option key={item.id} value={item.id}>{caseLabel(item)}</option>)}
             </select></label>
             <label>Destination<input name="destination" maxLength={160} required /></label>
             <label>Date de départ<input name="starts_on" type="date" defaultValue={from} required /></label>
@@ -130,11 +162,21 @@ export default async function MallettesPage({ searchParams }) {
             <button>Réserver</button>
           </form>
         </section>}
+        {archivedCases.length > 0 && <details className={styles.panel}>
+          <summary>Mallettes archivées ({archivedCases.length})</summary>
+          <ul className={styles.trips}>{archivedCases.map(item => <li key={item.id}>
+            <strong>{caseLabel(item)}</strong>
+            <form action={updateCase} className={styles.form}>
+              <CaseFields id={item.id} from={from} to={to} />
+              <button name="operation" value="restore">Réactiver</button>
+            </form>
+          </li>)}</ul>
+        </details>}
         <section className={styles.panel} aria-labelledby="available-cases-title">
           <h2 id="available-cases-title">Mallettes disponibles · {availableCases.length} sur {cases.length}</h2>
           <p>Du {formatDate(from)} au {formatDate(to)} inclus.</p>
           {availableCases.length === 0 ? <p>Aucune mallette n’est libre pendant toute cette période.</p> :
-            <ul>{availableCases.map(item => <li key={item.id}>{caseNames.get(item.id)}</li>)}</ul>}
+            <ul>{availableCases.map(item => <li key={item.id}>{caseLabel(item)}</li>)}</ul>}
         </section>
       </>}
     </main>
