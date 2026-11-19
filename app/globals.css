@@ -252,3 +252,30 @@ main.tesami-pricing{display:block!important;grid-template-columns:none!important
   }
   .admincard { padding: 16px; }
 }
+
+.adminpage .admin-metrics, .adminpage .growthgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.admin-metrics > div, .adminpage .growthmonth {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e9e5fa;
+  border-radius: 12px;
+  background: #faf8ff;
+}
+.admin-metrics strong { font-size: 20px; }
+.admin-primary-link {
+  display: inline-block;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #5634a8;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+}
