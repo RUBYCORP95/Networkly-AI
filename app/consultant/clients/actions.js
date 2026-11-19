@@ -5,7 +5,8 @@ import { requireConsultant } from "../../../lib/auth/consultant";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { isDate, parisDate } from "../../../lib/crm/dates.mjs";
 
-import { getVariants, requireEuroCatalogue } from "../../../lib/crm/catalogue";
+import { priceOrder, readLines } from "../../../lib/crm/order";
+import { randomBytes, createHash } from "node:crypto";
 import { parseCents } from "../../../lib/crm/money.mjs";
 
 const path = "/consultant/clients";
@@ -76,27 +77,13 @@ export async function addOrder(form) {
   let details = String(form.get("details") ?? "").trim();
   let total = parseCents(form.get("total"));
   const shipping = parseCents(form.get("shipping")) ?? 0;
-  let requested;
-  try { requested = JSON.parse(form.get("lines") || "[]"); }
-  catch { finish("invalid"); }
-  if (!uuid.test(id) || Number.isNaN(shipping) || !Array.isArray(requested) || requested.length > 20 ||
-      requested.some(line => !line || typeof line.handle !== "string" || !/^[0-9]+$/.test(line.id) ||
-        !Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 999) ||
-      new Set(requested.map(line => line.id)).size !== requested.length) finish("invalid");
+  const requested = readLines(form.get("lines"));
+  if (!uuid.test(id) || Number.isNaN(shipping) || !requested) finish("invalid");
 
   let items = [];
   if (requested.length) {
-    try {
-      const handles = [...new Set(requested.map(line => line.handle))];
-      const [, variants] = await Promise.all([requireEuroCatalogue(), Promise.all(handles.map(getVariants))]);
-      const available = new Map(variants.flat().map(item => [item.id, item]));
-      items = requested.map(line => {
-        const item = available.get(line.id);
-        if (!item || item.handle !== line.handle) throw new Error("Variante indisponible");
-        return { ...item, quantity: line.quantity };
-      });
-    } catch { finish("catalogue", id); }
-    total = items.reduce((sum, item) => sum + item.unit_cents * item.quantity, 0);
+    try { ({ items, total } = await priceOrder(requested)); }
+    catch { finish("catalogue", id); }
     details = "Bon de commande catalogue";
   }
   if (!details || details.length > 4000 || Number.isNaN(total) || total > 99999999) finish("invalid", id);
@@ -110,10 +97,26 @@ export async function updateOrder(form) {
   const client = await consultantClient();
   const id = form.get("id");
   const status = form.get("status");
+  const payment_status = form.get("payment_status");
   const shipping = parseCents(form.get("shipping")) ?? 0;
-  if (!uuid.test(id) || Number.isNaN(shipping) || !["pending", "confirmed", "completed", "cancelled"].includes(status)) finish("invalid");
+  if (!uuid.test(id) || Number.isNaN(shipping) || !["pending", "paid", "later"].includes(payment_status) ||
+      !["pending", "confirmed", "completed", "cancelled"].includes(status)) finish("invalid");
 
-  const { data, error } = await client.from("crm_orders").update({ status, shipping_cents: shipping }).eq("id", id)
+  const { data, error } = await client.from("crm_orders").update({ status, payment_status, shipping_cents: shipping }).eq("id", id)
     .select("client_id").single();
   finish(error || !data ? "error" : "order", data?.client_id);
+}
+
+export async function createOrderLink(form) {
+  const client = await consultantClient();
+  const id = form.get("client_id");
+  const shipping = parseCents(form.get("shipping")) ?? 0;
+  if (!uuid.test(id) || Number.isNaN(shipping)) return { error: "Vérifie les frais de livraison." };
+
+  const token = randomBytes(32).toString("base64url");
+  const token_hash = createHash("sha256").update(token).digest("hex");
+  const { error } = await client.from("crm_order_links").insert({
+    token_hash, client_id: id, shipping_cents: shipping,
+  });
+  return error ? { error: "Le lien n’a pas pu être créé." } : { token };
 }

@@ -3,6 +3,7 @@ import { createServerSupabase } from "../../../lib/supabase/server";
 import { formatDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
 import { addFollowup, saveClient, updateFollowup, updateOrder } from "./actions";
 import { formatEuros } from "../../../lib/crm/money.mjs";
+import ShareOrder from "./ShareOrder";
 import OrderForm from "./OrderForm";
 import styles from "../consultant.module.css";
 
@@ -69,11 +70,18 @@ function OrderHistory({ orders, clientId }) {
             <label>Statut<select name="status" defaultValue={order.status}>
               {orderStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select></label>
+            <label>Paiement<select name="payment_status" defaultValue={order.payment_status}>
+              <option value="pending">En attente</option>
+              <option value="paid">Payé</option>
+              <option value="later">À payer plus tard</option>
+            </select></label>
             <label>Livraison (€)<input name="shipping" type="number" min={0} max={999999.99} step="0.01" defaultValue={(order.shipping_cents / 100).toFixed(2)} /></label>
             <button>Mettre à jour</button>
           </form>
         </li>)}
       </ul>}
+      <h2>Partager un bon de commande</h2>
+      <ShareOrder key={clientId} clientId={clientId} />
       <h2>Ajouter une commande</h2>
       <OrderForm key={clientId} clientId={clientId} />
     </>}
@@ -94,7 +102,7 @@ export default async function ClientsPage({ searchParams }) {
   const names = new Map(clients.map(customer => [customer.id, customer.name]));
   const selected = clients.find(customer => customer.id === params.client);
   const orders = selected ? await db.from("crm_orders")
-    .select("id,details,total_cents,shipping_cents,items,status,created_at").eq("client_id", selected.id)
+    .select("id,details,total_cents,shipping_cents,items,status,payment_status,created_at").eq("client_id", selected.id)
     .order("created_at", { ascending: false }).order("id", { ascending: false }) : null;
   const active = (reminders.data ?? []).filter(item => !item.completed_at && names.has(item.client_id))
     .map(item => ({...item, name: names.get(item.client_id), date: item.due_date}));
