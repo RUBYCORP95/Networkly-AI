@@ -62,9 +62,11 @@ export async function updateCase(form) {
   const id = form.get("id");
   if (typeof id !== "string" || !/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(id)) finish("invalid", from, to);
 
+  const name = String(form.get("name") ?? "").trim();
   let changes;
   if (operation === "archive") changes = { archived_at: new Date().toISOString() };
   else if (operation === "restore") changes = { archived_at: null };
+  else if (operation === "rename" && name.length > 0 && name.length <= 80) changes = { name };
   else if (operation === "size" && ["small", "large"].includes(size)) changes = { size };
   else finish("invalid", from, to);
 
