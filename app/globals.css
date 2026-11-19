@@ -329,3 +329,9 @@ main.tesami-pricing{display:block!important;grid-template-columns:none!important
   text-decoration: none;
   font-weight: 700;
 }
+
+@media (min-width: 1250px) {
+  .tesami-pricing .tesami-pricing-grid { grid-template-columns: repeat(5,minmax(0,1fr)); }
+}
+.admin-metrics form label { display: block; }
+.admin-metrics form input { margin: 6px 0 10px; }
