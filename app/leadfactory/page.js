@@ -12,6 +12,7 @@ export default function LeadFactoryPage(){
  const [adviceType,setAdviceType]=useState("partnership");
  const [adviceCopied,setAdviceCopied]=useState(false);
  const [cityQuery,setCityQuery]=useState("");
+ const [sectorTab,setSectorTab]=useState("professional");
  const [prospectSearchMessage,setProspectSearchMessage]=useState("");
  const [prospectAvailability,setProspectAvailability]=useState(null);
  const [contactRevealBusy,setContactRevealBusy]=useState(null);
@@ -138,24 +139,34 @@ export default function LeadFactoryPage(){
   {(s||state.limited)&&<div className={styles.layout}>
    <div className={styles.panel}>
     <h2>📍 Choisir mon secteur</h2><p className={styles.muted}>Choisis une commune et un rayon pour retrouver tes prospects professionnels et tes contacts clients Klaviyo au même endroit. Les contacts non attribués restent privés.</p>
+    <div role="tablist" aria-label="Type de prospects" style={{display:"flex",gap:8,flexWrap:"wrap",margin:"18px 0"}}>
+      <button type="button" role="tab" aria-selected={sectorTab==="professional"} className={sectorTab==="professional"?styles.button:styles.buttonSecondary} onClick={()=>setSectorTab("professional")}>🏢 Prospects professionnels</button>
+      <button type="button" role="tab" aria-selected={sectorTab==="klaviyo"} className={sectorTab==="klaviyo"?styles.button:styles.buttonSecondary} onClick={()=>setSectorTab("klaviyo")}>👤 Clients Klaviyo</button>
+    </div>
+    <p className={styles.muted}>{sectorTab==="professional"?"Recherche des professionnels dans le rayon sélectionné.":"Consulte les clients Klaviyo déjà attribués à ton compte. La recherche géographique des clients non attribués n’est pas encore disponible."}</p>
     <label className={styles.label} htmlFor="lf-city">Ville ou code postal</label>
     <div className={styles.searchRow}><input className={styles.input} id="lf-city" value={cityQuery} onChange={e=>{setCityQuery(e.target.value);setSelectedCity(null);setCities([]);}} onKeyDown={e=>{if(e.key==="Enter")searchCities();}} placeholder="Ex. Viarmes ou 95270"/><button className={styles.buttonSecondary} onClick={searchCities} disabled={searchingCities||cityQuery.trim().length<2}>{searchingCities?"Recherche…":"Rechercher"}</button></div>
     {cities.length>0&&<div style={{marginTop:12}}><label className={styles.label} htmlFor="lf-city-results">Sélectionner une commune ({cities.length} résultat{cities.length>1?"s":""})</label><select id="lf-city-results" className={styles.input} defaultValue="" onChange={e=>{const city=cities[Number(e.target.value)];if(!city)return;setSelectedCity(city);setCityQuery(city.name);setCities([]);setSectorMessage("Ville sélectionnée : "+city.name+(city.postcode?" ("+city.postcode+")":""));}}><option value="" disabled>Choisir une ville dans la liste…</option>{cities.map((city,i)=><option key={city.code+"-"+i} value={i}>{city.name}{city.postcode?" · "+city.postcode:""}</option>)}</select></div>}
     <label className={styles.label} htmlFor="lf-radius">Rayon de prospection : {radius} km</label>
     <input className={styles.range} id="lf-radius" type="range" min="5" max="50" step="5" value={radius} onChange={e=>setRadius(Number(e.target.value))}/>
     <div className={styles.rangeLabels}><span>5 km</span><span>25 km</span><span>50 km</span></div>
-    <div style={{marginTop:22,display:"flex",gap:10,flexWrap:"wrap"}}><button className={styles.button} onClick={searchProspectsInSector} disabled={savingSector||searchingProspects||!selectedCity}>{savingSector||searchingProspects?"Recherche en cours…":"🔎 Rechercher prospects et clients"}</button><button className={styles.buttonSecondary} onClick={saveSector} disabled={savingSector||!selectedCity}>Enregistrer mon secteur</button></div>
+    <div style={{marginTop:22,display:"flex",gap:10,flexWrap:"wrap"}}><button className={styles.button} onClick={searchProspectsInSector} disabled={sectorTab==="klaviyo"||savingSector||searchingProspects||!selectedCity}>{sectorTab==="klaviyo"?"Recherche géographique Klaviyo à venir":savingSector||searchingProspects?"Recherche en cours…":"🔎 Rechercher des professionnels"}</button><button className={styles.buttonSecondary} onClick={saveSector} disabled={savingSector||!selectedCity}>Enregistrer mon secteur</button></div>
     {sectorMessage&&<p className={styles.message} role="status">{sectorMessage}</p>}
-    {prospectSearchMessage&&<div className={styles.panel} style={{marginTop:18}} role="status">
-      <h3>Résultats dans mon secteur</h3>
+    {sectorTab==="professional"&&prospectSearchMessage&&<div className={styles.panel} style={{marginTop:18}} role="status">
+      <h3>Professionnels dans mon secteur</h3>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:12,margin:"12px 0"}}>
        <div className={styles.stat}><div className={styles.statLabel}>Prospects professionnels</div><div className={styles.statValue}>{prospectAvailability?.available??"—"}</div><div className={styles.statNote}>Éligibles dans le rayon choisi</div></div>
-       <div className={styles.stat}><div className={styles.statLabel}>Contacts clients Klaviyo</div><div className={styles.statValue}>{visibleCards.filter(card=>card.contact_kind==="klaviyo").length}</div><div className={styles.statNote}>Déjà attribués à mon compte (toutes zones)</div></div>
+
       </div>
       <p>{prospectSearchMessage}</p>
       <p className={styles.muted}>Les contacts Klaviyo non attribués restent privés : leur disponibilité géographique n’est pas encore intégrée à cette recherche. Aucun contact n’est réservé.</p>
       {prospectAvailability?.adminPreview&&prospectAvailability.preview?.length>0&&<div className={styles.cards} style={{marginTop:14}}>{prospectAvailability.preview.map((pro,i)=><article className={styles.leadCard} key={i}><h3>{pro.company||"Entreprise"}</h3><p>{pro.sector||"Activité non précisée"}</p><p>📍 {pro.city}{pro.department?" · "+pro.department:""} · {pro.distance_km} km</p><p>{pro.validated?"Validé pour attribution":"En attente de validation"}</p><button className={styles.button} type="button" disabled={contactRevealBusy===pro.id} onClick={()=>revealAdminProfessional(pro)} style={{marginTop:12}}>{contactRevealBusy===pro.id?"Ouverture…":"Contacter · Voir les coordonnées"}</button></article>)}</div>}
      </div>}
+    {sectorTab==="klaviyo"&&<div className={styles.panel} role="tabpanel" style={{marginTop:18}}>
+      <h3>Mes clients Klaviyo attribués ({visibleCards.filter(card=>card.contact_kind==="klaviyo").length})</h3>
+      <p className={styles.muted}>Ces contacts sont déjà attribués à ton compte. Ils ne sont pas encore filtrés par le rayon choisi.</p>
+      {visibleCards.filter(card=>card.contact_kind==="klaviyo").length===0?<p>Aucun client Klaviyo attribué pour le moment.</p>:<div className={styles.cards}>{visibleCards.filter(card=>card.contact_kind==="klaviyo").map(card=><article className={styles.leadCard} key={card.allocation_id}><strong>Client Klaviyo</strong><p>{[card.city,card.department].filter(Boolean).join(" · ")||"Localisation non renseignée"}</p><button type="button" className={styles.buttonSecondary} onClick={()=>reveal(card.allocation_id)} disabled={busy===card.allocation_id}>{busy===card.allocation_id?"Ouverture…":"Contacter"}</button>{state.revealed[card.allocation_id]?.phone&&<p><a href={"tel:"+state.revealed[card.allocation_id].phone}>{state.revealed[card.allocation_id].phone}</a></p>}{state.revealed[card.allocation_id]?.email&&<p><a href={"mailto:"+state.revealed[card.allocation_id].email}>{state.revealed[card.allocation_id].email}</a></p>}</article>)}</div>}
+    </div>}
    </div>
    <div className={styles.panel}>
     <h2>🎯 Mes prospects du jour</h2><p className={styles.muted}>Retrouve ici tes quotas et le statut de ta demande quotidienne.</p>
