@@ -65,11 +65,14 @@ export async function updateCase(form) {
   if (typeof id !== "string" || !/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(id)) finish("invalid", from, to);
 
   const name = String(form.get("name") ?? "").trim();
+  const color = String(form.get("color") ?? "").toLowerCase();
   let changes;
   if (operation === "archive") changes = { archived_at: new Date().toISOString() };
   else if (operation === "restore") changes = { archived_at: null };
-  else if (operation === "rename" && name.length > 0 && name.length <= 80) changes = { name };
-  else if (operation === "size" && ["small", "large"].includes(size)) changes = { size };
+  else if (operation === "details" && name && name.length <= 80 && /^#[0-9a-f]{6}$/.test(color)) {
+    if (size !== "" && !["small", "large"].includes(size)) finish("invalid", from, to);
+    changes = { name, color, size: size || null };
+  }
   else finish("invalid", from, to);
 
   const { data, error } = await client.from("travelling_cases").update(changes)

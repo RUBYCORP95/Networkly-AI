@@ -119,3 +119,5 @@ main.crmPage {
 .receiptDetails summary.crmAction { display: inline-block; }
 .receiptDetails summary.crmAction::before { content: "▸"; margin-right: 8px; }
 .receiptDetails[open] summary.crmAction::before { content: "▾"; }
+
+.caseColor { display: inline-block; width: .8em; height: .8em; border: 1px solid #645871; border-radius: 50%; margin-inline-end: .45em; }

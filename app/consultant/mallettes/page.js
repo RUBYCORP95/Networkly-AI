@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 const notices = new Map([
   ["archive", "Mallette retirée du parc actif. Son historique est conservé."],
   ["restore", "Mallette réactivée."],
-  ["rename", "Nom de la mallette mis à jour."],
+  ["details", "Nom, couleur et taille de la mallette enregistrés."],
   ["size", "Taille de la mallette mise à jour."],
   ["inactive", "Cette mallette est archivée ou indisponible."],
   ["added", "Mallette ajoutée."],
@@ -25,9 +25,9 @@ const weekdays = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
 const sizes = { small: "Petite", large: "Grande" };
 
-function CaseSize({ size }) {
-  return <select name="size" defaultValue={size ?? ""} required>
-    <option value="" disabled>Choisir une taille</option>
+function CaseSize({ size, optional = false }) {
+  return <select name="size" defaultValue={size ?? ""} required={!optional}>
+    <option value="" disabled={!optional}>{optional ? "Non renseignée" : "Choisir une taille"}</option>
     {Object.entries(sizes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
   </select>;
 }
@@ -61,7 +61,7 @@ export default async function MallettesPage({ searchParams }) {
     .select("id,case_id,destination,starts_on,ends_on").eq("cancelled", false)
     .lte("starts_on", end).gte("ends_on", start).order("starts_on").order("id");
   const [casesResult, monthResult, periodResult] = await Promise.all([
-    client.from("travelling_cases").select("id,name,size,archived_at").order("name").order("id"),
+    client.from("travelling_cases").select("id,name,size,color,archived_at").order("name").order("id"),
     fetchTrips(first, last),
     fetchTrips(from, to),
   ]);
@@ -98,14 +98,15 @@ export default async function MallettesPage({ searchParams }) {
           <p>{availableCases.length} sur {cases.length} disponible(s) pendant toute la période du {formatDate(from)} au {formatDate(to)} inclus.</p>
           <div className={styles.cards}>
             {cases.map(item => <div className={styles.card} key={item.id}>
-              <strong>{caseLabel(item)}</strong>
+              <strong>{item.color && <span aria-hidden="true" className={styles.caseColor} style={{ backgroundColor: item.color }} />}{caseLabel(item)}</strong>
               <span>{unavailable.has(item.id) ? "Indisponible sur cette période" : "Disponible sur cette période"}</span>
               <form action={updateCase} className={styles.form}>
                 <CaseFields id={item.id} from={from} to={to} />
-                <label>Nom<input name="name" maxLength={80} defaultValue={item.name} /></label>
-                <button name="operation" value="rename" formNoValidate>Renommer</button>
-                <label>Taille<CaseSize size={item.size} /></label>
-                <button name="operation" value="size">Enregistrer la taille</button>
+                <input type="hidden" name="operation" value="details" />
+                <label>Nom<input name="name" maxLength={80} defaultValue={item.name} required /></label>
+                <label>Couleur<input name="color" type="color" defaultValue={item.color ?? "#5634a8"} /></label>
+                <label>Taille<CaseSize size={item.size} optional /></label>
+                <button>Enregistrer les modifications</button>
               </form>
               <form action={archiveCase}>
                 <CaseFields id={item.id} from={from} to={to} />
@@ -172,10 +173,11 @@ export default async function MallettesPage({ searchParams }) {
         {archivedCases.length > 0 && <details className={styles.panel}>
           <summary>Mallettes archivées ({archivedCases.length})</summary>
           <ul className={styles.trips}>{archivedCases.map(item => <li key={item.id}>
-            <strong>{caseLabel(item)}</strong>
+            <strong>{item.color && <span aria-hidden="true" className={styles.caseColor} style={{ backgroundColor: item.color }} />}{caseLabel(item)}</strong>
             <form action={updateCase} className={styles.form}>
               <CaseFields id={item.id} from={from} to={to} />
-              <button name="operation" value="restore">Réactiver</button>
+              <input type="hidden" name="operation" value="restore" />
+              <button>Réactiver</button>
             </form>
           </li>)}</ul>
         </details>}
@@ -186,7 +188,7 @@ export default async function MallettesPage({ searchParams }) {
             <ul className={styles.trips}>{availableCases.map(item => <li key={item.id}>
               <form action={archiveCase} className={styles.form}>
                 <CaseFields id={item.id} from={from} to={to} />
-                <strong>{caseLabel(item)}</strong>
+                <strong>{item.color && <span aria-hidden="true" className={styles.caseColor} style={{ backgroundColor: item.color }} />}{caseLabel(item)}</strong>
                 <button aria-label={"Retirer " + caseLabel(item) + " du parc"}>Retirer du parc</button>
               </form>
             </li>)}</ul>}
