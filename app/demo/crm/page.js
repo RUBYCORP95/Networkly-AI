@@ -27,7 +27,7 @@ const previousOrders = [
 ].map(order => ({...order, seller: sampleSeller, buyer: sampleBuyer, status: "completed", payment_status: "paid"}));
 
 export default function CrmDemo() {
-  const [selectedId, setSelectedId] = useState("camille");
+  const [selectedId, setSelectedId] = useState(null);
   const selectedClient = demoClients.find(c => c.id === selectedId) ?? demoClients[0];
   const [birthDate, setBirthDate] = useState(demoSettings.birthDate);
   const [delay, setDelay] = useState(String(demoSettings.delayDays));
@@ -46,19 +46,24 @@ export default function CrmDemo() {
     setNotification(customer.notification);
     setOrder(null);
   }
-  const validDelay = /^\d{1,4}$/.test(delay) && Number(delay) > 0 && Number(delay) <= 3650;
-  return <main className={styles.page}>
-    <h1>{selectedClient.name}</h1>
-    <p>Six fiches fictives pour tester le CRM. Aucune donnée réelle n'est modifiée.</p>
-    <section><h2>Fichier clients · 6 clients</h2>
+  if (!selectedId) return <main className={styles.page}>
+    <h1>Mes clients</h1>
+    <p>Sélectionne un client pour consulter sa fiche, son historique et préparer un bon de commande. Données fictives.</p>
+    <section><h2>Fichier clients · {demoClients.length} clients</h2>
       <div className={styles.cards}>{demoClients.map(customer =>
         <button type="button" key={customer.id} className={styles.card}
-          aria-pressed={selectedId === customer.id} onClick={() => selectClient(customer.id)}
-          style={{ textAlign: "left", background: selectedId === customer.id ? "#eee6fd" : "white", color: "#201740" }}>
+          onClick={() => selectClient(customer.id)}
+          style={{ textAlign: "left", background: "white", color: "#201740", cursor: "pointer" }}>
           <strong>{customer.name}</strong><span>{customer.email}</span>
-          <span>Relance : {customer.delay} jours</span>
+          <span>Voir la fiche client →</span>
         </button>)}</div>
     </section>
+  </main>;
+  const validDelay = /^\d{1,4}$/.test(delay) && Number(delay) > 0 && Number(delay) <= 3650;
+  return <main className={styles.page}>
+    <button type="button" onClick={() => setSelectedId(null)}>← Retour à la liste des clients</button>
+    <h1>{selectedClient.name}</h1>
+    <p>Six fiches fictives pour tester le CRM. Aucune donnée réelle n'est modifiée.</p>
     <section className={styles.panel} id="fiche-client">
       <h2>Paramètres de la fiche</h2>
       <div className={styles.form}>
