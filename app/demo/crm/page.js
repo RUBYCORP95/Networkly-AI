@@ -29,8 +29,8 @@ export default function CrmDemo() {
   const today = parisDate();
   const validDelay = /^\d{1,4}$/.test(delay) && Number(delay) > 0 && Number(delay) <= 3650;
   return <main className={styles.page}>
-    <h1>Démo · Clients et rappels</h1>
-    <p>Fiche fictive de Camille Martin. Les modifications restent dans cette page.</p>
+    <h1>{sampleBuyer.name}</h1>
+    <p>Fiche client de démonstration. Les modifications restent dans cette page.</p>
     <section className={styles.panel}>
       <h2>Paramètres de la fiche</h2>
       <div className={styles.form}>

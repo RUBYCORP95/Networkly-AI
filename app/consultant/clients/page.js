@@ -37,7 +37,7 @@ function FollowupTable({ title, rows, today }) {
     <h2>{title}</h2>
     {rows.length === 0 ? <p>Aucun rappel.</p> : <ul className={styles.trips}>
       {rows.map(item => <li className={styles.panel} key={item.id}>
-        <Link href={"?client=" + item.client_id + "#fiche"}>{item.name}</Link>
+        <Link href={"?client=" + item.client_id}>{item.name}</Link>
         <p>{item.birthday ? "Anniversaire" : "Relance"} · {formatDate(item.date)}
           {item.notification && item.date <= today && <strong> · Notification TESAMI</strong>}
           {!item.notification && " · Notification désactivée"}</p>
@@ -131,7 +131,8 @@ export default async function ClientsPage({ searchParams }) {
 
   return <main className={styles.page}>
     <Link href="/consultant">← Espace Consultant</Link>
-    <h1>Mes clients et rappels</h1>
+    <h1>{selected?.name ?? "Mes clients et rappels"}</h1>
+    {selected && <p><Link href="/consultant/clients">← Tous les clients</Link></p>}
     {notices.has(params.result) && <p className={styles.notice} role="status">{notices.get(params.result)}</p>}
     {customers.error || reminders.error ? <p role="alert">Le CRM est temporairement indisponible.</p> : <>
       {dueNotifications > 0 && <p className={styles.notice} role="status">{dueNotifications} notification(s) TESAMI à consulter.</p>}
@@ -142,11 +143,11 @@ export default async function ClientsPage({ searchParams }) {
       <section>
         <h2>Fichier clients</h2>
         {clients.length === 0 ? <p>Aucune fiche client.</p> : <div className={styles.cards}>
-          {clients.map(customer => <Link href={"?client=" + customer.id + "#fiche"} className={styles.card} key={customer.id}>{customer.name}</Link>)}
+          {clients.map(customer => <Link href={"?client=" + customer.id} className={styles.card} key={customer.id}>{customer.name}</Link>)}
         </div>}
       </section>
       {selected && <section id="fiche" key={selected.id}>
-        <h2>{selected.name}</h2>
+        <h2>Coordonnées du client</h2>
         <CustomerForm customer={selected} today={today} />
         <OrderHistory orders={orders} clientId={selected.id} />
         <h2>Programmer une relance</h2>
