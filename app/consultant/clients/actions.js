@@ -66,3 +66,28 @@ export async function updateFollowup(form) {
     .is("completed_at", null).select("client_id").single();
   finish(error || !data ? "error" : "updated", data?.client_id);
 }
+
+export async function addOrder(form) {
+  const client = await consultantClient();
+  const id = form.get("client_id");
+  const details = String(form.get("details") ?? "").trim();
+  const amount = String(form.get("total") ?? "").trim().replace(",", ".");
+  if (!uuid.test(id) || !details || details.length > 4000 ||
+      (amount && !/^\d{1,6}(?:\.\d{1,2})?$/.test(amount))) finish("invalid", uuid.test(id) ? id : null);
+
+  const { error } = await client.from("crm_orders").insert({
+    client_id: id, details, total_cents: amount ? Math.round(Number(amount) * 100) : null,
+  });
+  finish(error ? "error" : "order", id);
+}
+
+export async function updateOrder(form) {
+  const client = await consultantClient();
+  const id = form.get("id");
+  const status = form.get("status");
+  if (!uuid.test(id) || !["pending", "confirmed", "completed", "cancelled"].includes(status)) finish("invalid");
+
+  const { data, error } = await client.from("crm_orders").update({ status }).eq("id", id)
+    .select("client_id").single();
+  finish(error || !data ? "error" : "order", data?.client_id);
+}

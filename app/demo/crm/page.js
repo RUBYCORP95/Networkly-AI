@@ -22,6 +22,13 @@ export default function CrmDemo() {
       </div>
     </section>
     <section>
+      <h2>Historique des commandes</h2>
+      <ul className={styles.trips}>
+        <li className={styles.panel}><strong>12 novembre 2026 · 39,00 € · Terminée</strong><p>1 parfum et 1 recharge</p></li>
+        <li className={styles.panel}><strong>5 octobre 2026 · 25,00 € · Terminée</strong><p>1 parfum</p></li>
+      </ul>
+    </section>
+    <section>
       <h2>Tableau des relances</h2>
       <p>Rappel créé le {formatDate(today)}</p>
       <ul className={styles.trips}>
