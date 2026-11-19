@@ -6,7 +6,7 @@ import { addOrder } from "./actions";
 import styles from "../consultant.module.css";
 
 export default function OrderForm({ clientId, token, fixedShipping = 0, submitAction = addOrder }) {
-  const [query, setQuery] = useState("");
+  const [{ mode, query }, setSearch] = useState({ mode: "code", query: "" });
   const [items, setItems] = useState([]);
   const [lines, setLines] = useState([]);
   const [shipping, setShipping] = useState("");
@@ -21,7 +21,7 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const result = await fetch("/api/consultant/catalogue?" + new URLSearchParams({ q: searchQuery }), {
+        const result = await fetch("/api/consultant/catalogue?" + new URLSearchParams({ q: searchQuery, mode }), {
           signal: controller.signal,
           headers: token ? { "X-Order-Link": token } : undefined,
         });
@@ -29,7 +29,7 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
         if (!result.ok) throw new Error(data.error);
         if (controller.signal.aborted) return;
         setItems(data.items);
-        if (!data.items.length) setMessage("Aucun produit trouvé. Essaie une autre référence ou un lien produit.");
+        if (!data.items.length) setMessage("Aucun produit trouvé. Essaie un autre code ou nom de produit.");
       } catch (error) {
         if (!controller.signal.aborted) setMessage(error.message || "Recherche indisponible.");
       } finally {
@@ -40,11 +40,11 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
       clearTimeout(timer);
       controller.abort();
     };
-  }, [searchQuery, token]);
+  }, [searchQuery, mode, token]);
 
-  function updateQuery(value) {
-    setQuery(value);
-    if (value.trim() === searchQuery) return;
+  function updateQuery(nextMode, value) {
+    setSearch({ mode: nextMode, query: value });
+    if (nextMode === mode && value.trim() === searchQuery) return;
     setItems([]);
     setMessage("");
     setLoading(value.trim().length >= 2);
@@ -62,9 +62,13 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
   const shippingCents = token ? fixedShipping : parseCents(shipping) ?? 0;
   return <>
     <div className={styles.form}>
-      <label>Code article, nom du produit ou lien Parfum Inspiration
-        <input type="search" value={query} maxLength={240} placeholder="Saisis au moins 2 caractères"
-          onChange={event => updateQuery(event.target.value)} />
+      <label>Code article
+        <input type="search" value={mode === "code" ? query : ""} maxLength={240} placeholder="Ex. 020W"
+          onChange={event => updateQuery("code", event.target.value)} />
+      </label>
+      <label>Nom du produit
+        <input type="search" value={mode === "name" ? query : ""} maxLength={240} placeholder="Nom ou lien Parfum Inspiration"
+          onChange={event => updateQuery("name", event.target.value)} />
       </label>
       {items.length > 0 && <label>Ajouter un produit au bon
         <select value="" onChange={event => selectProduct(event.target.value)} disabled={lines.length >= 20}>
