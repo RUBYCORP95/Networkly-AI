@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatEuros, parseCents } from "../../../lib/crm/money.mjs";
 import { addOrder } from "./actions";
 import styles from "../consultant.module.css";
@@ -14,37 +14,68 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function search(event) {
-    event.preventDefault();
-    setLoading(true);
+  const searchQuery = query.trim();
+  useEffect(() => {
+    if (searchQuery.length < 2) return;
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const result = await fetch("/api/consultant/catalogue?" + new URLSearchParams({ q: searchQuery }), {
+          signal: controller.signal,
+          headers: token ? { "X-Order-Link": token } : undefined,
+        });
+        const data = await result.json();
+        if (!result.ok) throw new Error(data.error);
+        if (controller.signal.aborted) return;
+        setItems(data.items);
+        if (!data.items.length) setMessage("Aucun produit trouvé. Essaie une autre référence ou un lien produit.");
+      } catch (error) {
+        if (!controller.signal.aborted) setMessage(error.message || "Recherche indisponible.");
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }, 350);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [searchQuery, token]);
+
+  function updateQuery(value) {
+    setQuery(value);
+    if (value.trim() === searchQuery) return;
     setItems([]);
     setMessage("");
-    try {
-      const result = await fetch("/api/consultant/catalogue?" + new URLSearchParams({ q: query }),
-        token ? { headers: { "X-Order-Link": token } } : undefined);
-      const data = await result.json();
-      if (!result.ok) throw new Error(data.error);
-      setItems(data.items);
-      if (!data.items.length) setMessage("Aucune variante disponible. Essaie une autre référence ou un lien produit.");
-    } catch (error) {
-      setMessage(error.message || "Recherche indisponible.");
-    } finally {
-      setLoading(false);
-    }
+    setLoading(value.trim().length >= 2);
+  }
+
+  function selectProduct(id) {
+    const item = items.find(item => String(item.id) === id);
+    if (!item) return;
+    setLines(current => current.length >= 20 || current.some(line => line.id === item.id)
+      ? current : [...current, { ...item, quantity: 1 }]);
+    setMessage(item.title + " ajouté au bon.");
   }
 
   const productTotal = lines.length ? lines.reduce((sum, line) => sum + line.unit_cents * line.quantity, 0) : parseCents(manualTotal);
   const shippingCents = token ? fixedShipping : parseCents(shipping) ?? 0;
   return <>
-    <form onSubmit={search} className={styles.form}>
-      <label>Produit, référence ou lien Parfum Inspiration<input type="search" value={query} maxLength={240} onChange={event => setQuery(event.target.value)} required /></label>
-      <button disabled={loading}>{loading ? "Recherche…" : "Rechercher"}</button>
-    </form>
-    {message && <p role="status">{message}</p>}
-    {items.length > 0 && <ul className={styles.trips}>{items.map(item => <li className={styles.panel} key={item.id}>
-      <p>{item.title}{item.format && " · " + item.format}{item.reference && " · Réf. " + item.reference} · {formatEuros(item.unit_cents)}</p>
-      <button type="button" disabled={lines.length >= 20 || lines.some(line => line.id === item.id)} onClick={() => setLines([...lines, {...item, quantity: 1}])}>Ajouter au bon</button>
-    </li>)}</ul>}
+    <div className={styles.form}>
+      <label>Produit, référence ou lien Parfum Inspiration
+        <input type="search" value={query} maxLength={240} placeholder="Saisis au moins 2 caractères"
+          onChange={event => updateQuery(event.target.value)} />
+      </label>
+      {items.length > 0 && <label>Ajouter un produit au bon
+        <select value="" onChange={event => selectProduct(event.target.value)} disabled={lines.length >= 20}>
+          <option value="" disabled>Choisir parmi {items.length} résultat(s)</option>
+          {items.map(item => <option key={item.id} value={item.id} disabled={lines.some(line => line.id === item.id)}>
+            {[item.title, item.format, item.reference && "Réf. " + item.reference, formatEuros(item.unit_cents)].filter(Boolean).join(" · ")}
+          </option>)}
+        </select>
+      </label>}
+      <p role="status" style={{ flexBasis: "100%", margin: 0 }}>{loading ? "Recherche en cours…" : message}</p>
+    </div>
     <form action={submitAction} className={styles.form}>
       {clientId && <input name="client_id" type="hidden" value={clientId} />}
       <input name="lines" type="hidden" value={JSON.stringify(lines.map(({ handle, id, quantity }) => ({ handle, id, quantity })))} />
