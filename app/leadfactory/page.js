@@ -140,7 +140,7 @@ export default function LeadFactoryPage(){
   {(s||state.limited)&&<div className={styles.layout}>
    <div className={styles.panel}>
     <h2>📍 Choisir mon secteur</h2><p className={styles.muted}>Choisis une commune et un rayon pour retrouver tes prospects professionnels et tes contacts clients CHOGAN au même endroit. Les contacts non attribués restent privés.</p>
-    <div role="tablist" aria-label="Type de prospects" style={{display:"flex",gap:8,flexWrap:"wrap",margin:"18px 0"}}>
+    <div role="tablist" aria-label="Type de prospects" className={styles.sectorTabs}>
       <button type="button" role="tab" aria-selected={sectorTab==="professional"} className={sectorTab==="professional"?styles.button:styles.buttonSecondary} onClick={()=>setSectorTab("professional")}>🏢 Prospects professionnels</button>
       <button type="button" role="tab" aria-selected={sectorTab==="klaviyo"} className={sectorTab==="klaviyo"?styles.button:styles.buttonSecondary} onClick={()=>setSectorTab("klaviyo")}>👤 Clients CHOGAN</button>
     </div>
@@ -151,7 +151,7 @@ export default function LeadFactoryPage(){
     <label className={styles.label} htmlFor="lf-radius">Rayon de prospection : {radius} km</label>
     <input className={styles.range} id="lf-radius" type="range" min="5" max="50" step="5" value={radius} onChange={e=>setRadius(Number(e.target.value))}/>
     <div className={styles.rangeLabels}><span>5 km</span><span>25 km</span><span>50 km</span></div>
-    <div style={{marginTop:22,display:"flex",gap:10,flexWrap:"wrap"}}><button className={styles.button} onClick={searchProspectsInSector} disabled={sectorTab==="klaviyo"||savingSector||searchingProspects||!selectedCity}>{sectorTab==="klaviyo"?"Recherche géographique CHOGAN à venir":savingSector||searchingProspects?"Recherche en cours…":"🔎 Rechercher des professionnels"}</button><button className={styles.buttonSecondary} onClick={saveSector} disabled={savingSector||!selectedCity}>Enregistrer mon secteur</button></div>
+    <div className={styles.sectorActions}><button className={styles.button} onClick={searchProspectsInSector} disabled={sectorTab==="klaviyo"||savingSector||searchingProspects||!selectedCity}>{sectorTab==="klaviyo"?"Recherche géographique CHOGAN à venir":savingSector||searchingProspects?"Recherche en cours…":"🔎 Rechercher des professionnels"}</button><button className={styles.buttonSecondary} onClick={saveSector} disabled={savingSector||!selectedCity}>Enregistrer mon secteur</button></div>
     {sectorMessage&&<p className={styles.message} role="status">{sectorMessage}</p>}
     {sectorTab==="professional"&&prospectSearchMessage&&<div className={styles.panel} style={{marginTop:18}} role="status">
       <h3>Professionnels dans mon secteur</h3>
