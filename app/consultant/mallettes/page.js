@@ -5,6 +5,7 @@ import { addCase, bookTrip, cancelTrip, updateCase, archiveCase } from "./action
 import { overlaps, validDate } from "./dates";
 
 export const metadata = { title: "Mallettes voyageuses · TESAMI" };
+export const dynamic = "force-dynamic";
 
 const notices = new Map([
   ["archive", "Mallette retirée du parc actif. Son historique est conservé."],
