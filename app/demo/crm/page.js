@@ -10,7 +10,15 @@ import styles from "../../consultant/consultant.module.css";
 const sampleSeller = { name: "Alex Morgan", business: "Atelier des senteurs",
   email: "atelier@example.test", phone: "01 00 00 00 00", address: "1 rue des Exemples, 75000 Paris",
   registration: "Identifiant de démonstration" };
-const sampleBuyer = { name: "Camille Martin", email: "camille@example.test" };
+const demoClients = [
+  { id: "camille", name: "Camille Martin", email: "camille@example.test", birth: "1990-05-24", delay: 30, notification: true },
+  { id: "lucas", name: "Lucas Bernard", email: "lucas@example.test", birth: "1987-08-16", delay: 15, notification: true },
+  { id: "sophie", name: "Sophie Dubois", email: "sophie@example.test", birth: "1993-02-11", delay: 45, notification: false },
+  { id: "emma", name: "Emma Laurent", email: "emma@example.test", birth: "1998-12-04", delay: 60, notification: true },
+  { id: "thomas", name: "Thomas Petit", email: "thomas@example.test", birth: "1985-06-27", delay: 20, notification: false },
+  { id: "lea", name: "Léa Moreau", email: "lea@example.test", birth: "1995-09-09", delay: 30, notification: true },
+];
+const sampleBuyer = demoClients[0];
 const sampleProduct = { id: "151W", title: "Parfum Olfazeta", reference: "151W", format: "70 ml", unit_cents: 3500 };
 const previousOrders = [
   { id: "demo00000012", created_at: "2026-11-12T10:00Z", total_cents: 3400, shipping_cents: 500,
@@ -20,6 +28,8 @@ const previousOrders = [
 ].map(order => ({...order, seller: sampleSeller, buyer: sampleBuyer, status: "completed", payment_status: "paid"}));
 
 export default function CrmDemo() {
+  const [selectedId, setSelectedId] = useState("camille");
+  const selectedClient = demoClients.find(c => c.id === selectedId) ?? demoClients[0];
   const [birthDate, setBirthDate] = useState(demoSettings.birthDate);
   const [delay, setDelay] = useState(String(demoSettings.delayDays));
   const [notification, setNotification] = useState(demoSettings.notification);
@@ -28,9 +38,18 @@ export default function CrmDemo() {
   const [order, setOrder] = useState(null);
   const shippingCents = parseCents(shipping) ?? 0;
   const today = parisDate();
+  function selectClient(id) {
+    const customer = demoClients.find(c => c.id === id);
+    if (!customer) return;
+    setSelectedId(id);
+    setBirthDate(customer.birth);
+    setDelay(String(customer.delay));
+    setNotification(customer.notification);
+    setOrder(null);
+  }
   const validDelay = /^\d{1,4}$/.test(delay) && Number(delay) > 0 && Number(delay) <= 3650;
   return <main className={styles.page}>
-    <h1>{sampleBuyer.name}</h1>
+    <h1>{selectedClient.name}</h1>
     <p>Fiche client de démonstration. Les modifications restent dans cette page.</p>
     <CustomerList customers={[{ id: "camille-demo", name: sampleBuyer.name }]} demo />
     <section className={styles.panel} id="fiche-client">
@@ -53,7 +72,7 @@ export default function CrmDemo() {
       </div>
       <p>Total · {Number.isNaN(shippingCents) ? "Montant invalide" : formatEuros(quantity * 3500 + shippingCents)}</p>
       <button disabled={!Number.isInteger(quantity) || quantity < 1 || quantity > 999 || Number.isNaN(shippingCents)}
-        onClick={() => setOrder({ id: "demo00000019", created_at: new Date().toISOString(), seller: sampleSeller, buyer: sampleBuyer, status: "pending", payment_status: "pending", total_cents: quantity * 3500, shipping_cents: shippingCents, items: [{ ...sampleProduct, quantity }] })}>
+        onClick={() => setOrder({ id: "demo00000019", created_at: new Date().toISOString(), seller: sampleSeller, buyer: selectedClient, status: "pending", payment_status: "pending", total_cents: quantity * 3500, shipping_cents: shippingCents, items: [{ ...sampleProduct, quantity }] })}>
         Simuler l’envoi du bon
       </button>
     </section>
@@ -67,7 +86,7 @@ export default function CrmDemo() {
             <option value="pending">En attente</option><option value="paid">Payé</option><option value="later">À payer plus tard</option>
           </select></label></div>
         </li>}
-        {previousOrders.map(previous => <li key={previous.id} className={styles.panel}><OrderReceipt order={previous} /></li>)}
+        {(selectedId === "camille" ? previousOrders : []).map(previous => <li key={previous.id} className={styles.panel}><OrderReceipt order={previous} /></li>)}
       </ul>
     </section>
     <section>
