@@ -62,7 +62,7 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
   const shippingCents = token ? fixedShipping : parseCents(shipping) ?? 0;
   return <>
     <div className={styles.form}>
-      <label>Produit, référence ou lien Parfum Inspiration
+      <label>Code article, nom du produit ou lien Parfum Inspiration
         <input type="search" value={query} maxLength={240} placeholder="Saisis au moins 2 caractères"
           onChange={event => updateQuery(event.target.value)} />
       </label>
@@ -70,7 +70,7 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
         <select value="" onChange={event => selectProduct(event.target.value)} disabled={lines.length >= 20}>
           <option value="" disabled>Choisir parmi {items.length} résultat(s)</option>
           {items.map(item => <option key={item.id} value={item.id} disabled={lines.some(line => line.id === item.id)}>
-            {[item.title, item.format, item.reference && "Réf. " + item.reference, formatEuros(item.unit_cents)].filter(Boolean).join(" · ")}
+            {[item.reference && "Code " + item.reference, item.title, item.format, formatEuros(item.unit_cents)].filter(Boolean).join(" · ")}
           </option>)}
         </select>
       </label>}
