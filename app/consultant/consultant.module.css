@@ -108,3 +108,14 @@ main.crmPage {
 .caseDayCounts { margin-top: 3px; }
 .caseStatusFree { color: #226047; }
 .caseStatusBusy { color: #5c2b94; }
+
+.crmStat { position: relative; }
+.orderCardLink::after { content: ""; position: absolute; inset: 0; border-radius: 16px; }
+.orderNavigation { display: flex; flex-wrap: wrap; gap: 12px; }
+.orderNavigation [aria-current="page"] { background: #5634a8; color: white; }
+.crmAction:hover { border-color: #8057c7; box-shadow: 0 2px 6px #39236220; }
+.crmAction:focus-visible, .orderCardLink:focus-visible::after { outline: 2px solid #5634a8; outline-offset: 3px; }
+.orderEmailAction { background: #5634a8; color: white; }
+.receiptDetails summary.crmAction { display: inline-block; }
+.receiptDetails summary.crmAction::before { content: "▸"; margin-right: 8px; }
+.receiptDetails[open] summary.crmAction::before { content: "▾"; }

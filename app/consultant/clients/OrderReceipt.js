@@ -18,7 +18,7 @@ export default function OrderReceipt({ order }) {
     </header>
     <p>Commande · {new Map(orderStatuses).get(order.status)} <br /> Paiement · {new Map(paymentStatuses).get(order.payment_status)}</p>
     <details className={styles.receiptDetails}>
-      <summary>Consulter le bon de commande</summary>
+      <summary className={styles.crmAction}>Consulter le bon de commande</summary>
       <section>
         <h3>Consultant</h3>
         <SellerDetails seller={order.seller} />

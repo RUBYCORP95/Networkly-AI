@@ -36,12 +36,12 @@ export default function ShareOrder({ clientId }) {
     {share && <div className={styles.panel}>
       <p>Lien valable 24 heures et utilisable une fois.</p>
       {share.qr && <img src={share.qr} width={240} height={240} alt="QR code du bon de commande" style={{ maxWidth: "100%", height: "auto" }} />}
-      <p><a href={share.url} style={{ overflowWrap: "anywhere" }}>{share.url}</a></p>
+      <p><a className={styles.crmAction} href={share.url}>Ouvrir le bon de commande</a></p>
       <button type="button" onClick={async () => {
         try { await navigator.clipboard.writeText(share.url); setMessage("Lien copié."); }
         catch { setMessage("Sélectionne le lien affiché pour le copier."); }
       }}>Copier le lien</button>
-      {" "}<a href={"sms:?body=" + encodeURIComponent("Voici ton bon de commande TESAMI : " + share.url)}>Préparer un SMS</a>
+      {" "}<a className={styles.crmAction} href={"sms:?body=" + encodeURIComponent("Voici ton bon de commande TESAMI : " + share.url)}>Préparer un SMS</a>
       {" "}<button type="button" onClick={async () => {
         if (!navigator.share) {
           try { await navigator.clipboard.writeText(share.url); setMessage("Lien copié. Colle-le dans ton message Instagram ou SMS."); }

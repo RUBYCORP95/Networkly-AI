@@ -107,7 +107,12 @@ export async function updateOrder(form) {
 
   const { data, error } = await client.from("crm_orders").update({ status, payment_status, shipping_cents: shipping }).eq("id", id)
     .select("client_id").single();
-  finish(error || !data ? "error" : "order", data?.client_id);
+  const result = error || !data ? "error" : "order";
+  const filter = form.get("order_filter");
+  if (["all", "pending", "processed"].includes(filter)) {
+    redirect(path + "?" + new URLSearchParams({ view: "orders", filter, result }));
+  }
+  finish(result, data?.client_id);
 }
 
 export async function createOrderLink(form) {

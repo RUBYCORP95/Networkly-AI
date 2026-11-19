@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, Package, Settings, Users } from "lucide-react";
+import { Bell, Mail, Package, Settings, Users } from "lucide-react";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { formatDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
 import { addFollowup, saveClient, saveSeller, updateFollowup, updateOrder } from "./actions";
@@ -39,7 +39,7 @@ function FollowupTable({ title, rows, today }) {
     <h2>{title}</h2>
     {rows.length === 0 ? <p>Aucun rappel.</p> : <ul className={styles.trips}>
       {rows.map(item => <li className={styles.panel} key={item.id}>
-        <Link href={"?client=" + item.client_id}>{item.name}</Link>
+        <Link className={styles.crmAction} href={"?client=" + item.client_id}>{item.name}</Link>
         <p>{item.birthday ? "Anniversaire" : "Relance"} · {formatDate(item.date)}
           {item.notification && item.date <= today && <strong> · Notification TESAMI</strong>}
           {!item.notification && " · Notification désactivée"}</p>
@@ -77,6 +77,72 @@ function orderEmailDraft(order, recipient) {
   return `mailto:${address}?subject=${subject}&body=${body}`;
 }
 
+function OrderControls({ order, clientEmail, returnFilter }) {
+  return <>
+    <OrderReceipt order={order} />
+    {clientEmail ? <p><a className={`${styles.crmAction} ${styles.orderEmailAction}`} href={orderEmailDraft(order, clientEmail)}><Mail size={17} aria-hidden="true" /> Envoyer le bon par e-mail</a></p>
+      : <p>Ajoute l’adresse e-mail du client pour préparer l’envoi.</p>}
+    <form action={updateOrder} className={styles.form}>
+      <input name="id" type="hidden" value={order.id} />
+      {returnFilter && <input name="order_filter" type="hidden" value={returnFilter} />}
+      <label>Statut<select name="status" defaultValue={order.status}>
+        {orderStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select></label>
+      <label>Paiement<select name="payment_status" defaultValue={order.payment_status}>
+        {paymentStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select></label>
+      <label>Livraison (€)<input name="shipping" type="number" min={0} max={999999.99} step="0.01" defaultValue={(order.shipping_cents / 100).toFixed(2)} /></label>
+      <button>Mettre à jour</button>
+    </form>
+  </>;
+}
+
+const orderFields = "id,details,total_cents,shipping_cents,items,status,payment_status,created_at,buyer,seller";
+const ordersUrl = (filter = "all", page = 1) => "?view=orders&filter=" + filter + (page > 1 ? "&page=" + page : "");
+
+async function AllOrders({ db, params }) {
+  const filter = ["pending", "processed"].includes(params.filter) ? params.filter : "all";
+  const parsedPage = Number(params.page);
+  const page = Number.isSafeInteger(parsedPage) && parsedPage > 0 && parsedPage <= 1000000 ? parsedPage : 1;
+  const size = 20;
+  let query = db.from("crm_orders").select(orderFields + ",client_id,crm_clients(name,email)", { count: "exact" })
+    .order("created_at", { ascending: false }).order("id", { ascending: false }).range((page - 1) * size, page * size - 1);
+  if (filter === "pending") query = query.eq("status", "pending");
+  if (filter === "processed") query = query.in("status", ["confirmed", "completed"]);
+  const [orders, pending, processed] = await Promise.all([
+    query,
+    db.from("crm_orders").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    db.from("crm_orders").select("id", { count: "exact", head: true }).in("status", ["confirmed", "completed"]),
+  ]);
+  return <main className={`${styles.page} ${styles.crmPage}`}>
+    <Link className={styles.crmAction} href="/consultant/clients">← Tous les clients</Link>
+    <h1>Mes commandes</h1>
+    <nav aria-label="Filtrer les commandes" className={styles.orderNavigation}>
+      {[["all", "Toutes les commandes", filter === "all" ? orders.count : null],
+        ["pending", "Commandes en attente", pending.count],
+        ["processed", "Commandes traitées", processed.count]].map(([value, label, count]) =>
+        <Link key={value} className={styles.crmAction} href={ordersUrl(value)} aria-current={filter === value ? "page" : undefined}>
+          {label}{count !== null && " (" + count + ")"}
+        </Link>)}
+    </nav>
+    <p>Les commandes confirmées et terminées figurent dans « Commandes traitées ».</p>
+    {notices.has(params.result) && <p className={styles.notice} role="status">{notices.get(params.result)}</p>}
+    {orders.error ? <p role="alert">Les commandes sont temporairement indisponibles.</p> : <>
+      {!orders.data.length && <p>Aucune commande dans cette vue.</p>}
+      <ul className={styles.trips}>
+        {orders.data.map(order => <li key={order.id} className={styles.panel}>
+          <h2><Link className={styles.crmAction} href={"?client=" + order.client_id}>{order.crm_clients?.name ?? "Fiche client"}</Link></h2>
+          <OrderControls order={order} clientEmail={order.crm_clients?.email?.trim()} returnFilter={filter} />
+        </li>)}
+      </ul>
+      {(page > 1 || page * size < orders.count) && <nav aria-label="Pages des commandes" className={styles.orderNavigation}>
+        {page > 1 && <Link className={styles.crmAction} href={ordersUrl(filter, page - 1)}>← Page précédente</Link>}
+        {page * size < orders.count && <Link className={styles.crmAction} href={ordersUrl(filter, page + 1)}>Page suivante →</Link>}
+      </nav>}
+    </>}
+  </main>;
+}
+
 function OrderHistory({ orders, clientId, clientEmail }) {
   return <section>
     <h2>Historique des commandes</h2>
@@ -84,20 +150,7 @@ function OrderHistory({ orders, clientId, clientEmail }) {
     {orders.error ? <p role="alert">L’historique est temporairement indisponible.</p> : <>
       {orders.data.length === 0 ? <p>Aucune commande pour ce client.</p> : <ul className={styles.trips}>
         {orders.data.map(order => <li key={order.id} className={styles.panel}>
-          <OrderReceipt order={order} />
-          {clientEmail ? <p><a href={orderEmailDraft(order, clientEmail)}>Envoyer le bon par e-mail</a></p>
-            : <p>Ajoute l’adresse e-mail du client pour préparer l’envoi.</p>}
-          <form action={updateOrder} className={styles.form}>
-            <input name="id" type="hidden" value={order.id} />
-            <label>Statut<select name="status" defaultValue={order.status}>
-              {orderStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select></label>
-            <label>Paiement<select name="payment_status" defaultValue={order.payment_status}>
-              {paymentStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select></label>
-            <label>Livraison (€)<input name="shipping" type="number" min={0} max={999999.99} step="0.01" defaultValue={(order.shipping_cents / 100).toFixed(2)} /></label>
-            <button>Mettre à jour</button>
-          </form>
+          <OrderControls order={order} clientEmail={clientEmail} />
         </li>)}
       </ul>}
       <h2>Partager un bon de commande</h2>
@@ -114,6 +167,7 @@ export default async function ClientsPage({ searchParams }) {
   const params = await searchParams;
   const today = parisDate();
   const db = await createServerSupabase();
+  if (params.view === "orders") return <AllOrders db={db} params={params} />;
   const [customers, seller, reminders, activeFollowups, orderCount] = await Promise.all([
     db.from("crm_clients").select("id,name,email,phone,birth_date,birthday_notification", { count: "exact" }).order("name").order("id"),
     db.from("crm_seller_profiles").select("name,business,email,phone,address,registration").maybeSingle(),
@@ -125,7 +179,7 @@ export default async function ClientsPage({ searchParams }) {
   const names = new Map(clients.map(customer => [customer.id, customer.name]));
   const selected = clients.find(customer => customer.id === params.client);
   const orders = selected ? await db.from("crm_orders")
-    .select("id,details,total_cents,shipping_cents,items,status,payment_status,created_at,buyer,seller").eq("client_id", selected.id)
+    .select(orderFields).eq("client_id", selected.id)
     .order("created_at", { ascending: false }).order("id", { ascending: false }) : null;
   const active = (reminders.data ?? []).filter(item => !item.completed_at && names.has(item.client_id))
     .map(item => ({...item, name: names.get(item.client_id), date: item.due_date}));
@@ -139,10 +193,10 @@ export default async function ClientsPage({ searchParams }) {
   const stats = [[Users, "Clients", customers.count], [Bell, "Relances ouvertes", activeFollowups.count], [Package, "Commandes", orderCount.count]];
 
   return <main className={`${styles.page} ${styles.crmPage}`}>
-    <Link href="/consultant">← Espace Consultant</Link>
+    <Link className={styles.crmAction} href="/consultant">← Espace Consultant</Link>
     <header className={styles.crmHeader}>
       <h1>{settings ? "Paramètres du CRM" : selected?.name ?? "Mes clients"}</h1>
-      {settings || selected ? <Link href="/consultant/clients">← Tous les clients</Link> :
+      {settings || selected ? <Link className={styles.crmAction} href="/consultant/clients">← Tous les clients</Link> :
         <Link className={styles.crmAction} href="?view=settings"><Settings size={17} aria-hidden="true" /> Paramètres</Link>}
     </header>
     {notices.has(params.result) && <p className={styles.notice} role="status">{notices.get(params.result)}</p>}
@@ -154,7 +208,7 @@ export default async function ClientsPage({ searchParams }) {
         <dl className={styles.crmStats}>
           {stats.map(([Icon, label, count]) => <div className={styles.crmStat} key={label}>
             <span className={styles.crmAvatar} aria-hidden="true"><Icon size={19} /></span>
-            <dt>{label}</dt><dd>{count ?? "—"}</dd>
+            <dt>{label === "Commandes" ? <Link className={styles.orderCardLink} href={ordersUrl()}>Commandes</Link> : label}</dt><dd>{count ?? "—"}</dd>
           </div>)}
         </dl>
         <CustomerList customers={clients.map(({ id, name, email }) => ({ id, name, email }))} />
@@ -164,7 +218,7 @@ export default async function ClientsPage({ searchParams }) {
       <FollowupTable title="Aujourd’hui" rows={rows.filter(item => item.date === today)} today={today} />
       <FollowupTable title="À venir" rows={rows.filter(item => item.date > today)} today={today} />
       </div>}
-      {selected && <p><Link href="?view=settings">Paramètres professionnels</Link></p>}
+      {selected && <p><Link className={styles.crmAction} href="?view=settings">Paramètres professionnels</Link></p>}
       {selected && <section id="fiche" key={selected.id}>
         <h2>Coordonnées du client</h2>
         <CustomerForm customer={selected} today={today} />
