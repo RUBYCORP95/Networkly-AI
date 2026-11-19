@@ -4,7 +4,7 @@ export default function Decision({ request }) {
   return <div className={styles.orderNavigation}>
     {[["verified", "Valider"], ["rejected", "Refuser"]].map(([decision, label]) =>
       <details key={decision}>
-        <summary className={styles.crmAction}>{label}</summary>
+        <summary className={decision === "verified" ? `${styles.crmAction} ${styles.orderEmailAction}` : styles.crmAction}>{label}</summary>
         <form method="post" action="/admin/consultants/decision">
           <input type="hidden" name="user" value={request.user_id} />
           <input type="hidden" name="version" value={request.updated_at} />

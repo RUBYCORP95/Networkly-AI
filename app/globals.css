@@ -318,3 +318,14 @@ main.tesami-pricing{display:block!important;grid-template-columns:none!important
   .adminpage .admin-accounts td[data-label] { display: flex; justify-content: space-between; gap: 12px; }
   .admin-accounts td[data-label]::before { content: attr(data-label); color: #635c76; }
 }
+
+.admin-review-links { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+.admin-secondary-link {
+  display: inline-block;
+  padding: 9px 13px;
+  border: 1px solid #ded6f2;
+  border-radius: 10px;
+  color: #5634a8;
+  text-decoration: none;
+  font-weight: 700;
+}
