@@ -48,12 +48,12 @@ export default async function ConsultantReview({ searchParams }) {
     {Object.hasOwn(notices, params.result) && <p role="status">{notices[params.result]}</p>}
     <section className={styles.panel}>
       {error ? <p role="alert">Impossible de charger cette liste.</p> : !rows.length ? <p>{history ? "Aucune décision enregistrée." : "Aucune demande dans cette liste."}</p> :
-        <div className={styles.reviewTable}><table>
+        <div className={styles.reviewTable}><table aria-label={history ? "Historique des décisions" : "Demandes consultant"}>
           <thead><tr><th>Nom et prénom</th><th>Code sponsor</th><th>Statut</th><th>{history ? "Date de décision" : "Date de demande"}</th><th>{history ? "Administrateur" : "Action"}</th></tr></thead>
           <tbody>{rows.map(row => <tr key={row.id ?? row.user_id}>
-            <td>{identity(row.user_id, row.applicant_name)}</td><td>{row.sponsor_code ?? "Non renseigné"}</td>
-            <td>{statuses[row.decision ?? row.status]}</td><td>{date.format(new Date(row.decided_at ?? row.created_at))}</td>
-            <td>{history ? identity(row.admin_id) : row.status === "pending" ? <Decision request={row} /> : "—"}</td>
+            <td data-label="Nom et prénom">{identity(row.user_id, row.applicant_name)}</td><td data-label="Code sponsor">{row.sponsor_code ?? "Non renseigné"}</td>
+            <td data-label="Statut">{statuses[row.decision ?? row.status]}</td><td data-label={history ? "Date de décision" : "Date de demande"}>{date.format(new Date(row.decided_at ?? row.created_at))}</td>
+            <td data-label={history ? "Administrateur" : "Action"}>{history ? identity(row.admin_id) : row.status === "pending" ? <Decision request={row} /> : "—"}</td>
           </tr>)}</tbody>
         </table></div>}
       <nav className={styles.orderNavigation} aria-label="Pagination">

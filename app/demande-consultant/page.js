@@ -38,7 +38,7 @@ export default async function RequestConsultant({ searchParams }) {
         {data?.status === "rejected" && <p>Ta dernière demande a été refusée. Vérifie ton code sponsor avant de renvoyer une demande.</p>}
         <p>Renseigne ton nom, ton prénom et ton code sponsor CHOGAN. Un administrateur doit valider ta demande pour activer tes outils consultant et tes quotas gratuits.</p>
         {result && <p role="alert">{result === "invalid" ? "Vérifie ton nom, ton prénom et ton code sponsor CHOGAN." : "L’envoi a échoué. Réessaie dans un instant."}</p>}
-        <form action={submit} className={styles.form}>
+        <form action={submit} className={`${styles.form} ${styles.requestForm}`}>
           <label>Prénom<input name="first_name" autoComplete="given-name" maxLength={80} required /></label>
           <label>Nom<input name="last_name" autoComplete="family-name" maxLength={80} required /></label>
           <label>Code sponsor CHOGAN<input name="sponsor" defaultValue={data?.sponsor_code} minLength={2} maxLength={100} required /></label>
