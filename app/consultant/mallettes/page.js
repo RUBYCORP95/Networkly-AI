@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import styles from "../consultant.module.css";
-import { addCase, bookTrip, cancelTrip, updateCase } from "./actions";
+import { addCase, bookTrip, cancelTrip, updateCase, archiveCase } from "./actions";
 import { overlaps, validDate } from "./dates";
 
 export const metadata = { title: "Mallettes voyageuses · TESAMI" };
@@ -106,9 +106,9 @@ export default async function MallettesPage({ searchParams }) {
                 <label>Taille<CaseSize size={item.size} /></label>
                 <button name="operation" value="size">Enregistrer la taille</button>
               </form>
-              <form action={updateCase}>
+              <form action={archiveCase}>
                 <CaseFields id={item.id} from={from} to={to} />
-                <button name="operation" value="archive" type="submit">Retirer du parc</button>
+                <button type="submit">Retirer du parc</button>
               </form>
             </div>)}
           </div>
@@ -183,10 +183,10 @@ export default async function MallettesPage({ searchParams }) {
           <p>Du {formatDate(from)} au {formatDate(to)} inclus.</p>
           {availableCases.length === 0 ? <p>Aucune mallette n’est libre pendant toute cette période.</p> :
             <ul className={styles.trips}>{availableCases.map(item => <li key={item.id}>
-              <form action={updateCase} className={styles.form}>
+              <form action={archiveCase} className={styles.form}>
                 <CaseFields id={item.id} from={from} to={to} />
                 <strong>{caseLabel(item)}</strong>
-                <button name="operation" value="archive" aria-label={"Retirer " + caseLabel(item) + " du parc"}>Retirer du parc</button>
+                <button aria-label={"Retirer " + caseLabel(item) + " du parc"}>Retirer du parc</button>
               </form>
             </li>)}</ul>}
         </section>
