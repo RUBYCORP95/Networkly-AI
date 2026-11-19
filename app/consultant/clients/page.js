@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { formatDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
 import { addFollowup, saveClient, saveSeller, updateFollowup, updateOrder } from "./actions";
-import { orderStatuses, paymentStatuses, sellerFields } from "../../../lib/crm/order-receipt.mjs";
+import { orderStatuses, paymentStatuses, receiptNumber, receiptText, sellerFields } from "../../../lib/crm/order-receipt.mjs";
 import CustomerList from "./CustomerList";
 import OrderReceipt from "./OrderReceipt";
 import ShareOrder from "./ShareOrder";
@@ -54,13 +54,6 @@ function FollowupTable({ title, rows, today }) {
   </section>;
 }
 
-const emailStatuses = new Map([
-  ["not_requested", "Récapitulatif prévu à la confirmation"],
-  ["missing_email", "E-mail client manquant"],
-  ["queued", "E-mail en file d’attente"], ["sending", "E-mail en cours d’envoi"],
-  ["sent", "E-mail accepté par Brevo"], ["failed", "Échec de l’envoi de l’e-mail"],
-]);
-
 function SellerForm({ seller }) {
   return <section>
     <h2>Coordonnées sur les bons de commande</h2>
@@ -76,14 +69,23 @@ function SellerForm({ seller }) {
   </section>;
 }
 
-function OrderHistory({ orders, clientId }) {
+function orderEmailDraft(order, recipient) {
+  const address = encodeURIComponent(recipient).replace(/%40/g, "@");
+  const subject = encodeURIComponent("Votre bon de commande " + receiptNumber(order.id));
+  const body = encodeURIComponent(receiptText(order).replace(/\n/g, "\r\n"));
+  return `mailto:${address}?subject=${subject}&body=${body}`;
+}
+
+function OrderHistory({ orders, clientId, clientEmail }) {
   return <section>
     <h2>Historique des commandes</h2>
+    <p>L’envoi ouvre un brouillon dans ta messagerie. Choisis ton adresse professionnelle, puis clique sur Envoyer.</p>
     {orders.error ? <p role="alert">L’historique est temporairement indisponible.</p> : <>
       {orders.data.length === 0 ? <p>Aucune commande pour ce client.</p> : <ul className={styles.trips}>
         {orders.data.map(order => <li key={order.id} className={styles.panel}>
           <OrderReceipt order={order} />
-          <p>{emailStatuses.get(order.email_state)}</p>
+          {clientEmail ? <p><a href={orderEmailDraft(order, clientEmail)}>Envoyer le bon par e-mail</a></p>
+            : <p>Ajoute l’adresse e-mail du client pour préparer l’envoi.</p>}
           <form action={updateOrder} className={styles.form}>
             <input name="id" type="hidden" value={order.id} />
             <label>Statut<select name="status" defaultValue={order.status}>
@@ -120,7 +122,7 @@ export default async function ClientsPage({ searchParams }) {
   const names = new Map(clients.map(customer => [customer.id, customer.name]));
   const selected = clients.find(customer => customer.id === params.client);
   const orders = selected ? await db.from("crm_orders")
-    .select("id,details,total_cents,shipping_cents,items,status,payment_status,created_at,buyer,seller,email_state").eq("client_id", selected.id)
+    .select("id,details,total_cents,shipping_cents,items,status,payment_status,created_at,buyer,seller").eq("client_id", selected.id)
     .order("created_at", { ascending: false }).order("id", { ascending: false }) : null;
   const active = (reminders.data ?? []).filter(item => !item.completed_at && names.has(item.client_id))
     .map(item => ({...item, name: names.get(item.client_id), date: item.due_date}));
@@ -145,7 +147,7 @@ export default async function ClientsPage({ searchParams }) {
       {selected && <section id="fiche" key={selected.id}>
         <h2>Coordonnées du client</h2>
         <CustomerForm customer={selected} today={today} />
-        <OrderHistory orders={orders} clientId={selected.id} />
+        <OrderHistory orders={orders} clientId={selected.id} clientEmail={selected.email?.trim()} />
         <h2>Programmer une relance</h2>
         <form className={styles.form} action={addFollowup}>
           <input type="hidden" name="client_id" value={selected.id} />
