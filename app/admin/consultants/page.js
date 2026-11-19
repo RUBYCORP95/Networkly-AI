@@ -18,8 +18,8 @@ export default async function ConsultantReview({ searchParams }) {
   const size = 40;
   const db = createAdminSupabase();
   let query = history
-    ? db.from("lead_team_decisions").select("id,user_id,consultant_identifier,sponsor_code,applicant_name,decision,decided_at,admin_id", { count: "exact" }).order("decided_at", { ascending: false }).order("id")
-    : db.from("lead_team_memberships").select("user_id,consultant_identifier,sponsor_code,applicant_name,status,created_at,updated_at", { count: "exact" }).order("updated_at", { ascending: false }).order("user_id");
+    ? db.from("lead_team_decisions").select("id,user_id,sponsor_code,applicant_name,decision,decided_at,admin_id", { count: "exact" }).order("decided_at", { ascending: false }).order("id")
+    : db.from("lead_team_memberships").select("user_id,sponsor_code,applicant_name,status,created_at,updated_at", { count: "exact" }).order("updated_at", { ascending: false }).order("user_id");
   if (!history && filter === "pending") query = query.eq("status", "pending");
   const pendingQuery = db.from("lead_team_memberships").select("user_id", { count: "exact", head: true }).eq("status", "pending");
   const [{ data, error, count }, pending] = await Promise.all([query.range((page - 1) * size, page * size - 1), pendingQuery]);
@@ -48,10 +48,10 @@ export default async function ConsultantReview({ searchParams }) {
     {Object.hasOwn(notices, params.result) && <p role="status">{notices[params.result]}</p>}
     <section className={styles.panel}>
       {error ? <p role="alert">Impossible de charger cette liste.</p> : !rows.length ? <p>{history ? "Aucune décision enregistrée." : "Aucune demande dans cette liste."}</p> :
-        <div className="customertable"><table>
-          <thead><tr><th>Nom et prénom</th><th>Identifiant CHOGAN</th><th>Code sponsor</th><th>Statut</th><th>{history ? "Date de décision" : "Date de demande"}</th><th>{history ? "Administrateur" : "Action"}</th></tr></thead>
+        <div className={styles.reviewTable}><table>
+          <thead><tr><th>Nom et prénom</th><th>Code sponsor</th><th>Statut</th><th>{history ? "Date de décision" : "Date de demande"}</th><th>{history ? "Administrateur" : "Action"}</th></tr></thead>
           <tbody>{rows.map(row => <tr key={row.id ?? row.user_id}>
-            <td>{identity(row.user_id, row.applicant_name)}</td><td>{row.consultant_identifier}</td><td>{row.sponsor_code ?? "Non renseigné"}</td>
+            <td>{identity(row.user_id, row.applicant_name)}</td><td>{row.sponsor_code ?? "Non renseigné"}</td>
             <td>{statuses[row.decision ?? row.status]}</td><td>{date.format(new Date(row.decided_at ?? row.created_at))}</td>
             <td>{history ? identity(row.admin_id) : row.status === "pending" ? <Decision request={row} /> : "—"}</td>
           </tr>)}</tbody>
