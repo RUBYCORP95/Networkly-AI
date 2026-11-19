@@ -74,3 +74,16 @@ export async function updateCase(form) {
     .eq("id", id).select("id").maybeSingle();
   finish(error || !data ? "error" : operation, from, to);
 }
+
+export async function archiveCase(form) {
+  const client = await consultantClient();
+  const id = form.get("id");
+  const from = form.get("from");
+  const to = form.get("to");
+  if (typeof id !== "string" || !/^[\\da-f]{8}(?:-[\\da-f]{4}){3}-[\\da-f]{12}$/i.test(id)) finish("invalid", from, to);
+
+  const { data, error } = await client.from("travelling_cases")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", id).is("archived_at", null).select("id").maybeSingle();
+  finish(error || !data ? "error" : "archive", from, to);
+}
