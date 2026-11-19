@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { afterDays, demoSettings, formatDate, isDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
+import { formatEuros, parseCents } from "../../../lib/crm/money.mjs";
 import styles from "../../consultant/consultant.module.css";
 
 export default function CrmDemo() {
   const [birthDate, setBirthDate] = useState(demoSettings.birthDate);
   const [delay, setDelay] = useState(String(demoSettings.delayDays));
   const [notification, setNotification] = useState(demoSettings.notification);
+  const [shipping, setShipping] = useState("5.00");
   const today = parisDate();
   const validDelay = /^\d{1,4}$/.test(delay) && Number(delay) > 0 && Number(delay) <= 3650;
   return <main className={styles.page}>
@@ -21,10 +23,18 @@ export default function CrmDemo() {
         <label>Notification dans TESAMI<input type="checkbox" checked={notification} onChange={e => setNotification(e.target.checked)} /></label>
       </div>
     </section>
+    <section className={styles.panel}>
+      <h2>Bon de commande · exemple</h2>
+      <p>Parfum Olfazeta 151W · 70 ml · {formatEuros(3500)}</p>
+      <div className={styles.form}>
+        <label>Livraison (€)<input type="number" min={0} max={999999.99} step="0.01" value={shipping} onChange={e => setShipping(e.target.value)} /></label>
+      </div>
+      <p>Total · {Number.isNaN(parseCents(shipping)) ? "Montant invalide" : formatEuros(3500 + (parseCents(shipping) ?? 0))}</p>
+    </section>
     <section>
       <h2>Historique des commandes</h2>
       <ul className={styles.trips}>
-        <li className={styles.panel}><strong>12 novembre 2026 · 39,00 € · Terminée</strong><p>1 parfum et 1 recharge</p></li>
+        <li className={styles.panel}><strong>12 novembre 2026 · 39,00 € · Terminée</strong><p>1 parfum et 1 recharge · Sous-total 34,00 € · Livraison 5,00 €</p></li>
         <li className={styles.panel}><strong>5 octobre 2026 · 25,00 € · Terminée</strong><p>1 parfum</p></li>
       </ul>
     </section>

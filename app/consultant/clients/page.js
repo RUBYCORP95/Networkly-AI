@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { formatDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
-import { addFollowup, addOrder, saveClient, updateFollowup, updateOrder } from "./actions";
+import { addFollowup, saveClient, updateFollowup, updateOrder } from "./actions";
+import { formatEuros } from "../../../lib/crm/money.mjs";
+import OrderForm from "./OrderForm";
 import styles from "../consultant.module.css";
 
 const notices = new Map([
@@ -9,6 +11,7 @@ const notices = new Map([
   ["error", "L’opération a échoué. Réessaie dans un instant."],
   ["client", "Fiche client enregistrée."],
   ["followup", "Relance programmée."],
+  ["catalogue", "Un produit ou un prix du catalogue est indisponible. Relance la recherche."],
   ["order", "Commande enregistrée."],
   ["updated", "Relance mise à jour."],
 ]);
@@ -49,7 +52,6 @@ function FollowupTable({ title, rows, today }) {
 const orderStatuses = [
   ["pending", "En attente"], ["confirmed", "Confirmée"], ["completed", "Terminée"], ["cancelled", "Annulée"],
 ];
-const euros = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" });
 
 function OrderHistory({ orders, clientId }) {
   return <section>
@@ -57,24 +59,23 @@ function OrderHistory({ orders, clientId }) {
     {orders.error ? <p role="alert">L’historique est temporairement indisponible.</p> : <>
       {orders.data.length === 0 ? <p>Aucune commande pour ce client.</p> : <ul className={styles.trips}>
         {orders.data.map(order => <li key={order.id} className={styles.panel}>
-          <strong>{formatDate(parisDate(new Date(order.created_at)))} · {order.total_cents === null ? "Montant à confirmer" : euros.format(order.total_cents / 100)}</strong>
-          <p style={{ whiteSpace: "pre-wrap" }}>{order.details}</p>
+          <strong>{formatDate(parisDate(new Date(order.created_at)))} · {order.total_cents === null ? "Montant à confirmer" : formatEuros(order.total_cents + order.shipping_cents)}</strong>
+          {order.items.length ? <ul>{order.items.map(item => <li key={item.id}>
+            {item.quantity} × {item.title}{item.format && " · " + item.format}{item.reference && " · Réf. " + item.reference} · {formatEuros(item.unit_cents)} / unité
+          </li>)}</ul> : <p style={{ whiteSpace: "pre-wrap" }}>{order.details}</p>}
+          <p>Sous-total produits {order.total_cents === null ? "à confirmer" : formatEuros(order.total_cents)} · Livraison {formatEuros(order.shipping_cents)}</p>
           <form action={updateOrder} className={styles.form}>
             <input name="id" type="hidden" value={order.id} />
             <label>Statut<select name="status" defaultValue={order.status}>
               {orderStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select></label>
+            <label>Livraison (€)<input name="shipping" type="number" min={0} max={999999.99} step="0.01" defaultValue={(order.shipping_cents / 100).toFixed(2)} /></label>
             <button>Mettre à jour</button>
           </form>
         </li>)}
       </ul>}
       <h2>Ajouter une commande</h2>
-      <form action={addOrder} className={styles.form}>
-        <input name="client_id" type="hidden" value={clientId} />
-        <label>Produits et quantités<textarea name="details" maxLength={4000} rows={3} required /></label>
-        <label>Total en euros (facultatif)<input name="total" type="number" min={0} max={999999.99} step="0.01" /></label>
-        <button>Enregistrer la commande</button>
-      </form>
+      <OrderForm key={clientId} clientId={clientId} />
     </>}
   </section>;
 }
@@ -93,7 +94,7 @@ export default async function ClientsPage({ searchParams }) {
   const names = new Map(clients.map(customer => [customer.id, customer.name]));
   const selected = clients.find(customer => customer.id === params.client);
   const orders = selected ? await db.from("crm_orders")
-    .select("id,details,total_cents,status,created_at").eq("client_id", selected.id)
+    .select("id,details,total_cents,shipping_cents,items,status,created_at").eq("client_id", selected.id)
     .order("created_at", { ascending: false }).order("id", { ascending: false }) : null;
   const active = (reminders.data ?? []).filter(item => !item.completed_at && names.has(item.client_id))
     .map(item => ({...item, name: names.get(item.client_id), date: item.due_date}));

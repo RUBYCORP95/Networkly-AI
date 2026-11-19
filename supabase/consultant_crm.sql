@@ -46,6 +46,8 @@ create table public.crm_orders (
   created_at timestamptz not null default now(),
   details text not null check (char_length(btrim(details)) between 1 and 4000),
   total_cents integer check (total_cents between 0 and 99999999),
+  shipping_cents integer not null default 0 check (shipping_cents between 0 and 99999999),
+  items jsonb not null default '[]'::jsonb check (jsonb_typeof(items) = 'array' and jsonb_array_length(items) <= 20),
   status text not null default 'pending' check (status in ('pending', 'confirmed', 'completed', 'cancelled')),
   foreign key (owner_id, client_id) references public.crm_clients(owner_id, id) on delete cascade
 );
@@ -53,7 +55,7 @@ create index crm_orders_owner_client_date on public.crm_orders(owner_id, client_
 alter table public.crm_orders enable row level security;
 revoke all on public.crm_orders from public, anon, authenticated;
 grant select on public.crm_orders to authenticated;
-grant insert (client_id, details, total_cents), update (status) on public.crm_orders to authenticated;
+grant insert (client_id, details, total_cents, shipping_cents, items), update (status, shipping_cents) on public.crm_orders to authenticated;
 create policy own_crm_orders on public.crm_orders to authenticated
   using (owner_id = (select auth.uid()) and (select private.can_manage_travelling_cases()))
   with check (owner_id = (select auth.uid()) and (select private.can_manage_travelling_cases()));
