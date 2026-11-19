@@ -63,7 +63,7 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
   return <>
     <div className={styles.form}>
       <label>Code article
-        <input type="search" value={mode === "code" ? query : ""} maxLength={240} placeholder="Ex. 020W"
+        <input type="search" value={mode === "code" ? query : ""} maxLength={240} placeholder="Ex. 020M"
           onChange={event => updateQuery("code", event.target.value)} />
       </label>
       <label>Nom du produit
@@ -74,7 +74,7 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
         <select value="" onChange={event => selectProduct(event.target.value)} disabled={lines.length >= 20}>
           <option value="" disabled>Choisir parmi {items.length} résultat(s)</option>
           {items.map(item => <option key={item.id} value={item.id} disabled={lines.some(line => line.id === item.id)}>
-            {[item.reference && "Code " + item.reference, item.title, item.format, formatEuros(item.unit_cents)].filter(Boolean).join(" · ")}
+            {[item.chogan_code && "Code " + item.chogan_code, item.title, item.format, item.reference && item.reference !== item.chogan_code && "Réf. " + item.reference, formatEuros(item.unit_cents)].filter(Boolean).join(" · ")}
           </option>)}
         </select>
       </label>}
