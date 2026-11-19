@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { afterDays, demoSettings, formatDate, isDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
 import { formatEuros, parseCents } from "../../../lib/crm/money.mjs";
-import CustomerList from "../../consultant/clients/CustomerList";
 import OrderReceipt from "../../consultant/clients/OrderReceipt";
 import styles from "../../consultant/consultant.module.css";
 
@@ -50,8 +49,16 @@ export default function CrmDemo() {
   const validDelay = /^\d{1,4}$/.test(delay) && Number(delay) > 0 && Number(delay) <= 3650;
   return <main className={styles.page}>
     <h1>{selectedClient.name}</h1>
-    <p>Fiche client de démonstration. Les modifications restent dans cette page.</p>
-    <CustomerList customers={[{ id: "camille-demo", name: sampleBuyer.name }]} demo />
+    <p>Six fiches fictives pour tester le CRM. Aucune donnée réelle n'est modifiée.</p>
+    <section><h2>Fichier clients · 6 clients</h2>
+      <div className={styles.cards}>{demoClients.map(customer =>
+        <button type="button" key={customer.id} className={styles.card}
+          aria-pressed={selectedId === customer.id} onClick={() => selectClient(customer.id)}
+          style={{ textAlign: "left", background: selectedId === customer.id ? "#eee6fd" : "white", color: "#201740" }}>
+          <strong>{customer.name}</strong><span>{customer.email}</span>
+          <span>Relance : {customer.delay} jours</span>
+        </button>)}</div>
+    </section>
     <section className={styles.panel} id="fiche-client">
       <h2>Paramètres de la fiche</h2>
       <div className={styles.form}>
