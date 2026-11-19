@@ -105,7 +105,10 @@ export default async function MallettesPage({ searchParams }) {
                 <button name="operation" value="rename" formNoValidate>Renommer</button>
                 <label>Taille<CaseSize size={item.size} /></label>
                 <button name="operation" value="size">Enregistrer la taille</button>
-                <button name="operation" value="archive" formNoValidate>Retirer du parc</button>
+              </form>
+              <form action={updateCase}>
+                <CaseFields id={item.id} from={from} to={to} />
+                <button name="operation" value="archive" type="submit">Retirer du parc</button>
               </form>
             </div>)}
           </div>
