@@ -26,7 +26,17 @@ const previousOrders = [
     items: [{...sampleProduct, unit_cents: 2500, quantity: 1}] },
 ].map(order => ({...order, seller: sampleSeller, buyer: sampleBuyer, status: "completed", payment_status: "paid"}));
 
+function normalizeSearch(value) {
+  return value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
 export default function CrmDemo() {
+  const [search, setSearch] = useState("");
+  const searchTerms = normalizeSearch(search).trim().split(/\s+/).filter(Boolean);
+  const matchingClients = demoClients.filter(({ name, email }) => {
+    const searchable = normalizeSearch(`${name} ${email}`);
+    return searchTerms.every(term => searchable.includes(term));
+  });
   const [selectedId, setSelectedId] = useState(null);
   const selectedClient = demoClients.find(c => c.id === selectedId) ?? demoClients[0];
   const [birthDate, setBirthDate] = useState(demoSettings.birthDate);
@@ -50,7 +60,16 @@ export default function CrmDemo() {
     <h1>Mes clients</h1>
     <p>Sélectionne un client pour consulter sa fiche, son historique et préparer un bon de commande. Données fictives.</p>
     <section><h2>Fichier clients · {demoClients.length} clients</h2>
-      <div className={styles.cards}>{demoClients.map(customer =>
+      <div className={styles.form}>
+        <label>Rechercher un client
+          <input type="search" placeholder="Nom ou e-mail" value={search}
+            onChange={event => setSearch(event.target.value)} />
+        </label>
+      </div>
+      <p role="status">{searchTerms.length > 0 && (matchingClients.length === 0
+        ? "Aucun client ne correspond à la recherche."
+        : `${matchingClients.length} sur ${demoClients.length} clients`)}</p>
+      <div className={styles.cards}>{matchingClients.map(customer =>
         <button type="button" key={customer.id} className={styles.card}
           onClick={() => selectClient(customer.id)}
           style={{ textAlign: "left", background: "white", color: "#201740", cursor: "pointer" }}>
