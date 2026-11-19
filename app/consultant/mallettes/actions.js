@@ -80,7 +80,7 @@ export async function archiveCase(form) {
   const id = form.get("id");
   const from = form.get("from");
   const to = form.get("to");
-  if (typeof id !== "string" || !/^[\\da-f]{8}(?:-[\\da-f]{4}){3}-[\\da-f]{12}$/i.test(id)) finish("invalid", from, to);
+  if (typeof id !== "string" || !/^[0-9a-f-]{36}$/i.test(id)) finish("invalid", from, to);
 
   const { data, error } = await client.from("travelling_cases")
     .update({ archived_at: new Date().toISOString() })
