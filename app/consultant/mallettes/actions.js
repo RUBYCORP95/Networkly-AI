@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { requireConsultant } from "../../../lib/auth/consultant";
 import { validDate } from "./dates";
@@ -20,6 +21,7 @@ function finish(status, from, to) {
     params.set("from", from);
     params.set("to", to);
   }
+  revalidatePath("/consultant/mallettes");
   redirect("/consultant/mallettes?" + params);
 }
 
