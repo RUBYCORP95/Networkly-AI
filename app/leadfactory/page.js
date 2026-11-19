@@ -152,6 +152,22 @@ export default function LeadFactoryPage(){
    </div>
   </div>}
   <div id="lf-my-prospects" className={styles.sectionHeading}><h2>Mes prospects — Google Sheets et Klaviyo</h2><button className={styles.buttonSecondary} onClick={()=>setAdviceOpen(v=>!v)}>{adviceOpen?"Masquer les conseils":"💬 Conseils pour contacter un pro"}</button></div>
+  {s&&<p><a href="/consultant/rendez-vous#nouveau" className={styles.buttonSecondary}>Planifier un rendez-vous</a></p>}
+  {s&&visibleCards.length>0&&<div className={styles.cards}>
+    {visibleCards.map(card=>{
+      const contact=state.revealed[card.allocation_id];
+      return <article key={card.allocation_id} className={styles.leadCard}>
+        <h3>{card.contact_kind==="klaviyo"?"Contact Klaviyo":"Prospect professionnel"}</h3>
+        <p>{[card.city,card.department].filter(Boolean).join(" · ")}</p>
+        <button type="button" className={styles.buttonSecondary} onClick={()=>reveal(card.allocation_id)} disabled={busy===card.allocation_id}>
+          {busy===card.allocation_id?"Ouverture…":"Contacter"}
+        </button>
+        {(contact||card.contact_revealed)&&<p><a href={"/consultant/rendez-vous?lead="+encodeURIComponent(card.allocation_id)+"#nouveau"}>Planifier un rendez-vous</a></p>}
+        {contact?.phone&&<p><a href={"tel:"+contact.phone}>{contact.phone}</a></p>}
+        {contact?.email&&<p><a href={"mailto:"+contact.email}>{contact.email}</a></p>}
+      </article>;
+    })}
+  </div>}
   {adviceOpen&&<div id="leadfactory-advice" className={styles.advice}><h2>Comment démarrer la discussion ?</h2><p className={styles.muted}>Sélectionne une approche et personnalise le texte selon l’activité du professionnel.</p><div className={styles.adviceTabs}>{Object.entries(adviceTemplates).map(([key,item])=><button key={key} className={adviceType===key?styles.tab+" "+styles.tabActive:styles.tab} onClick={()=>{setAdviceType(key);setAdviceCopied(false);}} aria-pressed={adviceType===key}>{item.title}</button>)}</div><h3>{currentAdvice.title}</h3><p>{currentAdvice.tip}</p><div className={styles.script}>{currentAdvice.message}</div><div style={{marginTop:14}}><button className={styles.button} onClick={async()=>{try{await navigator.clipboard.writeText(currentAdvice.message);setAdviceCopied(true);}catch{setAdviceCopied(false);}}}>{adviceCopied?"Message copié !":"Copier le message"}</button></div><p className={styles.footnote}>Respecte les règles de prospection professionnelle, les refus et les demandes d’opposition. Ne promets pas de revenus.</p></div>}
   {demo&&<div className={styles.demoPanel} role="region" aria-label="Démonstration avec prospects fictifs"><strong>🧪 Simulation bêta — données 100 % fictives</strong><p>Voici un aperçu de cinq contacts clients Klaviyo et cinq prospects professionnels. Aucun vrai contact n’est attribué, aucun quota n’est consommé et aucune coordonnée personnelle n’est révélée.</p><div className={styles.demoGrid}>{Array.from({length:10},(_,i)=><div className={styles.demoItem} key={i}><strong>{i<5?"Client Klaviyo":"Professionnel"} · Démo {i%5+1}</strong><span>{i<5?"Panier abandonné fictif":"Entreprise fictive"} · Exemple uniquement</span><button className={styles.buttonSecondary} type="button" onClick={()=>{setAdviceOpen(true);setAdviceType(i<5?"products":"partnership");setAdviceCopied(false);}}>Préparer un message</button></div>)}</div></div>}
   {contactReveal&&<div className={styles.panel} role="status" style={{marginBottom:16}}><strong>Coordonnées révélées — {contactReveal.company}</strong><p>Ce prospect a été retiré de la liste à contacter.</p><p>Téléphone : {contactReveal.phone?<a href={"tel:"+contactReveal.phone}>{contactReveal.phone}</a>:"Non renseigné"}</p><p>E-mail : {contactReveal.email?<a href={"mailto:"+contactReveal.email}>{contactReveal.email}</a>:"Non renseigné"}</p><button className={styles.buttonSecondary} type="button" onClick={()=>setContactReveal(null)}>Fermer</button></div>}
