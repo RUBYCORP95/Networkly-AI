@@ -9,6 +9,7 @@ export const metadata = { title: "Mallettes voyageuses · TESAMI" };
 const notices = new Map([
   ["archive", "Mallette retirée du parc actif. Son historique est conservé."],
   ["restore", "Mallette réactivée."],
+  ["rename", "Nom de la mallette mis à jour."],
   ["size", "Taille de la mallette mise à jour."],
   ["inactive", "Cette mallette est archivée ou indisponible."],
   ["added", "Mallette ajoutée."],
@@ -100,9 +101,11 @@ export default async function MallettesPage({ searchParams }) {
               <span>{unavailable.has(item.id) ? "Indisponible sur cette période" : "Disponible sur cette période"}</span>
               <form action={updateCase} className={styles.form}>
                 <CaseFields id={item.id} from={from} to={to} />
+                <label>Nom<input name="name" maxLength={80} defaultValue={item.name} /></label>
+                <button name="operation" value="rename" formNoValidate>Renommer</button>
                 <label>Taille<CaseSize size={item.size} /></label>
                 <button name="operation" value="size">Enregistrer la taille</button>
-                <button name="operation" value="archive" formNoValidate>Archiver</button>
+                <button name="operation" value="archive" formNoValidate>Retirer du parc</button>
               </form>
             </div>)}
           </div>
