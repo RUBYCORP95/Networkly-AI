@@ -1,0 +1,33 @@
+"use client";
+
+import { useState } from "react";
+import { afterDays, demoSettings, formatDate, isDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
+import styles from "../../consultant/consultant.module.css";
+
+export default function CrmDemo() {
+  const [birthDate, setBirthDate] = useState(demoSettings.birthDate);
+  const [delay, setDelay] = useState(String(demoSettings.delayDays));
+  const [notification, setNotification] = useState(demoSettings.notification);
+  const today = parisDate();
+  const validDelay = /^\d{1,4}$/.test(delay) && Number(delay) > 0 && Number(delay) <= 3650;
+  return <main className={styles.page}>
+    <h1>Démo · Clients et rappels</h1>
+    <p>Fiche fictive de Camille Martin. Les modifications restent dans cette page.</p>
+    <section className={styles.panel}>
+      <h2>Paramètres de la fiche</h2>
+      <div className={styles.form}>
+        <label>Date de naissance<input type="date" value={birthDate} max={today} onChange={e => setBirthDate(e.target.value)} /></label>
+        <label>Délai de relance (jours)<input type="number" min={1} max={3650} value={delay} onChange={e => setDelay(e.target.value)} /></label>
+        <label>Notification dans TESAMI<input type="checkbox" checked={notification} onChange={e => setNotification(e.target.checked)} /></label>
+      </div>
+    </section>
+    <section>
+      <h2>Tableau des relances</h2>
+      <p>Rappel créé le {formatDate(today)}</p>
+      <ul className={styles.trips}>
+        {validDelay && <li className={styles.panel}>Relance · {formatDate(afterDays(today, Number(delay)))} · Notification {notification ? "activée" : "désactivée"}</li>}
+        {isDate(birthDate) && birthDate <= today && <li className={styles.panel}>Anniversaire annuel · prochaine échéance le {formatDate(nextBirthday(birthDate, today))} · Notification {notification ? "activée" : "désactivée"}</li>}
+      </ul>
+    </section>
+  </main>;
+}
