@@ -26,8 +26,9 @@ function finish(status, from, to) {
 export async function addCase(form) {
   const client = await consultantClient();
   const name = String(form.get("name") ?? "").trim();
-  if (!name || name.length > 80) finish("invalid");
-  const { error } = await client.from("travelling_cases").insert({ name });
+  const size = form.get("size");
+  if (!name || name.length > 80 || !["small", "large"].includes(size)) finish("invalid");
+  const { error } = await client.from("travelling_cases").insert({ name, size });
   finish(error ? "error" : "added");
 }
 
@@ -42,7 +43,7 @@ export async function bookTrip(form) {
   const { error } = await client.from("travelling_case_trips").insert({
     case_id, starts_on, ends_on, destination,
   });
-  finish(error?.code === "23P01" ? "overlap" : error ? "error" : "booked", starts_on, ends_on);
+  finish(error?.code === "23P01" ? "overlap" : error?.code === "23514" ? "inactive" : error ? "error" : "booked", starts_on, ends_on);
 }
 
 export async function cancelTrip(form) {
@@ -50,4 +51,24 @@ export async function cancelTrip(form) {
   const { data, error } = await client.from("travelling_case_trips")
     .update({ cancelled: true }).eq("id", form.get("id")).eq("cancelled", false).select("id").maybeSingle();
   finish(error || !data ? "error" : "cancelled", form.get("from"), form.get("to"));
+}
+
+export async function updateCase(form) {
+  const client = await consultantClient();
+  const operation = form.get("operation");
+  const size = form.get("size");
+  const from = form.get("from");
+  const to = form.get("to");
+  const id = form.get("id");
+  if (typeof id !== "string" || !/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(id)) finish("invalid", from, to);
+
+  let changes;
+  if (operation === "archive") changes = { archived_at: new Date().toISOString() };
+  else if (operation === "restore") changes = { archived_at: null };
+  else if (operation === "size" && ["small", "large"].includes(size)) changes = { size };
+  else finish("invalid", from, to);
+
+  const { data, error } = await client.from("travelling_cases").update(changes)
+    .eq("id", id).select("id").maybeSingle();
+  finish(error || !data ? "error" : operation, from, to);
 }
