@@ -3,6 +3,7 @@ import { createServerSupabase } from "../../../lib/supabase/server";
 import { formatDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
 import { addFollowup, saveClient, saveSeller, updateFollowup, updateOrder } from "./actions";
 import { orderStatuses, paymentStatuses, sellerFields } from "../../../lib/crm/order-receipt.mjs";
+import CustomerList from "./CustomerList";
 import OrderReceipt from "./OrderReceipt";
 import ShareOrder from "./ShareOrder";
 import OrderForm from "./OrderForm";
@@ -140,12 +141,7 @@ export default async function ClientsPage({ searchParams }) {
       <FollowupTable title="Aujourd’hui" rows={rows.filter(item => item.date === today)} today={today} />
       <FollowupTable title="À venir" rows={rows.filter(item => item.date > today)} today={today} />
       {seller.error ? <p role="alert">Les coordonnées professionnelles sont temporairement indisponibles.</p> : <SellerForm seller={seller.data} />}
-      <section>
-        <h2>Fichier clients</h2>
-        {clients.length === 0 ? <p>Aucune fiche client.</p> : <div className={styles.cards}>
-          {clients.map(customer => <Link href={"?client=" + customer.id} className={styles.card} key={customer.id}>{customer.name}</Link>)}
-        </div>}
-      </section>
+      <CustomerList customers={clients} />
       {selected && <section id="fiche" key={selected.id}>
         <h2>Coordonnées du client</h2>
         <CustomerForm customer={selected} today={today} />

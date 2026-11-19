@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { afterDays, demoSettings, formatDate, isDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
 import { formatEuros, parseCents } from "../../../lib/crm/money.mjs";
+import CustomerList from "../../consultant/clients/CustomerList";
 import OrderReceipt from "../../consultant/clients/OrderReceipt";
 import styles from "../../consultant/consultant.module.css";
 
@@ -31,7 +32,8 @@ export default function CrmDemo() {
   return <main className={styles.page}>
     <h1>{sampleBuyer.name}</h1>
     <p>Fiche client de démonstration. Les modifications restent dans cette page.</p>
-    <section className={styles.panel}>
+    <CustomerList customers={[{ id: "camille-demo", name: sampleBuyer.name }]} demo />
+    <section className={styles.panel} id="fiche-client">
       <h2>Paramètres de la fiche</h2>
       <div className={styles.form}>
         <label>Date de naissance<input type="date" value={birthDate} max={today} onChange={e => setBirthDate(e.target.value)} /></label>
