@@ -68,13 +68,25 @@
 .receiptLines { list-style: none; padding: 0; }
 .receiptLines li, .receiptTotals > div:last-child { border-top: 1px solid #ded6f2; padding-block: 8px; }
 
-.crmPage { display: grid; gap: 18px; align-content: start; }
+main.crmPage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  gap: 18px;
+  align-content: start;
+}
+.crmPage section:where(:not(.crmDirectory, .panel)) {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+.crmPage .crmDirectory { min-width: 0; margin: 0; }
 .crmHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .crmHeader h1 { margin: 0; overflow-wrap: anywhere; }
 .crmAction { display: inline-flex; gap: 8px; align-items: center; padding: 10px 14px; background: white; color: #5634a8; border: 1px solid #ded6f2; border-radius: 10px; text-decoration: none; font-weight: 650; }
 .crmStats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
 .crmStat, .crmDirectory { background: white; border: 1px solid #ded6f2; border-radius: 16px; padding: clamp(12px, 3vw, 22px); }
-.crmStat dt { margin-top: 8px; color: #574e69; }
+.crmStat dt { margin-top: 8px; color: #574e69; overflow-wrap: anywhere; }
 .crmStat dd { margin: 0; font-size: clamp(24px, 4vw, 34px); font-weight: 750; }
 .crmAvatar { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: #eee6fd; color: #5634a8; font-size: 13px; font-weight: 750; }
 .crmDirectory h2 { margin-top: 0; }
