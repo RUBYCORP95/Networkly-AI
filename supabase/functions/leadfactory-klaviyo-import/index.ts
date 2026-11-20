@@ -31,6 +31,27 @@ function frenchDepartment(zip: string, country: unknown) {
  return /^9[78]/.test(zip) ? zip.slice(0, 3) : zip.slice(0, 2);
 }
 
+async function communeCoordinates(city: string, zip: string, country: unknown) {
+ if (!city || !/^\d{5}$/.test(zip) || !["FR", "France"].includes(String(country))) return null;
+ const normalize = (value: string) => value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+ try {
+  const response = await fetch("https://geo.api.gouv.fr/communes?" + query({
+   codePostal: zip, fields: "nom,centre,codeDepartement",
+  }), {signal: AbortSignal.timeout(3500)});
+  if (!response.ok) return null;
+  const communes = await response.json();
+  if (!Array.isArray(communes)) return null;
+  const matches = communes.filter(c => typeof c.nom === "string" && normalize(c.nom) === normalize(city));
+  if (matches.length !== 1) return null;
+  const [longitude, latitude] = matches[0].centre?.coordinates ?? [];
+  const lat = coordinate(latitude, 90);
+  const lon = coordinate(longitude, 180);
+  return lat === null || lon === null ? null : {lat, lon, department: matches[0].codeDepartement};
+ } catch {
+  return null;
+ }
+}
+
 Deno.serve(async (req) => {
  if (req.method === "OPTIONS") return new Response(null, {status: 204, headers: cors(req)});
  const reply = (body: unknown, status = 200) => respond(body, status, req);
@@ -98,12 +119,13 @@ Deno.serve(async (req) => {
    if (cart === null || cart > cutoff || (order !== null && order >= cart)) continue;
    const lat = coordinate(location.latitude, 90);
    const lon = coordinate(location.longitude, 180);
-   const hasCoordinates = lat !== null && lon !== null && (lat !== 0 || lon !== 0);
-   if (!hasCoordinates) counts.missing_coordinates++;
+   const point = lat !== null && lon !== null && (lat !== 0 || lon !== 0)
+    ? {lat, lon, department} : await communeCoordinates(city, zip, location.country);
+   if (!point) counts.missing_coordinates++;
    rows.push({
     klaviyo_profile_id: id, email, phone, first_name: a.first_name || null, last_name: a.last_name || null,
-    city: city || null, department, postal_code: zip || null,
-    latitude: hasCoordinates ? lat : null, longitude: hasCoordinates ? lon : null,
+    city: city || null, department: point?.department || department, postal_code: zip || null,
+    latitude: point?.lat ?? null, longitude: point?.lon ?? null,
     last_abandoned_at: new Date(cart).toISOString(),
     last_order_at: order === null ? null : new Date(order).toISOString(),
     orders_checked_at: now, consent_status: "unknown", source_segment_id: SEGMENT, updated_at: now,
