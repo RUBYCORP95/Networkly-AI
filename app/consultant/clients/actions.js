@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { requireConsultant } from "../../../lib/auth/consultant";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { isDate, parisDate } from "../../../lib/crm/dates.mjs";
-
+import { orderTotals, readDiscount } from "../../../lib/crm/order-pricing.mjs";
 import { priceOrder, readLines } from "../../../lib/crm/order";
 import { randomBytes, createHash } from "node:crypto";
 import { sellerFields } from "../../../lib/crm/order-receipt.mjs";
@@ -81,17 +81,23 @@ export async function addOrder(form) {
   const requested = readLines(form.get("lines"));
   if (!uuid.test(id) || Number.isNaN(shipping) || !requested) finish("invalid");
 
+  let discount;
+  try { discount = readDiscount(form.get("discount_type"), form.get("discount_value")); }
+  catch { finish("invalid", id); }
   let items = [];
   if (requested.length) {
-    try { ({ items, total } = await priceOrder(requested)); }
+    try { ({ items, total } = await priceOrder(requested, { customPricing: true })); }
     catch { finish("catalogue", id); }
     details = "Bon de commande catalogue";
   }
   if (!details || details.length > 4000 || Number.isNaN(total) || total > 99999999) finish("invalid", id);
+  if (discount && total === null) finish("invalid", id);
+  const { net, savings } = orderTotals(total, discount, shipping);
   const { data: seller } = await client.from("crm_seller_profiles").select("name").maybeSingle();
   if (!seller) finish("seller_required", id);
   const { error } = await client.from("crm_orders").insert({
-    client_id: id, details, total_cents: total, shipping_cents: shipping, items,
+    client_id: id, details, total_cents: net, shipping_cents: shipping, items,
+    ...(discount && { order_discount: { ...discount, applied_cents: savings } }),
   });
   finish(error ? "error" : "order", id);
 }

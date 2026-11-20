@@ -159,3 +159,22 @@ main.crmPage {
     content: attr(data-label);
   }
 }
+
+.orderLines, .orderDiscount {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.orderLines > li { min-width: 0; }
+.orderDiscount {
+  border: 1px solid #ded6f2;
+  border-radius: 8px;
+  margin: 0;
+  padding: 12px;
+}
+.orderFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 135px), 1fr));
+  align-items: end;
+  gap: 10px;
+}
+.orderFields :is(input, select) { box-sizing: border-box; font-size: 16px; }

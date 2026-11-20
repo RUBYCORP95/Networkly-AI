@@ -2,8 +2,30 @@
 
 import { useEffect, useState } from "react";
 import { formatEuros, parseCents } from "../../../lib/crm/money.mjs";
+import { discountCents, lineTotal, orderTotals, readDiscount } from "../../../lib/crm/order-pricing.mjs";
 import { addOrder } from "./actions";
 import styles from "../consultant.module.css";
+
+function previewDiscount(type, value) {
+  try { return readDiscount(type, value); }
+  catch { return null; }
+}
+
+function DiscountFields({ label, type, value, onType, onValue, global = false }) {
+  return <>
+    <label>{label} · Unité
+      <select name={global ? "discount_type" : undefined} value={type} onChange={event => onType(event.target.value)}>
+        <option value="percent">%</option>
+        <option value="euros">€</option>
+      </select>
+    </label>
+    <label>{label} ({type === "percent" ? "%" : "€"})
+      <input name={global ? "discount_value" : undefined} type="number" min={0}
+        max={type === "percent" ? 100 : 999999.99} step="0.01" inputMode="decimal"
+        value={value} onChange={event => onValue(event.target.value)} placeholder="0" />
+    </label>
+  </>;
+}
 
 export default function OrderForm({ clientId, token, fixedShipping = 0, submitAction = addOrder }) {
   const [{ mode, query }, setSearch] = useState({ mode: "code", query: "" });
@@ -11,6 +33,8 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
   const [lines, setLines] = useState([]);
   const [shipping, setShipping] = useState("");
   const [manualTotal, setManualTotal] = useState("");
+  const [discountType, setDiscountType] = useState("percent");
+  const [discountValue, setDiscountValue] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -54,12 +78,23 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
     const item = items.find(item => String(item.id) === id);
     if (!item) return;
     setLines(current => current.length >= 20 || current.some(line => line.id === item.id)
-      ? current : [...current, { ...item, quantity: 1 }]);
+      ? current : [...current, { ...item, quantity: 1, price: (item.unit_cents / 100).toFixed(2), discountType: "percent", discountValue: "" }]);
     setMessage(item.title + " ajouté au bon.");
   }
 
-  const productTotal = lines.length ? lines.reduce((sum, line) => sum + line.unit_cents * line.quantity, 0) : parseCents(manualTotal);
+  function updateLine(id, changes) {
+    setLines(current => current.map(line => line.id === id ? { ...line, ...changes } : line));
+  }
+
+  const pricedLines = lines.map(line => ({
+    ...line,
+    unit_cents: token ? line.unit_cents : parseCents(line.price) ?? line.unit_cents,
+    discount: token ? null : previewDiscount(line.discountType, line.discountValue),
+  }));
+  const productTotal = lines.length ? pricedLines.reduce((sum, line) => sum + lineTotal(line), 0) : parseCents(manualTotal);
   const shippingCents = token ? fixedShipping : parseCents(shipping) ?? 0;
+  const { savings, total } = orderTotals(productTotal, token ? null : previewDiscount(discountType, discountValue), shippingCents);
+  const displayAmount = amount => Number.isFinite(amount) ? formatEuros(amount) : "À confirmer";
   return <>
     <div className={styles.form}>
       <label>Code article
@@ -82,19 +117,47 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
     </div>
     <form action={submitAction} className={styles.form}>
       {clientId && <input name="client_id" type="hidden" value={clientId} />}
-      <input name="lines" type="hidden" value={JSON.stringify(lines.map(({ handle, id, quantity }) => ({ handle, id, quantity })))} />
-      {lines.length > 0 ? <ul className={styles.trips} style={{ flexBasis: "100%" }}>
-        {lines.map(line => <li className={styles.panel} key={line.id}>
-          <p>{line.title}{line.format && " · " + line.format} · {formatEuros(line.unit_cents)} / unité</p>
-          <label>Quantité<input type="number" min={1} max={999} required value={line.quantity || ""} onChange={event => setLines(lines.map(item => item.id === line.id ? {...item, quantity: Number(event.target.value)} : item))} /></label>
-          <button type="button" onClick={() => setLines(lines.filter(item => item.id !== line.id))}>Retirer du bon</button>
+      <input name="lines" type="hidden" value={JSON.stringify(lines.map(({ handle, id, quantity, price, discountType, discountValue }) => ({
+        handle, id, quantity, ...(!token && { price, discountType, discountValue }),
+      })))} />
+      {lines.length > 0 ? <ul className={`${styles.trips} ${styles.orderLines}`}>
+        {pricedLines.map(line => <li className={styles.panel} key={line.id}>
+          <p><strong>{line.title}</strong>{line.format && " · " + line.format}{token && " · " + formatEuros(line.unit_cents) + " / unité"}</p>
+          <div className={styles.orderFields}>
+            <label>Quantité<input type="number" min={1} max={999} required value={line.quantity || ""}
+              onChange={event => updateLine(line.id, { quantity: Number(event.target.value) })} /></label>
+            {!token && <>
+              <label>Prix unitaire (€)<input type="number" min={0} max={999999.99} step="0.01" inputMode="decimal" required
+                value={line.price} onChange={event => updateLine(line.id, { price: event.target.value })} /></label>
+              <DiscountFields label="Remise article" type={line.discountType} value={line.discountValue}
+                onType={discountType => updateLine(line.id, { discountType })}
+                onValue={discountValue => updateLine(line.id, { discountValue })} />
+            </>}
+          </div>
+          {!token && <p>Total article {displayAmount(lineTotal(line))}
+            {line.quantity > 0 && lineTotal(line) === 0 && <strong> · Offert</strong>}
+            {line.discount && <> · Remise −{displayAmount(discountCents(line.unit_cents * line.quantity, line.discount))}</>}
+          </p>}
+          <button type="button" onClick={() => setLines(current => current.filter(item => item.id !== line.id))}>Retirer du bon</button>
         </li>)}
       </ul> : token ? <p>Ajoute au moins un produit au bon.</p> : <>
         <label>Produits et quantités<textarea name="details" maxLength={4000} rows={3} required /></label>
         <label>Sous-total des produits (€)<input name="total" type="number" min={0} max={999999.99} step="0.01" value={manualTotal} onChange={event => setManualTotal(event.target.value)} /></label>
       </>}
       {!token && <label>Livraison (€)<input name="shipping" type="number" min={0} max={999999.99} step="0.01" value={shipping} onChange={event => setShipping(event.target.value)} placeholder="0,00" /></label>}
-      <p style={{ flexBasis: "100%" }}>Sous-total {productTotal === null ? "à confirmer" : formatEuros(productTotal)} · Livraison {formatEuros(shippingCents)} · Total {productTotal === null ? "à confirmer" : formatEuros(productTotal + shippingCents)}</p>
+      {!token && (lines.length > 0 || Number.isFinite(productTotal)) && <fieldset className={styles.orderDiscount}>
+        <legend>Remise globale</legend>
+        <div className={styles.orderFields}>
+          <DiscountFields label="Remise globale" type={discountType} value={discountValue}
+            onType={setDiscountType} onValue={setDiscountValue} global />
+        </div>
+      </fieldset>}
+      <dl className={`${styles.receiptTotals} ${styles.orderLines}`} aria-live="polite">
+        <div><dt>Sous-total produits</dt><dd>{displayAmount(productTotal)}</dd></div>
+        {savings > 0 && <div><dt>Remise globale</dt><dd>−{displayAmount(savings)}</dd></div>}
+        <div><dt>Livraison</dt><dd>{displayAmount(shippingCents)}</dd></div>
+        <div><dt>Total à payer</dt><dd><strong>{displayAmount(total)}</strong></dd></div>
+      </dl>
       <button disabled={!!token && !lines.length}>{token ? "Envoyer mon bon de commande" : "Enregistrer le bon"}</button>
     </form>
   </>;

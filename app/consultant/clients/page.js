@@ -3,7 +3,7 @@ import { Bell, Mail, Package, Settings, Users } from "lucide-react";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { formatDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
 import { addFollowup, saveClient, saveSeller, updateFollowup, updateOrder } from "./actions";
-import { orderStatuses, paymentStatuses, receiptNumber, receiptEmailText, sellerFields } from "../../../lib/crm/order-receipt.mjs";
+import { orderFields, orderStatuses, paymentStatuses, receiptNumber, receiptEmailText, sellerFields } from "../../../lib/crm/order-receipt.mjs";
 import CustomerList from "./CustomerList";
 import OrderReceipt from "./OrderReceipt";
 import ShareOrder from "./ShareOrder";
@@ -81,6 +81,7 @@ function orderEmailDraft(order, recipient) {
 function OrderControls({ order, clientEmail, returnFilter }) {
   return <>
     <OrderReceipt order={order} />
+    <p><a className={styles.crmAction} href={`/api/consultant/orders/${order.id}/pdf`}>Télécharger le PDF</a></p>
     {clientEmail ? <p><a className={`${styles.crmAction} ${styles.orderEmailAction}`} href={orderEmailDraft(order, clientEmail)}><Mail size={17} aria-hidden="true" /> Envoyer le bon par e-mail</a></p>
       : <p>Ajoute l’adresse e-mail du client pour préparer l’envoi.</p>}
     <form action={updateOrder} className={styles.form}>
@@ -98,7 +99,6 @@ function OrderControls({ order, clientEmail, returnFilter }) {
   </>;
 }
 
-const orderFields = "id,details,total_cents,shipping_cents,items,status,payment_status,created_at,buyer,seller";
 const ordersUrl = (filter = "all", page = 1) => "?view=orders&filter=" + filter + (page > 1 ? "&page=" + page : "");
 
 async function AllOrders({ db, params }) {
