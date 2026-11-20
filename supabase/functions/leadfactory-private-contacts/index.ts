@@ -1,5 +1,6 @@
 import {createClient} from "npm:@supabase/supabase-js@2.57.0";
 const allowed=new Set(["https://app.tesami.fr","https://networkly-sage.vercel.app","https://networkly-ai.vercel.app"]);
+const PAGE_SIZE=100;
 Deno.serve(async(req)=>{
  const origin=req.headers.get("origin")||"";
  const headers={"Access-Control-Allow-Origin":allowed.has(origin)?origin:"https://networkly-sage.vercel.app","Access-Control-Allow-Headers":"authorization,apikey,content-type,x-client-info","Access-Control-Allow-Methods":"GET,PATCH,OPTIONS","Content-Type":"application/json","Cache-Control":"no-store","Vary":"Origin"};
@@ -21,7 +22,7 @@ Deno.serve(async(req)=>{
   if(body?.action==="bulk_approve"){
    const ids=body.ids;
    const note=typeof body.note==="string"?body.note.trim():"";
-   if(!Array.isArray(ids)||ids.length<1||ids.length>20||new Set(ids).size!==ids.length||
+   if(!Array.isArray(ids)||ids.length<1||ids.length>PAGE_SIZE||new Set(ids).size!==ids.length||
       ids.some(id=>typeof id!=="string"||!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id))||
       !note||note.length>2000||body.confirmed!==true){
     return reply({error:"Sélection ou référence d’accord invalide."},400);
@@ -68,10 +69,10 @@ Deno.serve(async(req)=>{
  }
  const page=Math.min(1000,Math.max(0,Number(params.get("page"))||0));
  const search=(params.get("search")||"").trim().slice(0,80);
- let query=db.from("lead_private_klaviyo_contacts").select("id,first_name,last_name,email,phone,city,department,last_abandoned_at,consent_status,qualification_status,manual_review_status,manual_review_note,manual_review_at,imported_at",{count:"exact"}).order("imported_at",{ascending:false}).order("id").range(page*20,page*20+19);
+ let query=db.from("lead_private_klaviyo_contacts").select("id,first_name,last_name,email,phone,city,department,last_abandoned_at,consent_status,qualification_status,manual_review_status,manual_review_note,manual_review_at,imported_at",{count:"exact"}).order("imported_at",{ascending:false}).order("id").range(page*PAGE_SIZE,(page+1)*PAGE_SIZE-1);
  if(params.get("status")==="consultant")query=query.eq("qualification_status","consultant");
  if(search){const escaped=search.replace(/[%_,()]/g,"");query=query.or("email.ilike.%"+escaped+"%,first_name.ilike.%"+escaped+"%,last_name.ilike.%"+escaped+"%,city.ilike.%"+escaped+"%,department.ilike.%"+escaped+"%");}
  const {data,error:dbError,count}=await query;
  if(dbError)return reply({error:"Unable to list contacts"},500);
- return reply({contacts:data||[],total:count||0,page,page_size:20,admin_only:true});
+ return reply({contacts:data||[],total:count||0,page,page_size:PAGE_SIZE,admin_only:true});
 });
