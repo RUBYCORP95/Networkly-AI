@@ -118,7 +118,10 @@ export async function updateOrder(form) {
   if (["all", "pending", "processed"].includes(filter)) {
     redirect(path + "?" + new URLSearchParams({ view: "orders", filter, result }));
   }
-  finish(result, data?.client_id);
+  if (data?.client_id) {
+    redirect(path + "?" + new URLSearchParams({ view: "history", client: data.client_id, result }));
+  }
+  finish(result);
 }
 
 export async function createOrderLink(form) {

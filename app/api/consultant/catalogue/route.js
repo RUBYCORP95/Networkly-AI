@@ -33,9 +33,12 @@ export async function GET(request) {
 
   try {
     const [handles] = await Promise.all([findProducts(query, mode), requireEuroCatalogue()]);
-    const items = (await Promise.all(handles.map(getVariants))).flat();
+    const variants = await Promise.allSettled(handles.map(getVariants));
+    const items = variants.flatMap(result => result.status === "fulfilled" ? result.value : []);
+    const matches = mode === "code" ? items.filter(item => matchesArticleCode(item, query)) : items;
+    if (!matches.length && variants.some(result => result.status === "rejected")) throw new Error("Recherche incomplète");
     return Response.json({ items: mode === "code"
-      ? rankByArticleCode(items.filter(item => matchesArticleCode(item, query)), query)
+      ? rankByArticleCode(matches, query)
       : mode === "name" ? items : rankByArticleCode(items, query) }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return Response.json({ error: "Le catalogue Parfum Inspiration est indisponible." }, { status: 502 });

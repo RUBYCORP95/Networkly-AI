@@ -175,7 +175,8 @@ export default async function ClientsPage({ searchParams }) {
   const clients = customers.data ?? [];
   const names = new Map(clients.map(customer => [customer.id, customer.name]));
   const selected = clients.find(customer => customer.id === params.client);
-  const orders = selected ? await db.from("crm_orders")
+  const history = selected && params.view === "history";
+  const orders = history ? await db.from("crm_orders")
     .select(orderFields).eq("client_id", selected.id)
     .order("created_at", { ascending: false }).order("id", { ascending: false }) : null;
   const active = (reminders.data ?? []).filter(item => !item.completed_at && names.has(item.client_id))
@@ -199,7 +200,7 @@ export default async function ClientsPage({ searchParams }) {
     {notices.has(params.result) && <p className={styles.notice} role="status">{notices.get(params.result)}</p>}
     {settings ? (seller.error ? <p role="alert">Les coordonnées professionnelles sont temporairement indisponibles.</p> :
       <div className={styles.panel}><SellerForm seller={seller.data} /></div>) :
-    customers.error || reminders.error ? <p role="alert">Le CRM est temporairement indisponible.</p> : <>
+    customers.error || (!history && reminders.error) ? <p role="alert">Le CRM est temporairement indisponible.</p> : <>
       {dueNotifications > 0 && <p className={styles.notice} role="status">{dueNotifications} notification(s) TESAMI à consulter.</p>}
       {!selected && <>
         <dl className={styles.crmStats}>
@@ -217,25 +218,30 @@ export default async function ClientsPage({ searchParams }) {
       </div>}
       {selected && <p><Link className={styles.crmAction} href="?view=settings">Paramètres professionnels</Link></p>}
       {selected && <section id="fiche" key={selected.id}>
-        <section>
-          <h2>Partager un bon de commande</h2>
-          <ShareOrder clientId={selected.id} />
-          <h2>Ajouter une commande</h2>
-          <OrderForm clientId={selected.id} />
-        </section>
-        <h2>Coordonnées du client</h2>
-        <CustomerForm customer={selected} today={today} />
-        <h2>Programmer une relance</h2>
-        <form className={styles.form} action={addFollowup}>
-          <input type="hidden" name="client_id" value={selected.id} />
-          <label>Délai à partir d’aujourd’hui (jours)<input type="number" name="delay_days" min={1} max={3650} required /></label>
-          <label>Notification dans TESAMI<input type="checkbox" name="notification" /></label>
-          <button>Programmer</button>
-        </form>
-        <h2>Relances effectuées</h2>
-        <ul>{reminders.data.filter(item => item.client_id === selected.id && item.completed_at)
-          .map(item => <li key={item.id}>Relance du {formatDate(item.due_date)} · effectuée le {formatDate(parisDate(new Date(item.completed_at)))}</li>)}</ul>
-        <OrderHistory orders={orders} clientEmail={selected.email?.trim()} />
+        <nav className={styles.orderNavigation} aria-label="Sections de la fiche client">
+          <Link className={styles.crmAction} href={"?client=" + selected.id} aria-current={!history ? "page" : undefined}>Fiche client</Link>
+          <Link className={styles.crmAction} href={"?client=" + selected.id + "&view=history"} aria-current={history ? "page" : undefined}>Historique des commandes</Link>
+        </nav>
+        {history ? <OrderHistory orders={orders} clientEmail={selected.email?.trim()} /> : <>
+          <section>
+            <h2>Partager un bon de commande</h2>
+            <ShareOrder clientId={selected.id} />
+            <h2>Ajouter une commande</h2>
+            <OrderForm clientId={selected.id} />
+          </section>
+          <h2>Coordonnées du client</h2>
+          <CustomerForm customer={selected} today={today} />
+          <h2>Programmer une relance</h2>
+          <form className={styles.form} action={addFollowup}>
+            <input type="hidden" name="client_id" value={selected.id} />
+            <label>Délai à partir d’aujourd’hui (jours)<input type="number" name="delay_days" min={1} max={3650} required /></label>
+            <label>Notification dans TESAMI<input type="checkbox" name="notification" /></label>
+            <button>Programmer</button>
+          </form>
+          <h2>Relances effectuées</h2>
+          <ul>{reminders.data.filter(item => item.client_id === selected.id && item.completed_at)
+            .map(item => <li key={item.id}>Relance du {formatDate(item.due_date)} · effectuée le {formatDate(parisDate(new Date(item.completed_at)))}</li>)}</ul>
+        </>}
       </section>}
       {!selected && <section className={styles.panel}>
         <h2>Ajouter un client</h2>

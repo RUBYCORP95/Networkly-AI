@@ -15,8 +15,8 @@ function DiscountFields({ label, type, value, onType, onValue, global = false })
   return <>
     <label>{label} · Unité
       <select name={global ? "discount_type" : undefined} value={type} onChange={event => onType(event.target.value)}>
-        <option value="percent">%</option>
-        <option value="euros">€</option>
+        <option value="percent">Pourcentage (%)</option>
+        <option value="euros">Euros (€)</option>
       </select>
     </label>
     <label>{label} ({type === "percent" ? "%" : "€"})
@@ -36,6 +36,8 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
   const [discountType, setDiscountType] = useState("percent");
   const [discountValue, setDiscountValue] = useState("");
   const [message, setMessage] = useState("");
+  const [searchFailed, setSearchFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(false);
 
   const searchQuery = query.trim();
@@ -46,16 +48,23 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
     const timer = setTimeout(async () => {
       try {
         const result = await fetch("/api/consultant/catalogue?" + new URLSearchParams({ q: searchQuery, mode }), {
-          signal: controller.signal,
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(22000)]),
           headers: token ? { "X-Order-Link": token } : undefined,
         });
         const data = await result.json();
-        if (!result.ok) throw new Error(data.error);
         if (controller.signal.aborted) return;
+        if (!result.ok) {
+          setMessage(data.error || "Le catalogue est indisponible.");
+          setSearchFailed(result.status >= 500);
+          return;
+        }
         setItems(data.items);
         if (!data.items.length) setMessage("Aucun produit trouvé. Essaie un autre code ou nom de produit.");
-      } catch (error) {
-        if (!controller.signal.aborted) setMessage(error.message || "Recherche indisponible.");
+      } catch {
+        if (!controller.signal.aborted) {
+          setMessage("La recherche du catalogue a échoué.");
+          setSearchFailed(true);
+        }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -64,13 +73,14 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
       clearTimeout(timer);
       controller.abort();
     };
-  }, [searchQuery, mode, token]);
+  }, [searchQuery, mode, token, attempt]);
 
   function updateQuery(nextMode, value) {
     setSearch({ mode: nextMode, query: value });
     if (nextMode === mode && value.trim() === searchQuery) return;
     setItems([]);
     setMessage("");
+    setSearchFailed(false);
     setLoading(value.trim().length >= 2);
   }
 
@@ -114,6 +124,12 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
         </select>
       </label>}
       <p role="status" style={{ flexBasis: "100%", margin: 0 }}>{loading ? "Recherche en cours…" : message}</p>
+      {searchFailed && <button type="button" onClick={() => {
+        setSearchFailed(false);
+        setMessage("");
+        setLoading(true);
+        setAttempt(current => current + 1);
+      }}>Réessayer la recherche</button>}
     </div>
     <form action={submitAction} className={styles.form}>
       {clientId && <input name="client_id" type="hidden" value={clientId} />}
@@ -142,10 +158,10 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
         </li>)}
       </ul> : token ? <p>Ajoute au moins un produit au bon.</p> : <>
         <label>Produits et quantités<textarea name="details" maxLength={4000} rows={3} required /></label>
-        <label>Sous-total des produits (€)<input name="total" type="number" min={0} max={999999.99} step="0.01" value={manualTotal} onChange={event => setManualTotal(event.target.value)} /></label>
+        <label>Sous-total des produits (€)<input name="total" type="number" min={0} max={999999.99} step="0.01" required={!!previewDiscount(discountType, discountValue)} value={manualTotal} onChange={event => setManualTotal(event.target.value)} /></label>
       </>}
       {!token && <label>Livraison (€)<input name="shipping" type="number" min={0} max={999999.99} step="0.01" value={shipping} onChange={event => setShipping(event.target.value)} placeholder="0,00" /></label>}
-      {!token && (lines.length > 0 || Number.isFinite(productTotal)) && <fieldset className={styles.orderDiscount}>
+      {!token && <fieldset className={styles.orderDiscount}>
         <legend>Remise globale</legend>
         <div className={styles.orderFields}>
           <DiscountFields label="Remise globale" type={discountType} value={discountValue}
