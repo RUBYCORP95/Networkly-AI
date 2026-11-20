@@ -22,7 +22,7 @@ export async function GET() {
     const {values = []} = await response.json();
     const rows = values.slice(1)
       .map(row => Array.from({length:5}, (_, index) => String(row[index] ?? "").trim()))
-      .filter(([postal, city, phone, country]) => postal && city && /^[+()0-9 .-]{6,25}$/.test(phone) && country);
+      .filter(([postal, , phone, country]) => postal && phone && country);
     return Response.json(rows, {headers:{...headers,"Cache-Control":"public, max-age=0, s-maxage=60"}});
   } catch {
     return Response.json({error:"Annuaire indisponible."}, {status:503, headers});
