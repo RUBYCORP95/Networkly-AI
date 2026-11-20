@@ -1,6 +1,7 @@
 import {createClient} from "npm:@supabase/supabase-js@2.57.0";
 const allowed=new Set(["https://app.tesami.fr","https://networkly-sage.vercel.app","https://networkly-ai.vercel.app"]);
 const PAGE_SIZE=100;
+const genericProof=(note:string)=>["excel","csv","klaviyo","oui","ok"].includes(note.trim().toLowerCase());
 Deno.serve(async(req)=>{
  const origin=req.headers.get("origin")||"";
  const headers={"Access-Control-Allow-Origin":allowed.has(origin)?origin:"https://networkly-sage.vercel.app","Access-Control-Allow-Headers":"authorization,apikey,content-type,x-client-info","Access-Control-Allow-Methods":"GET,PATCH,OPTIONS","Content-Type":"application/json","Cache-Control":"no-store","Vary":"Origin"};
@@ -24,7 +25,7 @@ Deno.serve(async(req)=>{
    const note=typeof body.note==="string"?body.note.trim():"";
    if(!Array.isArray(ids)||ids.length<1||ids.length>PAGE_SIZE||new Set(ids).size!==ids.length||
       ids.some(id=>typeof id!=="string"||!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id))||
-      !note||note.length>2000||body.confirmed!==true){
+      !note||genericProof(note)||note.length>2000||body.confirmed!==true){
     return reply({error:"Sélection ou référence d’accord invalide."},400);
    }
    const {data,error}=await db.from(table).update({
@@ -41,7 +42,7 @@ Deno.serve(async(req)=>{
    return reply({error:"Statut ou contact invalide"},400);
   }
   const isReview=body.action==="manual_review";
-  if(isReview&&(!["pending","approved","rejected"].includes(body.review_status)||typeof body.note!=="string"||body.note.length>2000||(body.review_status==="approved"&&!body.note.trim())))return reply({error:"Indiquez le résultat et la preuve ou justification de la validation."},400);
+  if(isReview&&(!["pending","approved","rejected"].includes(body.review_status)||typeof body.note!=="string"||body.note.length>2000||(body.review_status==="approved"&&(!body.note.trim()||genericProof(body.note)))))return reply({error:"Indiquez le résultat et la preuve ou justification de la validation."},400);
   const update=isReview?{manual_review_status:body.review_status,manual_review_note:body.note.trim(),manual_review_at:new Date().toISOString(),manual_review_by:user.id}:{qualification_status:body.status};
   const {data,error}=await db.from(table).update(update)
     .eq("id",body.id).select("id").maybeSingle();
@@ -50,13 +51,8 @@ Deno.serve(async(req)=>{
  }
  const params=new URL(req.url).searchParams;
  if(params.get("stats")==="1"){
-  const [pending,ready,assigned]=await Promise.all([
-   db.from(table).select("id",{count:"exact",head:true}).eq("manual_review_status","pending"),
-   db.from(table).select("id",{count:"exact",head:true}).eq("manual_review_status","approved").eq("consent_status","subscribed").not("latitude","is",null).not("longitude","is",null).gte("orders_checked_at",new Date(Date.now()-86400000).toISOString()).or("qualification_status.is.null,qualification_status.eq.interested"),
-   db.from("lead_daily_allocations").select("id",{count:"exact",head:true}).eq("contact_kind","klaviyo").is("released_at",null).gt("expires_at",new Date().toISOString())
-  ]);
-  if(pending.error||ready.error||assigned.error)return reply({error:"Statistiques indisponibles"},500);
-  return reply({pending:pending.count||0,ready:ready.count||0,assigned:assigned.count||0,ready_label:"Validés avec critères techniques (à contrôler)"});
+  const {data,error}=await db.rpc("leadfactory_klaviyo_admin_stats").single();
+  return error?reply({error:"Statistiques indisponibles"},500):reply(data);
  }
  if(params.get("export")==="consultants"){
   const emails=new Set<string>();
