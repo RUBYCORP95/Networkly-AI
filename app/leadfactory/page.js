@@ -101,6 +101,27 @@ export default function LeadFactoryPage(){
   finally{setSearchingProspects(false);}
   document.getElementById("lf-my-prospects")?.scrollIntoView({behavior:"smooth",block:"start"});
  }
+ const [generating,setGenerating]=useState(false);
+ const [generationMessage,setGenerationMessage]=useState("");
+ async function generateLeads(){
+  setGenerating(true);
+  setGenerationMessage("");
+  try{
+   if(!(await saveSector()))return;
+   const supabase=createClient();
+   const {error:requestError}=await supabase.rpc("start_my_lead_daily_request");
+   if(requestError)throw requestError;
+   const {data,error}=await supabase.rpc("allocate_my_daily_leads");
+   if(error)throw error;
+   const count=(data?.[0]?.klaviyo_count??0)+(data?.[0]?.professional_count??0);
+   setGenerationMessage(count ? `${count} lead(s) attribué(s). Retrouve-les ci-dessous.` : "Aucun lead disponible dans ton secteur aujourd’hui.");
+   await load();
+  }catch{
+   setGenerationMessage("La génération a échoué. Tu peux réessayer.");
+  }finally{
+   setGenerating(false);
+  }
+ }
  async function reveal(id){
   setBusy(id);
   try{
@@ -175,7 +196,13 @@ export default function LeadFactoryPage(){
     <div className={styles.quota}><span>Prospects professionnels</span><strong>{professional}</strong></div>
     <p className={styles.muted}>Secteur : <strong>{s?.sector?.city||"Non renseigné"}</strong> · Rayon : <strong>{s?.sector?.radius_km||"—"} km</strong></p>
     <p className={styles.muted}>{s?.today?.requested?"Demande du jour : "+s.today.status:"Aucune demande aujourd’hui."}</p>
-    {!state.limited&&s&&<div style={{margin:"14px 0"}}><button className={styles.button} type="button" disabled={true} title="Distribution suspendue en attendant la validation de conformité">{s.today?.requested?"Génération déjà effectuée aujourd'hui":"Génération réelle temporairement indisponible"}</button><p className={styles.muted}>{!prospectAvailability?.available?"Recherche ton secteur : le bouton sera disponible lorsque des prospects professionnels validés y seront présents.":"La génération utilise les quotas de ton abonnement et ne peut être demandée qu'une fois par jour."}</p></div>}
+    {!state.limited&&s&&<div style={{margin:"14px 0"}}>
+      <button className={styles.button} type="button" disabled={generating||savingSector||!selectedCity||s.today?.status==="completed"} onClick={generateLeads}>
+        {generating?"Génération en cours…":s.today?.status==="completed"?"Génération terminée pour aujourd’hui":"Générer mes leads"}
+      </button>
+      <p className={styles.muted}>Choisis ta ville et ton rayon, puis génère tes leads. Clique sur « Contacter » dans une fiche pour afficher ses coordonnées.</p>
+      {generationMessage&&<p role="status">{generationMessage}</p>}
+    </div>}
     <button className={styles.button} type="button" onClick={()=>setDemo(v=>!v)}>{demo?"Masquer la démonstration":"Tester la génération (mode démo)"}</button>
     <p className={styles.disabledNote}>Mode bêta : cette démonstration utilise uniquement des contacts fictifs. La distribution de vrais prospects reste désactivée pendant les vérifications.</p>
    </div>
