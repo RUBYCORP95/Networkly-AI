@@ -19,10 +19,13 @@ Deno.serve(async(req)=>{
  if(req.method==="PATCH"){
   const body=await req.json().catch(()=>null);
   if(typeof body?.id!=="string"||!/^[a-f0-9-]{36}$/i.test(body.id)||
-     ![null,"interested","not_interested","consultant"].includes(body.status)){
+     !(body.action==="manual_review"||[null,"interested","not_interested","consultant"].includes(body.status))){
    return reply({error:"Statut ou contact invalide"},400);
   }
-  const {data,error}=await db.from(table).update({qualification_status:body.status})
+  const isReview=body.action==="manual_review";
+  if(isReview&&(!["pending","approved","rejected"].includes(body.review_status)||typeof body.note!=="string"||body.note.length>2000||(body.review_status==="approved"&&!body.note.trim())))return reply({error:"Indiquez le résultat et la preuve ou justification de la validation."},400);
+  const update=isReview?{manual_review_status:body.review_status,manual_review_note:body.note.trim(),manual_review_at:new Date().toISOString(),manual_review_by:user.id}:{qualification_status:body.status};
+  const {data,error}=await db.from(table).update(update)
     .eq("id",body.id).select("id").maybeSingle();
   if(error)return reply({error:"Impossible d’enregistrer le statut"},500);
   return data?reply({saved:true}):reply({error:"Contact introuvable"},404);
@@ -48,7 +51,7 @@ Deno.serve(async(req)=>{
  }
  const page=Math.min(1000,Math.max(0,Number(params.get("page"))||0));
  const search=(params.get("search")||"").trim().slice(0,80);
- let query=db.from("lead_private_klaviyo_contacts").select("id,first_name,last_name,email,phone,city,department,last_abandoned_at,consent_status,qualification_status,imported_at",{count:"exact"}).order("imported_at",{ascending:false}).order("id").range(page*20,page*20+19);
+ let query=db.from("lead_private_klaviyo_contacts").select("id,first_name,last_name,email,phone,city,department,last_abandoned_at,consent_status,qualification_status,manual_review_status,manual_review_note,manual_review_at,imported_at",{count:"exact"}).order("imported_at",{ascending:false}).order("id").range(page*20,page*20+19);
  if(params.get("status")==="consultant")query=query.eq("qualification_status","consultant");
  if(search){const escaped=search.replace(/[%_,()]/g,"");query=query.or("email.ilike.%"+escaped+"%,first_name.ilike.%"+escaped+"%,last_name.ilike.%"+escaped+"%,city.ilike.%"+escaped+"%,department.ilike.%"+escaped+"%");}
  const {data,error:dbError,count}=await query;
