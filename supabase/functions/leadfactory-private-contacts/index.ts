@@ -18,6 +18,23 @@ Deno.serve(async(req)=>{
  const table="lead_private_klaviyo_contacts";
  if(req.method==="PATCH"){
   const body=await req.json().catch(()=>null);
+  if(body?.action==="bulk_approve"){
+   const ids=body.ids;
+   const note=typeof body.note==="string"?body.note.trim():"";
+   if(!Array.isArray(ids)||ids.length<1||ids.length>20||new Set(ids).size!==ids.length||
+      ids.some(id=>typeof id!=="string"||!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id))||
+      !note||note.length>2000||body.confirmed!==true){
+    return reply({error:"Sélection ou référence d’accord invalide."},400);
+   }
+   const {data,error}=await db.from(table).update({
+    manual_review_status:"approved", manual_review_note:note,
+    manual_review_at:new Date().toISOString(), manual_review_by:user.id,
+   }).in("id",ids).eq("manual_review_status","pending")
+    .in("consent_status",["unknown","subscribed"])
+    .or("qualification_status.is.null,qualification_status.eq.interested").select("id");
+   if(error)return reply({error:"Impossible d’enregistrer la validation groupée."},500);
+   return reply({approved:data.length,skipped:ids.length-data.length});
+  }
   if(typeof body?.id!=="string"||!/^[a-f0-9-]{36}$/i.test(body.id)||
      !(body.action==="manual_review"||[null,"interested","not_interested","consultant"].includes(body.status))){
    return reply({error:"Statut ou contact invalide"},400);
