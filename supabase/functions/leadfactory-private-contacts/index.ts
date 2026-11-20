@@ -49,6 +49,15 @@ Deno.serve(async(req)=>{
   return data?reply({saved:true}):reply({error:"Contact introuvable"},404);
  }
  const params=new URL(req.url).searchParams;
+ if(params.get("stats")==="1"){
+  const [pending,ready,assigned]=await Promise.all([
+   db.from(table).select("id",{count:"exact",head:true}).eq("manual_review_status","pending"),
+   db.from(table).select("id",{count:"exact",head:true}).eq("manual_review_status","approved").eq("consent_status","subscribed").not("latitude","is",null).not("longitude","is",null).gte("orders_checked_at",new Date(Date.now()-86400000).toISOString()).or("qualification_status.is.null,qualification_status.eq.interested"),
+   db.from("lead_daily_allocations").select("id",{count:"exact",head:true}).eq("contact_kind","klaviyo").is("released_at",null).gt("expires_at",new Date().toISOString())
+  ]);
+  if(pending.error||ready.error||assigned.error)return reply({error:"Statistiques indisponibles"},500);
+  return reply({pending:pending.count||0,ready:ready.count||0,assigned:assigned.count||0,ready_label:"Validés avec critères techniques (à contrôler)"});
+ }
  if(params.get("export")==="consultants"){
   const emails=new Set<string>();
   let after="";
