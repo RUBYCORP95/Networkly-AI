@@ -144,7 +144,7 @@ async function AllOrders({ db, params }) {
   </main>;
 }
 
-function OrderHistory({ orders, clientId, clientEmail }) {
+function OrderHistory({ orders, clientEmail }) {
   return <section>
     <h2>Historique des commandes</h2>
     <p>L’envoi ouvre un brouillon dans ta messagerie. Choisis ton adresse professionnelle, puis clique sur Envoyer.</p>
@@ -154,10 +154,6 @@ function OrderHistory({ orders, clientId, clientEmail }) {
           <OrderControls order={order} clientEmail={clientEmail} />
         </li>)}
       </ul>}
-      <h2>Partager un bon de commande</h2>
-      <ShareOrder key={clientId} clientId={clientId} />
-      <h2>Ajouter une commande</h2>
-      <OrderForm key={clientId} clientId={clientId} />
     </>}
   </section>;
 }
@@ -221,9 +217,14 @@ export default async function ClientsPage({ searchParams }) {
       </div>}
       {selected && <p><Link className={styles.crmAction} href="?view=settings">Paramètres professionnels</Link></p>}
       {selected && <section id="fiche" key={selected.id}>
+        <section>
+          <h2>Partager un bon de commande</h2>
+          <ShareOrder clientId={selected.id} />
+          <h2>Ajouter une commande</h2>
+          <OrderForm clientId={selected.id} />
+        </section>
         <h2>Coordonnées du client</h2>
         <CustomerForm customer={selected} today={today} />
-        <OrderHistory orders={orders} clientId={selected.id} clientEmail={selected.email?.trim()} />
         <h2>Programmer une relance</h2>
         <form className={styles.form} action={addFollowup}>
           <input type="hidden" name="client_id" value={selected.id} />
@@ -234,6 +235,7 @@ export default async function ClientsPage({ searchParams }) {
         <h2>Relances effectuées</h2>
         <ul>{reminders.data.filter(item => item.client_id === selected.id && item.completed_at)
           .map(item => <li key={item.id}>Relance du {formatDate(item.due_date)} · effectuée le {formatDate(parisDate(new Date(item.completed_at)))}</li>)}</ul>
+        <OrderHistory orders={orders} clientEmail={selected.email?.trim()} />
       </section>}
       {!selected && <section className={styles.panel}>
         <h2>Ajouter un client</h2>
