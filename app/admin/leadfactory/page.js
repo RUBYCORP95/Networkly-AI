@@ -56,6 +56,7 @@ export default function LeadFactoryAdmin(){
  const [selectedIds,setSelectedIds]=useState([]);
  const [contactPageSize,setContactPageSize]=useState(20);
  const [bulkResult,setBulkResult]=useState("");
+ const [leadStats,setLeadStats]=useState(null);
  const selectable=contacts.filter(p=>(p.manual_review_status||"pending")==="pending"&&["unknown","subscribed"].includes(p.consent_status)&&(!p.qualification_status||p.qualification_status==="interested"));
  const selectableIds=selectable.map(p=>p.id);
  async function privateContactsRequest(path,options={}){
@@ -112,6 +113,7 @@ export default function LeadFactoryAdmin(){
    if(onlyConsultants)params.set("status","consultant");
    const data=await (await privateContactsRequest("?"+params)).json();
    setContacts(data.contacts||[]);setContactTotal(data.total||0);setContactPage(page);setContactPageSize(data.page_size||20);
+   try{setLeadStats(await (await privateContactsRequest("?stats=1")).json())}catch{setLeadStats(null)}
   }catch(e){setError(e.message||"Erreur de chargement")}finally{setContactLoading(false)}
  }
 
@@ -153,6 +155,7 @@ export default function LeadFactoryAdmin(){
  return <main className={styles.page}><div className={styles.wrap}>
  <header className={styles.top}><div><p className={styles.eyebrow}>TESAMI / LEADFACTORY</p><h1 className={styles.heading}>LeadFactory</h1><p className={styles.sub}>Vérifie les autorisations avant que les contacts puissent être attribués.</p></div><a className={styles.back} href="/">← Tableau de bord TESAMI</a></header>
  {error&&<p role="alert" className={styles.notice}>{error}</p>}
+ <section className={styles.card}><h2 className={styles.sectionTitle}>Suivi des contacts Klaviyo</h2><div className={styles.stats}><div className={styles.stat}><p className={styles.statLabel}>À vérifier</p><p className={styles.statNumber}>{leadStats?.pending??"—"}</p></div><div className={styles.stat}><p className={styles.statLabel}>Validés avec critères techniques</p><p className={styles.statNumber}>{leadStats?.ready??"—"}</p></div><div className={styles.stat}><p className={styles.statLabel}>Déjà attribués</p><p className={styles.statNumber}>{leadStats?.assigned??"—"}</p></div></div><p className={styles.muted}>Le deuxième compteur indique les fiches approuvées avec abonnement Klaviyo, localisation et contrôle récent des commandes. Il ne prouve pas à lui seul l'autorisation de transmission aux consultants.</p><button className={styles.button+" "+styles.secondary} type="button" onClick={()=>loadContacts(contactPage,search)} disabled={contactLoading}>Actualiser les compteurs</button></section>
  <section className={styles.card}><div className={styles.detail}><div><h2 className={styles.sectionTitle}>Valider les contacts Klaviyo</h2><p className={styles.muted}>Charge la liste, puis choisis « Validé avec preuve » ou « Refusé » sur chaque fiche. Pour valider, indique la référence de l’accord de transmission aux consultants.</p></div><button className={styles.button+" "+styles.secondary} type="button" disabled={contactLoading} onClick={()=>loadContacts(0,search)}>{contacts.length?"Actualiser la liste":"Afficher les contacts"}</button></div><div className={styles.actions}><button className={styles.button+" "+styles.secondary} type="button" aria-pressed={consultantsOnly} disabled={contactLoading||qualificationBusy} onClick={()=>{setConsultantsOnly(!consultantsOnly);loadContacts(0,search,!consultantsOnly)}}>{consultantsOnly?"Afficher tous les contacts":"Voir les contacts déjà consultants"}</button><button className={styles.button} type="button" disabled={qualificationBusy} onClick={exportConsultants}>Exporter les e-mails des consultants (CSV)</button></div><form className={styles.actions} onSubmit={e=>{e.preventDefault();loadContacts(0,search)}}><input aria-label="Rechercher un contact" placeholder="Nom, email, ville ou département" value={search} onChange={e=>setSearch(e.target.value)} style={{flex:"1 1 250px",minHeight:46,padding:"12px",border:"1px solid #ddd5ef",borderRadius:10}}/><button className={styles.button} type="submit" disabled={contactLoading}>Rechercher</button></form><div className={styles.actions}>
  <button className={styles.button} type="button" disabled={!selectedIds.length||qualificationBusy||contactLoading} onClick={approveSelection}>Valider la sélection ({selectedIds.length})</button>
  </div>{bulkResult&&<p role="status" className={styles.info}>{bulkResult}</p>}
