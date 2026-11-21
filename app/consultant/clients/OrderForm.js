@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatEuros, parseCents } from "../../../lib/crm/money.mjs";
 import { discountCents, lineTotal, orderTotals, readDiscount, savedOrderTotals } from "../../../lib/crm/order-pricing.mjs";
+import { orderDate } from "../../../lib/crm/order-receipt.mjs";
 import { addOrder } from "./actions";
 import styles from "../consultant.module.css";
 
@@ -27,7 +28,7 @@ function DiscountFields({ label, type, value, onType, onValue, global = false })
   </>;
 }
 
-export default function OrderForm({ clientId, token, fixedShipping = 0, order, submitAction = addOrder }) {
+export default function OrderForm({ clientId, token, fixedShipping = 0, order, today, submitAction = addOrder }) {
   const [{ mode, query }, setSearch] = useState({ mode: "code", query: "" });
   const [items, setItems] = useState([]);
   const [lines, setLines] = useState(() => (order?.items ?? []).map(item => ({
@@ -139,6 +140,15 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, order, s
     </div>
     <form action={submitAction} className={styles.form}>
       {clientId && <input name="client_id" type="hidden" value={clientId} />}
+      {!token && <label>Date de commande
+        <input name="order_date" type="date" required max={today} defaultValue={order ? orderDate(order) : today} />
+      </label>}
+      {!token && !order && <label>Statut à l’enregistrement
+        <select name="initial_status" defaultValue="pending">
+          <option value="pending">En attente</option>
+          <option value="processed">Traitée (terminée et payée)</option>
+        </select>
+      </label>}
       <input name="lines" type="hidden" value={JSON.stringify(lines.map(({ handle, id, quantity, price, discountType, discountValue }) => ({
         handle, id, quantity, ...(!token && { price, discountType, discountValue }),
       })))} />

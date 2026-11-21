@@ -1,5 +1,5 @@
 import { lineTotal, savedOrderTotals } from "../../../lib/crm/order-pricing.mjs";
-import { itemDiscountText, discountText, orderStatuses, paymentStatuses, receiptDate, receiptNumber, sellerFields } from "../../../lib/crm/order-receipt.mjs";
+import { itemDiscountText, discountText, orderStatuses, paymentStatuses, orderDate, receiptDate, receiptNumber, sellerFields } from "../../../lib/crm/order-receipt.mjs";
 import { formatEuros } from "../../../lib/crm/money.mjs";
 import styles from "../consultant.module.css";
 
@@ -15,7 +15,7 @@ export default function OrderReceipt({ order }) {
   const total = amounts.total === null ? "À confirmer" : formatEuros(amounts.total);
   return <>
     <header className={styles.receiptHeader}>
-      <div><strong>Bon {receiptNumber(order.id)}</strong><br /><time dateTime={order.created_at}>{receiptDate(order)}</time></div>
+      <div><strong>Bon {receiptNumber(order.id)}</strong><br /><time dateTime={orderDate(order)}>{receiptDate(order)}</time></div>
       <strong>{total}</strong>
     </header>
     <p>Commande · {new Map(orderStatuses).get(order.status)} <br /> Paiement · {new Map(paymentStatuses).get(order.payment_status)}</p>

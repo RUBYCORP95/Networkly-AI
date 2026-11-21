@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Bell, Mail, Package, Settings, Users } from "lucide-react";
 import { createServerSupabase } from "../../../lib/supabase/server";
-import { formatDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
+import { formatDate, isDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
 import { addFollowup, editOrder, saveClient, saveSeller, updateFollowup, updateOrder } from "./actions";
 import { orderFields, orderStatuses, paymentStatuses, receiptNumber, receiptEmailText, sellerFields } from "../../../lib/crm/order-receipt.mjs";
 import CustomerList from "./CustomerList";
@@ -9,6 +9,7 @@ import OrderReceipt from "./OrderReceipt";
 import ShareOrder from "./ShareOrder";
 import ShareRegistration from "./ShareRegistration";
 import OrderForm from "./OrderForm";
+import InvoiceUpload from "./InvoiceUpload";
 import styles from "../consultant.module.css";
 
 const notices = new Map([
@@ -20,6 +21,8 @@ const notices = new Map([
   ["seller_required", "Enregistre d’abord tes coordonnées professionnelles."],
   ["seller", "Coordonnées professionnelles enregistrées."],
   ["order", "Commande enregistrée."],
+  ["invoice", "Facture importée."],
+  ["invoice_invalid", "Vérifie la date de facture et choisis un PDF valide de 3 Mo maximum."],
   ["updated", "Relance mise à jour."],
 ]);
 
@@ -78,18 +81,23 @@ function orderEmailDraft(order, recipient) {
   return `mailto:${address}?subject=${subject}&body=${body}`;
 }
 
-function OrderControls({ order, clientId, clientEmail, returnFilter }) {
+function OrderControls({ order, clientId, clientEmail, returnFilter, dates }) {
   return <>
     <OrderReceipt order={order} />
     <div className={styles.orderActions}>
       <Link className={styles.crmAction} href={"?" + new URLSearchParams({ client: clientId, view: "history", edit: order.id })}>Modifier le bon</Link>
-      <a className={styles.crmAction} href={`/api/consultant/orders/${order.id}/pdf`}>Télécharger le PDF</a>
+      <form action={`/api/consultant/orders/${order.id}/pdf`} method="post">
+        <button className={styles.crmAction}>Télécharger le PDF</button>
+      </form>
       {clientEmail && <a className={`${styles.crmAction} ${styles.orderEmailAction}`} href={orderEmailDraft(order, clientEmail)}><Mail size={17} aria-hidden="true" /> Envoyer le bon par e-mail</a>}
     </div>
     {!clientEmail && <p>Ajoute l’adresse e-mail du client pour préparer l’envoi.</p>}
     <form action={updateOrder} className={styles.form}>
       <input name="id" type="hidden" value={order.id} />
-      {returnFilter && <input name="order_filter" type="hidden" value={returnFilter} />}
+      {returnFilter && <>
+        <input name="order_filter" type="hidden" value={returnFilter} />
+        {Object.entries(dates).map(([key, value]) => <input key={key} name={key} type="hidden" value={value} />)}
+      </>}
       <label>Statut<select name="status" defaultValue={order.status}>
         {orderStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select></label>
@@ -102,7 +110,17 @@ function OrderControls({ order, clientId, clientEmail, returnFilter }) {
   </>;
 }
 
-const ordersUrl = (filter = "all", page = 1) => "?view=orders&filter=" + filter + (page > 1 ? "&page=" + page : "");
+function ordersUrl(filter = "all", page = 1, dates = {}) {
+  const query = new URLSearchParams({ view: "orders", filter, ...dates });
+  if (page > 1) query.set("page", page);
+  return "?" + query;
+}
+
+function filterOrderDates(query, { from, to }) {
+  if (from) query = query.gte("order_date", from);
+  if (to) query = query.lte("order_date", to);
+  return query;
+}
 
 function filterOrders(query, filter) {
   if (filter === "processed") return query.in("status", ["confirmed", "completed"]).eq("payment_status", "paid");
@@ -112,24 +130,35 @@ function filterOrders(query, filter) {
 
 async function AllOrders({ db, params }) {
   const filter = ["pending", "processed"].includes(params.filter) ? params.filter : "all";
+  const dates = {};
+  for (const key of ["from", "to"]) if (isDate(params[key])) dates[key] = params[key];
   const parsedPage = Number(params.page);
   const page = Number.isSafeInteger(parsedPage) && parsedPage > 0 && parsedPage <= 1000000 ? parsedPage : 1;
   const size = 20;
   const query = db.from("crm_orders").select(orderFields + ",client_id,crm_clients(name,email)", { count: "exact" })
-    .order("created_at", { ascending: false }).order("id", { ascending: false }).range((page - 1) * size, page * size - 1);
+    .order("order_date", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).range((page - 1) * size, page * size - 1);
   const [orders, pending, processed] = await Promise.all([
-    filterOrders(query, filter),
-    filterOrders(db.from("crm_orders").select("id", { count: "exact", head: true }), "pending"),
-    filterOrders(db.from("crm_orders").select("id", { count: "exact", head: true }), "processed"),
+    filterOrders(filterOrderDates(query, dates), filter),
+    ...["pending", "processed"].map(status => filterOrders(filterOrderDates(
+      db.from("crm_orders").select("id", { count: "exact", head: true }), dates), status)),
+
   ]);
   return <main className={`${styles.page} ${styles.crmPage}`}>
     <Link className={styles.crmAction} href="/consultant/clients">← Tous les clients</Link>
     <h1>Mes commandes</h1>
+    <form method="get" className={styles.form}>
+      <input type="hidden" name="view" value="orders" />
+      <input type="hidden" name="filter" value={filter} />
+      <label>Commandes à partir du<input type="date" name="from" defaultValue={dates.from} /></label>
+      <label>Commandes jusqu’au<input type="date" name="to" defaultValue={dates.to} /></label>
+      <button>Filtrer par date</button>
+      {(dates.from || dates.to) && <Link className={styles.crmAction} href={ordersUrl(filter)}>Effacer les dates</Link>}
+    </form>
     <nav aria-label="Filtrer les commandes" className={styles.orderNavigation}>
       {[["all", "Toutes les commandes", filter === "all" ? orders.count : null],
         ["pending", "Commandes en attente", pending.count],
         ["processed", "Commandes traitées", processed.count]].map(([value, label, count]) =>
-        <Link key={value} className={styles.crmAction} href={ordersUrl(value)} aria-current={filter === value ? "page" : undefined}>
+        <Link key={value} className={styles.crmAction} href={ordersUrl(value, 1, dates)} aria-current={filter === value ? "page" : undefined}>
           {label}{count !== null && " (" + count + ")"}
         </Link>)}
     </nav>
@@ -140,23 +169,23 @@ async function AllOrders({ db, params }) {
       <ul className={styles.trips}>
         {orders.data.map(order => <li key={order.id} className={styles.panel}>
           <h2><Link className={styles.crmAction} href={"?client=" + order.client_id}>{order.crm_clients?.name ?? "Fiche client"}</Link></h2>
-          <OrderControls order={order} clientId={order.client_id} clientEmail={order.crm_clients?.email?.trim()} returnFilter={filter} />
+          <OrderControls order={order} clientId={order.client_id} clientEmail={order.crm_clients?.email?.trim()} returnFilter={filter} dates={dates} />
         </li>)}
       </ul>
       {(page > 1 || page * size < orders.count) && <nav aria-label="Pages des commandes" className={styles.orderNavigation}>
-        {page > 1 && <Link className={styles.crmAction} href={ordersUrl(filter, page - 1)}>← Page précédente</Link>}
-        {page * size < orders.count && <Link className={styles.crmAction} href={ordersUrl(filter, page + 1)}>Page suivante →</Link>}
+        {page > 1 && <Link className={styles.crmAction} href={ordersUrl(filter, page - 1, dates)}>← Page précédente</Link>}
+        {page * size < orders.count && <Link className={styles.crmAction} href={ordersUrl(filter, page + 1, dates)}>Page suivante →</Link>}
       </nav>}
     </>}
   </main>;
 }
 
-function OrderHistory({ orders, clientId, clientEmail, editId }) {
+function OrderHistory({ orders, clientId, clientEmail, editId, today }) {
   const orderToEdit = editId && orders.data?.find(order => order.id === editId);
   if (orderToEdit) return <section>
     <h2>Modifier le bon de commande {receiptNumber(orderToEdit.id)}</h2>
     <p><Link className={styles.crmAction} href={"?" + new URLSearchParams({ client: clientId, view: "history" })}>Annuler</Link></p>
-    <OrderForm key={orderToEdit.id} order={orderToEdit} submitAction={editOrder.bind(null, orderToEdit.id, clientId)} />
+    <OrderForm key={orderToEdit.id} order={orderToEdit} today={today} submitAction={editOrder.bind(null, orderToEdit.id, clientId)} />
   </section>;
   return <section>
     <h2>Historique des commandes</h2>
@@ -168,6 +197,35 @@ function OrderHistory({ orders, clientId, clientEmail, editId }) {
         </li>)}
       </ul>}
     </>}
+  </section>;
+}
+
+async function ClientInvoices({ db, clientId, today, params }) {
+  const invoiceDate = isDate(params.invoice_date) ? params.invoice_date : "";
+  let query = db.from("crm_client_invoices").select("id,filename,document_date,order_id")
+    .eq("client_id", clientId).order("document_date", { ascending: false })
+    .order("uploaded_at", { ascending: false }).order("id", { ascending: false });
+  if (invoiceDate) query = query.eq("document_date", invoiceDate);
+  const { data, error } = await query;
+  return <section>
+    <h2>Factures du client</h2>
+    <InvoiceUpload clientId={clientId} today={today} />
+    <form method="get" className={styles.form}>
+      <input name="client" type="hidden" value={clientId} />
+      <input name="view" type="hidden" value="invoices" />
+      <label>Filtrer par date<input name="invoice_date" type="date" max={today} defaultValue={invoiceDate} required /></label>
+      <button>Afficher les documents</button>
+      {invoiceDate && <Link className={styles.crmAction} href={"?client=" + clientId + "&view=invoices"}>Toutes les dates</Link>}
+    </form>
+    {error ? <p role="alert">Les factures sont temporairement indisponibles.</p> :
+      data.length === 0 ? <p>{invoiceDate ? "Aucun document à cette date." : "Aucun document archivé."}</p> :
+      <ul className={styles.trips}>
+        {data.map(invoice => <li className={styles.panel} key={invoice.id}>
+          <p>{invoice.order_id ? "Bon de commande" : "Facture importée"} · <time dateTime={invoice.document_date}>{formatDate(invoice.document_date)}</time></p>
+          <a className={styles.crmAction} style={{ overflowWrap: "anywhere" }}
+            href={`/api/consultant/invoices/${invoice.id}`} download>{invoice.filename}</a>
+        </li>)}
+      </ul>}
   </section>;
 }
 
@@ -189,9 +247,10 @@ export default async function ClientsPage({ searchParams }) {
   const names = new Map(clients.map(customer => [customer.id, customer.name]));
   const selected = clients.find(customer => customer.id === params.client);
   const history = selected && params.view === "history";
+  const invoices = selected && params.view === "invoices";
   const orders = history ? await db.from("crm_orders")
     .select(orderFields).eq("client_id", selected.id)
-    .order("created_at", { ascending: false }).order("id", { ascending: false }) : null;
+    .order("order_date", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }) : null;
   const active = (reminders.data ?? []).filter(item => !item.completed_at && names.has(item.client_id))
     .map(item => ({...item, name: names.get(item.client_id), date: item.due_date}));
   const birthdays = clients.filter(customer => customer.birth_date)
@@ -213,7 +272,7 @@ export default async function ClientsPage({ searchParams }) {
     {notices.has(params.result) && <p className={styles.notice} role="status">{notices.get(params.result)}</p>}
     {settings ? (seller.error ? <p role="alert">Les coordonnées professionnelles sont temporairement indisponibles.</p> :
       <div className={styles.panel}><SellerForm seller={seller.data} /></div>) :
-    customers.error || (!history && reminders.error) ? <p role="alert">Le CRM est temporairement indisponible.</p> : <>
+    customers.error || (!history && !invoices && reminders.error) ? <p role="alert">Le CRM est temporairement indisponible.</p> : <>
       {dueNotifications > 0 && <p className={styles.notice} role="status">{dueNotifications} notification(s) TESAMI à consulter.</p>}
       {!selected && <>
         <dl className={styles.crmStats}>
@@ -232,15 +291,17 @@ export default async function ClientsPage({ searchParams }) {
       {selected && <p><Link className={styles.crmAction} href="?view=settings">Paramètres professionnels</Link></p>}
       {selected && <section id="fiche" key={selected.id}>
         <nav className={styles.orderNavigation} aria-label="Sections de la fiche client">
-          <Link className={styles.crmAction} href={"?client=" + selected.id} aria-current={!history ? "page" : undefined}>Fiche client</Link>
+          <Link className={styles.crmAction} href={"?client=" + selected.id} aria-current={!history && !invoices ? "page" : undefined}>Fiche client</Link>
           <Link className={styles.crmAction} href={"?client=" + selected.id + "&view=history"} aria-current={history ? "page" : undefined}>Historique des commandes</Link>
+          <Link className={styles.crmAction} href={"?client=" + selected.id + "&view=invoices"} aria-current={invoices ? "page" : undefined}>Factures</Link>
         </nav>
-        {history ? <OrderHistory orders={orders} clientId={selected.id} clientEmail={selected.email?.trim()} editId={params.edit} /> : <>
+        {history ? <OrderHistory orders={orders} clientId={selected.id} clientEmail={selected.email?.trim()} editId={params.edit} today={today} /> :
+          invoices ? <ClientInvoices db={db} clientId={selected.id} today={today} params={params} /> : <>
           <section>
             <h2>Partager un bon de commande</h2>
             <ShareOrder clientId={selected.id} />
             <h2>Ajouter une commande</h2>
-            <OrderForm clientId={selected.id} />
+            <OrderForm clientId={selected.id} today={today} />
           </section>
           <h2>Coordonnées du client</h2>
           <CustomerForm customer={selected} today={today} />

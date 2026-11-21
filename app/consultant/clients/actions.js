@@ -101,11 +101,16 @@ export async function addOrder(form) {
   const client = await consultantClient();
   const id = form.get("client_id");
   if (!uuid.test(id)) finish("invalid");
+  const today = parisDate();
+  const order_date = form.get("order_date") ?? today;
+  const initialStatus = form.get("initial_status") ?? "pending";
+  if (!isDate(order_date) || order_date > today || !["pending", "processed"].includes(initialStatus)) finish("invalid", id);
+  const state = initialStatus === "processed" ? { status: "completed", payment_status: "paid" } : {};
   const { values, error: pricingError } = await readOrderPricing(form);
   if (pricingError) finish(pricingError, id);
   const { data: seller } = await client.from("crm_seller_profiles").select("name").maybeSingle();
   if (!seller) finish("seller_required", id);
-  const { error } = await client.from("crm_orders").insert({ client_id: id, ...values });
+  const { error } = await client.from("crm_orders").insert({ client_id: id, order_date, ...state, ...values });
   finish(error ? "error" : "order", id);
 }
 
@@ -113,16 +118,18 @@ export async function editOrder(id, clientId, form) {
   const client = await consultantClient();
   if (!uuid.test(id) || !uuid.test(clientId)) finish("invalid");
   const params = new URLSearchParams({ view: "history", client: clientId });
-  const { data: order } = await client.from("crm_orders").select("items")
+  const { data: order } = await client.from("crm_orders").select("items,order_date")
     .eq("id", id).eq("client_id", clientId).maybeSingle();
   let result = "error";
   if (order) {
-    const { values, error: pricingError } = await readOrderPricing(form, order.items);
+    const order_date = form.get("order_date") ?? order.order_date;
+    const { values, error: pricingError } = isDate(order_date) && order_date <= parisDate()
+      ? await readOrderPricing(form, order.items) : { error: "invalid" };
     if (pricingError) {
       params.set("edit", id);
       result = pricingError;
     } else {
-      const { data, error } = await client.from("crm_orders").update(values)
+      const { data, error } = await client.from("crm_orders").update({ ...values, order_date })
         .eq("id", id).eq("client_id", clientId).select("id").maybeSingle();
       if (data && !error) result = "order";
       else params.set("edit", id);
@@ -146,7 +153,12 @@ export async function updateOrder(form) {
   const result = error || !data ? "error" : "order";
   const filter = form.get("order_filter");
   if (["all", "pending", "processed"].includes(filter)) {
-    redirect(path + "?" + new URLSearchParams({ view: "orders", filter, result }));
+    const params = new URLSearchParams({ view: "orders", filter, result });
+    for (const key of ["from", "to"]) {
+      const value = form.get(key);
+      if (isDate(value)) params.set(key, value);
+    }
+    redirect(path + "?" + params);
   }
   if (data?.client_id) {
     redirect(path + "?" + new URLSearchParams({ view: "history", client: data.client_id, result }));
