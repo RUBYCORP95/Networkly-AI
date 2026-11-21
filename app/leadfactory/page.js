@@ -163,7 +163,7 @@ export default function LeadFactoryPage(){
    setProspectAvailability(current=>current?{...current,results:current.results.filter(item=>item.contact_id!==candidate.contact_id)}:current);
    if(contact.newly_revealed)setUsage(current=>current?{...current,[kind+"_used"]:current[kind+"_used"]+1}:current);
    await load();
-  }catch(error){setProspectSearchMessage(error.message||"Contact indisponible.");}
+  }catch(error){setProspectSearchMessage(/quota quotidien/i.test(error.message||"")?"Quota atteint pour aujourd’hui. Revenez demain.":error.message||"Contact indisponible.");}
   finally{setContactRevealBusy(null);}
  }
  function showContactDetails(contact,fallbackName){
@@ -190,6 +190,8 @@ export default function LeadFactoryPage(){
  const currentAdvice=adviceTemplates[adviceType];
  const s=state.status;
  const klaviyo=s?.quotas?.klaviyo||0, professional=s?.quotas?.professional||0;
+ const activeQuota=sectorTab==="klaviyo"?klaviyo:professional;
+ const quotaReached=!!usage&&usage[sectorTab+"_used"]>=activeQuota;
  const visibleCards=state.cards; // Existing allocations remain owned by the consultant even if their saved sector changes.
  if(state.limited)return <main className={styles.page}>
    <h1>LeadFactory</h1><p>Pour accéder aux quotas gratuits, envoie ta demande d’accès consultant CHOGAN.</p>
@@ -249,12 +251,12 @@ export default function LeadFactoryPage(){
     {sectorMessage&&<p className={styles.message} role="status">{sectorMessage}</p>}
     {prospectAvailability?.kind===sectorTab&&<div className={styles.panel} style={{marginTop:18}}>
       <h3>Résultats de recherche</h3>
-      <p role="status">{prospectSearchMessage}</p>
+      <p role="status">{quotaReached?"Quota atteint pour aujourd’hui. Revenez demain.":prospectSearchMessage}</p>
       <div className={styles.cards}>
         {prospectAvailability.results.map(candidate=><article className={styles.leadCard} key={candidate.contact_id}>
           <h3>{candidate.company||(sectorTab==="klaviyo"?"Client potentiel CHOGAN":"Prospect professionnel")}</h3>
           <p>{[candidate.city,candidate.department].filter(Boolean).join(" · ")} · {candidate.distance_km.toFixed(1)} km</p>
-          <button type="button" className={styles.button} disabled={!!contactRevealBusy||busy!==null} onClick={()=>claimCandidate(candidate,sectorTab)}>{contactRevealBusy===candidate.contact_id?"Ouverture…":"Contacter"}</button>
+          <button type="button" className={styles.button} disabled={quotaReached||!!contactRevealBusy||busy!==null} onClick={()=>claimCandidate(candidate,sectorTab)}>{contactRevealBusy===candidate.contact_id?"Ouverture…":"Contacter"}</button>
         </article>)}
       </div>
     </div>}
