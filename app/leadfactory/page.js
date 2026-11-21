@@ -178,13 +178,13 @@ export default function LeadFactoryPage(){
    <div className={styles.stat}><div className={styles.statLabel}>Prospects pros / jour</div><div className={styles.statValue}>{s?professional:"—"}</div><div className={styles.statNote}>Quota maximum</div></div>
    <div className={styles.stat}><div className={styles.statLabel}>Mes contacts</div><div className={styles.statValue}>{visibleCards.length}</div><div className={styles.statNote}>Actuellement attribués</div></div>
   </div>
-  <aside className={styles.panel} aria-labelledby="leadfactory-contact-notice" style={{marginBottom:20}}>
+  <section className={styles.panel} aria-labelledby="leadfactory-contact-notice" style={{marginBottom:20}}>
    <h2 id="leadfactory-contact-notice">Important avant de contacter un prospect</h2>
    <p>Les contacts CHOGAN proposés sont des clients potentiels. Certains peuvent toutefois être déjà consultants CHOGAN ou avoir laissé leurs coordonnées par erreur.</p>
    <p>Privilégiez un premier contact courtois par e-mail ou SMS, uniquement lorsque vous êtes autorisé à les solliciter. Présentez-vous clairement, indiquez l’origine réelle de leurs coordonnées et laissez-leur la possibilité de refuser tout nouveau contact.</p>
    <p><strong>Exemple de premier message</strong></p>
    <p>« Bonjour, je suis conseiller(ère) indépendant(e) CHOGAN dans votre région. Vous aviez commencé une commande de produits CHOGAN il y a quelque temps sans la finaliser. Je me permets de vous proposer mon aide si vous avez des questions ou souhaitez des renseignements. Si vous ne souhaitez pas être recontacté(e), dites-le-moi simplement. Belle journée ! »</p>
-  </aside>
+  </section>
   {state.loading&&<div className={styles.panel} role="status">Chargement de ton espace LeadFactory…</div>}
   {state.error&&<div className={styles.alert} role="alert"><p>{state.error}</p><button type="button" className={styles.button} onClick={load}>Réessayer le chargement</button>{state.error.includes("Connecte-toi")&&<a className={styles.loginLink} href="/login?next=%2Fleadfactory">Se connecter à TESAMI</a>}</div>}
   {state.limited&&<div className={styles.betaNotice} role="status"><strong>Bienvenue dans la bêta publique !</strong><p>Tu peux tester gratuitement les dix contacts fictifs, les conseils de prospection et l’interface. Les vrais contacts CHOGAN et professionnels ne sont pas accessibles aux comptes bêta non autorisés.</p><a href="/login?next=%2Fleadfactory">Gérer mon compte</a></div>}
