@@ -13,13 +13,22 @@ async function findCities(query) {
 async function consultantAction(action,allocationId){
  const {data:{session}}=await createClient().auth.getSession();
  if(!session?.access_token)throw new Error("Reconnecte-toi à TESAMI.");
- const response=await fetch("/api/leadfactory/consultant-action",{
+ const request={
   method:"POST",
   headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},
   body:JSON.stringify({action,allocationId})
- });
- const data=await response.json();
- if(!response.ok)throw new Error(data.error||"Action LeadFactory indisponible.");
+ };
+ const send=()=>fetch("/api/leadfactory/consultant-action",{...request,signal:AbortSignal.timeout(12000)});
+ let response;
+ try{
+  response=await send().catch(()=>null);
+  // Claiming the same contact again returns the existing allocation.
+  if(!response||[502,503,504].includes(response.status))response=await send();
+ }catch{
+  throw new Error("La connexion à LeadFactory a été interrompue. Tu peux réessayer sur la même fiche.");
+ }
+ const data=await response.json().catch(()=>null);
+ if(!response.ok||!data)throw new Error(data?.error||"LeadFactory est momentanément indisponible.");
  return data;
 }
 
