@@ -76,7 +76,7 @@ export default function LeadFactoryPage(){
    // Le secteur est prêt avant d'afficher les commandes.
    setState(s=>({...s,loading:false,error:"",status,cards:s.cards,limited:false}));
    const {data:cards,error}=await Promise.race([
-     supabase.rpc("my_lead_allocation_cards"),
+     supabase.rpc("my_lead_allocation_cards_with_names"),
      new Promise((_,reject)=>setTimeout(()=>reject(new Error("Le chargement des contacts prend trop de temps. Réessaie.")),12000))
    ]);
    if(error)throw error;
@@ -234,7 +234,7 @@ export default function LeadFactoryPage(){
     {sectorTab==="klaviyo"&&<div className={styles.panel} role="tabpanel" style={{marginTop:18}}>
       <h3>Mes clients CHOGAN attribués ({visibleCards.filter(card=>card.contact_kind==="klaviyo").length})</h3>
       <p className={styles.muted}>Ces contacts sont déjà attribués à ton compte. Ils ne sont pas encore filtrés par le rayon choisi.</p>
-      {visibleCards.filter(card=>card.contact_kind==="klaviyo").length===0?<p>Aucun client CHOGAN attribué pour le moment.</p>:<div className={styles.cards}>{visibleCards.filter(card=>card.contact_kind==="klaviyo").map(card=><article className={styles.leadCard} key={card.allocation_id}><strong>Client CHOGAN</strong><p>{[card.city,card.department].filter(Boolean).join(" · ")||"Localisation non renseignée"}</p><button type="button" className={styles.buttonSecondary} onClick={()=>reveal(card.allocation_id)} disabled={busy===card.allocation_id}>{busy===card.allocation_id?"Ouverture…":"Contacter"}</button>{state.revealed[card.allocation_id]?.phone&&<p><a href={"tel:"+state.revealed[card.allocation_id].phone}>{state.revealed[card.allocation_id].phone}</a></p>}{state.revealed[card.allocation_id]?.email&&<p><a href={"mailto:"+state.revealed[card.allocation_id].email}>{state.revealed[card.allocation_id].email}</a></p>}</article>)}</div>}
+      {visibleCards.filter(card=>card.contact_kind==="klaviyo").length===0?<p>Aucun client CHOGAN attribué pour le moment.</p>:<div className={styles.cards}>{visibleCards.filter(card=>card.contact_kind==="klaviyo").map(card=><article className={styles.leadCard} key={card.allocation_id}><strong>{card.display_name||"Client CHOGAN"}</strong><p>{[card.city,card.department].filter(Boolean).join(" · ")||"Localisation non renseignée"}</p><button type="button" className={styles.buttonSecondary} onClick={()=>reveal(card.allocation_id)} disabled={busy===card.allocation_id}>{busy===card.allocation_id?"Ouverture…":"Contacter"}</button>{state.revealed[card.allocation_id]?.phone&&<p><a href={"tel:"+state.revealed[card.allocation_id].phone}>{state.revealed[card.allocation_id].phone}</a></p>}{state.revealed[card.allocation_id]?.email&&<p><a href={"mailto:"+state.revealed[card.allocation_id].email}>{state.revealed[card.allocation_id].email}</a></p>}</article>)}</div>}
     </div>}
    </div>
    <div className={styles.panel}>
@@ -258,7 +258,7 @@ export default function LeadFactoryPage(){
     {visibleCards.map(card=>{
       const contact=state.revealed[card.allocation_id];
       return <article key={card.allocation_id} className={styles.leadCard}>
-        <h3>{card.contact_kind==="klaviyo"?"Contact CHOGAN":"Prospect professionnel"}</h3>
+        <h3>{card.contact_kind==="klaviyo"?(card.display_name||"Contact CHOGAN"):"Prospect professionnel"}</h3>
         <p>{[card.city,card.department].filter(Boolean).join(" · ")}</p>
         <button type="button" className={styles.buttonSecondary} onClick={()=>reveal(card.allocation_id)} disabled={busy===card.allocation_id}>
           {busy===card.allocation_id?"Ouverture…":"Contacter"}
