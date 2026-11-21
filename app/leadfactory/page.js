@@ -1,7 +1,27 @@
 "use client";
-import {useCallback,useEffect,useState} from "react";
+import {useCallback,useEffect,useRef,useState} from "react";
 import {createClient} from "../../lib/supabase/client";
 import styles from "./leadfactory.module.css";
+
+async function findCities(query) {
+ const response=await fetch("/api/leadfactory/cities?q="+encodeURIComponent(query),{signal:AbortSignal.timeout(12000)});
+ const data=await response.json();
+ if(!response.ok)throw new Error(data.error||"Recherche impossible.");
+ return data.cities||[];
+}
+
+async function consultantAction(action,allocationId){
+ const {data:{session}}=await createClient().auth.getSession();
+ if(!session?.access_token)throw new Error("Reconnecte-toi à TESAMI.");
+ const response=await fetch("/api/leadfactory/consultant-action",{
+  method:"POST",
+  headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},
+  body:JSON.stringify({action,allocationId})
+ });
+ const data=await response.json();
+ if(!response.ok)throw new Error(data.error||"Action LeadFactory indisponible.");
+ return data;
+}
 
 export default function LeadFactoryPage(){
  const [state,setState]=useState({loading:true,error:"",status:null,cards:[],revealed:{},limited:false});
@@ -38,6 +58,7 @@ export default function LeadFactoryPage(){
  const [savingSector,setSavingSector]=useState(false);
  const [sectorMessage,setSectorMessage]=useState("");
  const [searchingCities,setSearchingCities]=useState(false);
+ const citySearchVersion=useRef(0);
  const load=useCallback(async()=>{
   try{
    const supabase=createClient();
@@ -62,29 +83,57 @@ export default function LeadFactoryPage(){
   }catch(e){setState(s=>({...s,loading:false,error:e.name==="TimeoutError"?"Le chargement prend trop de temps. Réessaie.":e.message||"Erreur de chargement"}));}
  },[]);
  useEffect(()=>{load()},[load]);
+ function selectCity(city){
+  setSelectedCity(city);
+  setCityQuery(city.name);
+  setCities([]);
+ }
+ async function findMatchingCity(query){
+  const results=await findCities(query.trim());
+  const exact=results.filter(city=>city.name.localeCompare(query.trim(),"fr",{sensitivity:"base"})===0);
+  const match=results.length===1?results[0]:exact.length===1?exact[0]:null;
+  return {results,match};
+ }
  async function searchCities(){
+  const version=++citySearchVersion.current;
   setSearchingCities(true);setSectorMessage("");
-  try{const res=await fetch("/api/leadfactory/cities?q="+encodeURIComponent(cityQuery));const data=await res.json();if(!res.ok)throw new Error(data.error||"Recherche impossible");setCities(data.cities||[]);if(!data.cities?.length)setSectorMessage("Aucune ville trouvée. Essaie une autre orthographe ou un code postal.");}
-  catch(e){setSectorMessage(e.message||"Recherche impossible");}finally{setSearchingCities(false);}
+  try{
+   const {results,match}=await findMatchingCity(cityQuery);
+   if(version!==citySearchVersion.current)return;
+   if(match)selectCity(match);
+   else setCities(results);
+   setSectorMessage(match?"Ville sélectionnée : "+match.name+(match.postcode?" ("+match.postcode+")":""):results.length?"Choisis ta commune dans la liste.":"Aucune ville trouvée. Essaie un autre code postal.");
+  }catch(error){if(version===citySearchVersion.current)setSectorMessage(error.message||"Recherche impossible.");}
+  finally{setSearchingCities(false);}
  }
  async function saveSector(){
-  if(!selectedCity||selectedCity.name!==cityQuery){setSectorMessage("Choisis une ville dans les résultats avant d'enregistrer.");return;}
   if(radius<5||radius>50){setSectorMessage("Le rayon doit être compris entre 5 et 50 km.");return false;}
   setSavingSector(true);setSectorMessage("");
   try{
-   const supabase=createClient();const {data:{user},error:authError}=await supabase.auth.getUser();
+   let city=selectedCity;
+   if(!city||city.name!==cityQuery){
+    const {results,match}=await findMatchingCity(cityQuery);
+    if(!match){
+     setCities(results);
+     throw new Error(results.length?"Choisis ta commune dans la liste.":"Aucune ville trouvée. Vérifie ta saisie.");
+    }
+    city=match;
+    selectCity(city);
+   }
+   const supabase=createClient();
+   const {data:{user},error:authError}=await supabase.auth.getUser();
    if(authError||!user)throw new Error("Connecte-toi pour enregistrer ton secteur.");
-   const {error}=await supabase.from("lead_preferences").upsert({user_id:user.id,city:selectedCity.name,radius_km:radius,latitude:selectedCity.latitude,longitude:selectedCity.longitude,updated_at:new Date().toISOString()},{onConflict:"user_id"});
+   const {error}=await supabase.from("lead_preferences").upsert({user_id:user.id,city:city.name,radius_km:radius,latitude:city.latitude,longitude:city.longitude,updated_at:new Date().toISOString()},{onConflict:"user_id"});
    if(error)throw error;
-   setSectorMessage("Secteur enregistré : "+selectedCity.name+" · "+radius+" km.");
+   setState(current=>current.status?{...current,status:{...current.status,sector:{...current.status.sector,city:city.name,radius_km:radius}}}:current);
+   setSectorMessage("Secteur enregistré : "+city.name+" · "+radius+" km.");
    setProspectSearchMessage("");
    setProspectAvailability(null);
-   if(!state.limited)await load();
    return true;
-  }catch(e){setSectorMessage(e.message||"Enregistrement impossible");return false;}finally{setSavingSector(false);}
+  }catch(error){setSectorMessage(error.message||"Enregistrement impossible.");return false;}
+  finally{setSavingSector(false);}
  }
  async function searchProspectsInSector(){
-  if(!selectedCity||selectedCity.name!==cityQuery){setSectorMessage("Sélectionne une commune dans le menu déroulant.");return;}
   if(radius<5||radius>50){setSectorMessage("Choisis un rayon entre 5 et 50 km.");return;}
   const saved=await saveSector();
   if(!saved)return;
@@ -108,16 +157,12 @@ export default function LeadFactoryPage(){
   setGenerationMessage("");
   try{
    if(!(await saveSector()))return;
-   const supabase=createClient();
-   const {error:requestError}=await supabase.rpc("start_my_lead_daily_request");
-   if(requestError)throw requestError;
-   const {data,error}=await supabase.rpc("allocate_my_daily_leads");
-   if(error)throw error;
-   const count=(data?.[0]?.klaviyo_count??0)+(data?.[0]?.professional_count??0);
+   const result=await consultantAction("generate");
+   const count=(result.klaviyo_count??0)+(result.professional_count??0);
    setGenerationMessage(count ? `${count} lead(s) attribué(s). Retrouve-les ci-dessous.` : "Aucun lead disponible dans ton secteur aujourd’hui.");
    await load();
-  }catch{
-   setGenerationMessage("La génération a échoué. Tu peux réessayer.");
+  }catch(error){
+   setGenerationMessage(error.message||"La génération a échoué. Tu peux réessayer.");
   }finally{
    setGenerating(false);
   }
@@ -125,10 +170,8 @@ export default function LeadFactoryPage(){
  async function reveal(id){
   setBusy(id);
   try{
-   const {data,error}=await createClient().rpc("reveal_my_daily_allocation",{p_allocation_id:id});
-   if(error)throw error;
-   if(!data?.length)throw new Error("Coordonnées indisponibles.");
-   setState(s=>({...s,revealed:{...s.revealed,[id]:data[0]}}));
+   const contact=await consultantAction("reveal",id);
+   setState(s=>({...s,revealed:{...s.revealed,[id]:contact}}));
    await load();
   }catch(e){setState(s=>({...s,error:e.message||"Impossible de révéler le contact"}));}
   finally{setBusy(null);}
@@ -165,14 +208,17 @@ export default function LeadFactoryPage(){
       <button type="button" role="tab" aria-selected={sectorTab==="professional"} className={sectorTab==="professional"?styles.button:styles.buttonSecondary} onClick={()=>setSectorTab("professional")}>🏢 Prospects professionnels</button>
       <button type="button" role="tab" aria-selected={sectorTab==="klaviyo"} className={sectorTab==="klaviyo"?styles.button:styles.buttonSecondary} onClick={()=>setSectorTab("klaviyo")}>👤 Clients CHOGAN</button>
     </div>
-    <p className={styles.muted}>{sectorTab==="professional"?"Recherche des professionnels dans le rayon sélectionné.":"Consulte les clients CHOGAN déjà attribués à ton compte. La recherche géographique des clients non attribués n’est pas encore disponible."}</p>
+    <p className={styles.muted}>{sectorTab==="professional"?"Recherche des professionnels dans le rayon sélectionné.":"Choisis ta commune et ton rayon, puis clique sur « Générer mes leads » pour demander les contacts CHOGAN disponibles dans ton secteur."}</p>
     <label className={styles.label} htmlFor="lf-city">Ville ou code postal</label>
-    <div className={styles.searchRow}><input className={styles.input} id="lf-city" value={cityQuery} onChange={e=>{setCityQuery(e.target.value);setSelectedCity(null);setCities([]);}} onKeyDown={e=>{if(e.key==="Enter")searchCities();}} placeholder="Ex. Viarmes ou 95270"/><button className={styles.buttonSecondary} onClick={searchCities} disabled={searchingCities||cityQuery.trim().length<2}>{searchingCities?"Recherche…":"Rechercher"}</button></div>
-    {cities.length>0&&<div style={{marginTop:12}}><label className={styles.label} htmlFor="lf-city-results">Sélectionner une commune ({cities.length} résultat{cities.length>1?"s":""})</label><select id="lf-city-results" className={styles.input} defaultValue="" onChange={e=>{const city=cities[Number(e.target.value)];if(!city)return;setSelectedCity(city);setCityQuery(city.name);setCities([]);setSectorMessage("Ville sélectionnée : "+city.name+(city.postcode?" ("+city.postcode+")":""));}}><option value="" disabled>Choisir une ville dans la liste…</option>{cities.map((city,i)=><option key={city.code+"-"+i} value={i}>{city.name}{city.postcode?" · "+city.postcode:""}</option>)}</select></div>}
+    <div className={styles.searchRow}><input className={styles.input} id="lf-city" value={cityQuery} disabled={savingSector||generating} onChange={e=>{citySearchVersion.current++;setCityQuery(e.target.value);setSelectedCity(null);setCities([]);setSectorMessage("");}} onKeyDown={e=>{if(e.key==="Enter"&&!searchingCities&&cityQuery.trim().length>=2)searchCities();}} placeholder="Ex. Viarmes ou 95270"/><button className={styles.buttonSecondary} onClick={searchCities} disabled={searchingCities||cityQuery.trim().length<2}>{searchingCities?"Recherche…":"Rechercher"}</button></div>
+    {cities.length>0&&<div style={{marginTop:12}}><label className={styles.label} htmlFor="lf-city-results">Sélectionner une commune ({cities.length} résultat{cities.length>1?"s":""})</label><select id="lf-city-results" className={styles.input} defaultValue="" onChange={e=>{const city=cities[Number(e.target.value)];if(!city)return;selectCity(city);setSectorMessage("Ville sélectionnée : "+city.name+(city.postcode?" ("+city.postcode+")":""));}}><option value="" disabled>Choisir une ville dans la liste…</option>{cities.map((city,i)=><option key={city.code+"-"+i} value={i}>{city.name}{city.postcode?" · "+city.postcode:""}</option>)}</select></div>}
     <label className={styles.label} htmlFor="lf-radius">Rayon de prospection : {radius} km</label>
-    <input className={styles.range} id="lf-radius" type="range" min="5" max="50" step="5" value={radius} onChange={e=>setRadius(Number(e.target.value))}/>
+    <input className={styles.range} id="lf-radius" type="range" min="5" max="50" step="5" value={radius} disabled={savingSector||generating} onChange={e=>setRadius(Number(e.target.value))}/>
     <div className={styles.rangeLabels}><span>5 km</span><span>25 km</span><span>50 km</span></div>
-    <div className={styles.sectorActions}><button className={styles.button} onClick={searchProspectsInSector} disabled={sectorTab==="klaviyo"||savingSector||searchingProspects||!selectedCity}>{sectorTab==="klaviyo"?"Recherche géographique CHOGAN à venir":savingSector||searchingProspects?"Recherche en cours…":"🔎 Rechercher des professionnels"}</button><button className={styles.buttonSecondary} onClick={saveSector} disabled={savingSector||!selectedCity}>Enregistrer mon secteur</button></div>
+    <div className={styles.sectorActions}>
+      {sectorTab==="professional"&&<button type="button" className={styles.button} onClick={searchProspectsInSector} disabled={savingSector||generating||searchingCities||searchingProspects||cityQuery.trim().length<2}>{searchingProspects?"Recherche en cours…":"🔎 Rechercher des professionnels"}</button>}
+      <button type="button" className={styles.buttonSecondary} onClick={saveSector} disabled={savingSector||generating||searchingCities||searchingProspects||cityQuery.trim().length<2}>{savingSector?"Enregistrement…":"Enregistrer mon secteur"}</button>
+    </div>
     {sectorMessage&&<p className={styles.message} role="status">{sectorMessage}</p>}
     {sectorTab==="professional"&&prospectSearchMessage&&<div className={styles.panel} style={{marginTop:18}} role="status">
       <h3>Professionnels dans mon secteur</h3>
@@ -181,7 +227,7 @@ export default function LeadFactoryPage(){
 
       </div>
       <p>{prospectSearchMessage}</p>
-      <p className={styles.muted}>Les contacts CHOGAN non attribués restent privés : leur disponibilité géographique n’est pas encore intégrée à cette recherche. Aucun contact n’est réservé.</p>
+      <p className={styles.muted}>Cette recherche ne réserve aucun contact.</p>
       {prospectAvailability?.adminPreview&&prospectAvailability.preview?.length>0&&<div className={styles.cards} style={{marginTop:14}}>{prospectAvailability.preview.map((pro,i)=><article className={styles.leadCard} key={i}><h3>{pro.company||"Entreprise"}</h3><p>{pro.sector||"Activité non précisée"}</p><p>📍 {pro.city}{pro.department?" · "+pro.department:""} · {pro.distance_km} km</p><p>{pro.validated?"Validé pour attribution":"En attente de validation"}</p><button className={styles.button} type="button" disabled={contactRevealBusy===pro.id} onClick={()=>revealAdminProfessional(pro)} style={{marginTop:12}}>{contactRevealBusy===pro.id?"Ouverture…":"Contacter · Voir les coordonnées"}</button></article>)}</div>}
      </div>}
     {sectorTab==="klaviyo"&&<div className={styles.panel} role="tabpanel" style={{marginTop:18}}>
@@ -197,14 +243,12 @@ export default function LeadFactoryPage(){
     <p className={styles.muted}>Secteur : <strong>{s?.sector?.city||"Non renseigné"}</strong> · Rayon : <strong>{s?.sector?.radius_km||"—"} km</strong></p>
     <p className={styles.muted}>{s?.today?.requested?"Demande du jour : "+s.today.status:"Aucune demande aujourd’hui."}</p>
     {!state.limited&&s&&<div style={{margin:"14px 0"}}>
-      <button className={styles.button} type="button" disabled={generating||savingSector||!selectedCity||s.today?.status==="completed"} onClick={generateLeads}>
+      <button className={styles.button} type="button" disabled={generating||savingSector||searchingCities||searchingProspects||cityQuery.trim().length<2||s.today?.status==="completed"} onClick={generateLeads}>
         {generating?"Génération en cours…":s.today?.status==="completed"?"Génération terminée pour aujourd’hui":"Générer mes leads"}
       </button>
       <p className={styles.muted}>Choisis ta ville et ton rayon, puis génère tes leads. Clique sur « Contacter » dans une fiche pour afficher ses coordonnées.</p>
       {generationMessage&&<p role="status">{generationMessage}</p>}
     </div>}
-    <button className={styles.button} type="button" onClick={()=>setDemo(v=>!v)}>{demo?"Masquer la démonstration":"Tester la génération (mode démo)"}</button>
-    <p className={styles.disabledNote}>Mode bêta : cette démonstration utilise uniquement des contacts fictifs. La distribution de vrais prospects reste désactivée pendant les vérifications.</p>
    </div>
   </div>}
   <div id="lf-my-prospects" className={styles.sectionHeading}><h2>Mes prospects — Google Sheets et CHOGAN</h2><button className={styles.buttonSecondary} onClick={()=>setAdviceOpen(v=>!v)}>{adviceOpen?"Masquer les conseils":"💬 Conseils pour contacter un pro"}</button></div>
