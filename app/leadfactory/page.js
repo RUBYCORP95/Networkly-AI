@@ -235,11 +235,6 @@ export default function LeadFactoryPage(){
       </div>
     </div>}
     {!prospectAvailability&&prospectSearchMessage&&<p role="status">{prospectSearchMessage}</p>}
-    {sectorTab==="klaviyo"&&<div className={styles.panel} role="tabpanel" style={{marginTop:18}}>
-      <h3>Mes clients CHOGAN attribués ({visibleCards.filter(card=>card.contact_kind==="klaviyo").length})</h3>
-      <p className={styles.muted}>Ces contacts sont déjà attribués à ton compte. Ils ne sont pas encore filtrés par le rayon choisi.</p>
-      {visibleCards.filter(card=>card.contact_kind==="klaviyo").length===0?<p>Aucun client CHOGAN attribué pour le moment.</p>:<div className={styles.cards}>{visibleCards.filter(card=>card.contact_kind==="klaviyo").map(card=><article className={styles.leadCard} key={card.allocation_id}><strong>{card.display_name||"Client CHOGAN"}</strong><p>{[card.city,card.department].filter(Boolean).join(" · ")||"Localisation non renseignée"}</p><button type="button" className={styles.buttonSecondary} onClick={()=>reveal(card.allocation_id)} disabled={busy===card.allocation_id}>{busy===card.allocation_id?"Ouverture…":"Contacter"}</button>{state.revealed[card.allocation_id]?.phone&&<p><a href={"tel:"+state.revealed[card.allocation_id].phone}>{state.revealed[card.allocation_id].phone}</a></p>}{state.revealed[card.allocation_id]?.email&&<p><a href={"mailto:"+state.revealed[card.allocation_id].email}>{state.revealed[card.allocation_id].email}</a></p>}</article>)}</div>}
-    </div>}
    </div>
    <div className={styles.panel}>
     {contactReveal&&<section ref={contactDetails} tabIndex={-1} aria-labelledby="leadfactory-contact-details" className={styles.panel} style={{position:"sticky",top:16,zIndex:1,marginBottom:16,overflowWrap:"anywhere"}}>
@@ -254,6 +249,11 @@ export default function LeadFactoryPage(){
     <p className={styles.muted}>Secteur : <strong>{s?.sector?.city||"Non renseigné"}</strong> · Rayon : <strong>{s?.sector?.radius_km||"—"} km</strong></p>
     <p className={styles.muted}>Les recherches sont libres. Le premier affichage du numéro de chaque fiche utilise une place dans la catégorie correspondante.</p>
     {usage&&<p role="status">Numéros ouverts aujourd’hui : {usage.klaviyo_used}/{klaviyo} clients CHOGAN · {usage.professional_used}/{professional} professionnels</p>}
+    {sectorTab==="klaviyo"&&<div className={styles.panel} role="tabpanel" style={{marginTop:18}}>
+      <h3>Mes clients CHOGAN attribués ({visibleCards.filter(card=>card.contact_kind==="klaviyo").length})</h3>
+      <p className={styles.muted}>Ces contacts sont déjà attribués à ton compte. Ils ne sont pas encore filtrés par le rayon choisi.</p>
+      {visibleCards.filter(card=>card.contact_kind==="klaviyo").length===0?<p>Aucun client CHOGAN attribué pour le moment.</p>:<div className={styles.cards}>{visibleCards.filter(card=>card.contact_kind==="klaviyo").map(card=><article className={styles.leadCard} key={card.allocation_id}><strong>{card.display_name||"Client CHOGAN"}</strong><p>{[card.city,card.department].filter(Boolean).join(" · ")||"Localisation non renseignée"}</p><button type="button" className={styles.buttonSecondary} onClick={()=>reveal(card.allocation_id)} disabled={busy===card.allocation_id}>{busy===card.allocation_id?"Ouverture…":"Contacter"}</button>{state.revealed[card.allocation_id]?.phone&&<p><a href={"tel:"+state.revealed[card.allocation_id].phone}>{state.revealed[card.allocation_id].phone}</a></p>}{state.revealed[card.allocation_id]?.email&&<p><a href={"mailto:"+state.revealed[card.allocation_id].email}>{state.revealed[card.allocation_id].email}</a></p>}</article>)}</div>}
+    </div>}
    </div>
   </div>}
   <div id="lf-my-prospects" className={styles.sectionHeading}><h2>Mes prospects — Google Sheets et CHOGAN</h2><button className={styles.buttonSecondary} onClick={()=>setAdviceOpen(v=>!v)}>{adviceOpen?"Masquer les conseils":"💬 Conseils pour contacter un pro"}</button></div>
