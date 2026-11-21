@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatEuros, parseCents } from "../../../lib/crm/money.mjs";
-import { discountCents, lineTotal, orderTotals, readDiscount } from "../../../lib/crm/order-pricing.mjs";
+import { discountCents, lineTotal, orderTotals, readDiscount, savedOrderTotals } from "../../../lib/crm/order-pricing.mjs";
 import { addOrder } from "./actions";
 import styles from "../consultant.module.css";
 
@@ -27,14 +27,20 @@ function DiscountFields({ label, type, value, onType, onValue, global = false })
   </>;
 }
 
-export default function OrderForm({ clientId, token, fixedShipping = 0, submitAction = addOrder }) {
+export default function OrderForm({ clientId, token, fixedShipping = 0, order, submitAction = addOrder }) {
   const [{ mode, query }, setSearch] = useState({ mode: "code", query: "" });
   const [items, setItems] = useState([]);
-  const [lines, setLines] = useState([]);
-  const [shipping, setShipping] = useState("");
-  const [manualTotal, setManualTotal] = useState("");
-  const [discountType, setDiscountType] = useState("percent");
-  const [discountValue, setDiscountValue] = useState("");
+  const [lines, setLines] = useState(() => (order?.items ?? []).map(item => ({
+    ...item,
+    price: (item.unit_cents / 100).toFixed(2),
+    discountType: item.discount?.type ?? "percent",
+    discountValue: item.discount ? String(item.discount.amount / 100) : "",
+  })));
+  const [shipping, setShipping] = useState(order ? String(order.shipping_cents / 100) : "");
+  const legacyOrder = order && !order.items.length ? order : null;
+  const legacySubtotal = legacyOrder ? savedOrderTotals(legacyOrder).subtotal : null;
+  const [discountType, setDiscountType] = useState(order?.order_discount?.type ?? "percent");
+  const [discountValue, setDiscountValue] = useState(order?.order_discount ? String(order.order_discount.amount / 100) : "");
   const [message, setMessage] = useState("");
   const [searchFailed, setSearchFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -101,7 +107,7 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
     unit_cents: token ? line.unit_cents : parseCents(line.price) ?? line.unit_cents,
     discount: token ? null : previewDiscount(line.discountType, line.discountValue),
   }));
-  const productTotal = lines.length ? pricedLines.reduce((sum, line) => sum + lineTotal(line), 0) : parseCents(manualTotal);
+  const productTotal = lines.length ? pricedLines.reduce((sum, line) => sum + lineTotal(line), 0) : legacySubtotal;
   const shippingCents = token ? fixedShipping : parseCents(shipping) ?? 0;
   const { savings, total } = orderTotals(productTotal, token ? null : previewDiscount(discountType, discountValue), shippingCents);
   const displayAmount = amount => Number.isFinite(amount) ? formatEuros(amount) : "À confirmer";
@@ -156,10 +162,11 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
           </p>}
           <button type="button" onClick={() => setLines(current => current.filter(item => item.id !== line.id))}>Retirer du bon</button>
         </li>)}
-      </ul> : token ? <p>Ajoute au moins un produit au bon.</p> : <>
-        <label>Produits et quantités<textarea name="details" maxLength={4000} rows={3} required /></label>
-        <label>Sous-total des produits (€)<input name="total" type="number" min={0} max={999999.99} step="0.01" required={!!previewDiscount(discountType, discountValue)} value={manualTotal} onChange={event => setManualTotal(event.target.value)} /></label>
-      </>}
+      </ul> : legacyOrder ? <>
+        <p style={{ whiteSpace: "pre-wrap" }}>{legacyOrder.details}</p>
+        <input type="hidden" name="details" value={legacyOrder.details} />
+        <input type="hidden" name="total" value={legacySubtotal === null ? "" : (legacySubtotal / 100).toFixed(2)} />
+      </> : <p>Ajoute au moins un produit au bon.</p>}
       {!token && <label>Livraison (€)<input name="shipping" type="number" min={0} max={999999.99} step="0.01" value={shipping} onChange={event => setShipping(event.target.value)} placeholder="0,00" /></label>}
       {!token && <fieldset className={styles.orderDiscount}>
         <legend>Remise globale</legend>
@@ -174,7 +181,7 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, submitAc
         <div><dt>Livraison</dt><dd>{displayAmount(shippingCents)}</dd></div>
         <div><dt>Total à payer</dt><dd><strong>{displayAmount(total)}</strong></dd></div>
       </dl>
-      <button disabled={!!token && !lines.length}>{token ? "Envoyer mon bon de commande" : "Enregistrer le bon"}</button>
+      <button disabled={!lines.length && (!legacyOrder || (legacySubtotal === null && !!previewDiscount(discountType, discountValue)))}>{token ? "Envoyer mon bon de commande" : order ? "Enregistrer les modifications" : "Enregistrer le bon"}</button>
     </form>
   </>;
 }

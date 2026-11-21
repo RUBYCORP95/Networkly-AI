@@ -38,3 +38,17 @@ test("a saved order round trips with free items and both discounts in receipt an
   const pdf = await makeOrderPdf(order);
   assert.match(Buffer.from(pdf).subarray(0, 8).toString(), /^%PDF-/);
 });
+
+test("an existing catalogue line can be repriced without fetching Shopify", async () => {
+  const { priceOrder } = await import("../lib/crm/order.js");
+  const existingItems = [{ id: "20", handle: "parfum-chogan-n-20", unit_cents: 3500,
+    quantity: 1, title: "Parfum 020", discount: readDiscount("euros", "5") }];
+  const request = { id: "20", handle: "parfum-chogan-n-20", price: "35", quantity: 2,
+    discountType: "percent", discountValue: "20" };
+  const edited = await priceOrder([request], { existingItems, customPricing: true });
+  assert.equal(edited.total, 5600);
+  assert.deepEqual(edited.items[0].discount, { type: "percent", amount: 2000 });
+  const gifted = await priceOrder([{ ...request, price: "0", discountValue: "" }], { existingItems, customPricing: true });
+  assert.equal(gifted.total, 0);
+  assert.equal(gifted.items[0].discount, undefined);
+});

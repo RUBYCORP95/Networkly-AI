@@ -72,34 +72,64 @@ export async function updateFollowup(form) {
   finish(error || !data ? "error" : "updated", data?.client_id);
 }
 
-export async function addOrder(form) {
-  const client = await consultantClient();
-  const id = form.get("client_id");
+async function readOrderPricing(form, existingItems) {
   let details = String(form.get("details") ?? "").trim();
   let total = parseCents(form.get("total"));
   const shipping = parseCents(form.get("shipping")) ?? 0;
   const requested = readLines(form.get("lines"));
-  if (!uuid.test(id) || Number.isNaN(shipping) || !requested) finish("invalid");
+  if (Number.isNaN(shipping) || !requested) return { error: "invalid" };
 
   let discount;
   try { discount = readDiscount(form.get("discount_type"), form.get("discount_value")); }
-  catch { finish("invalid", id); }
+  catch { return { error: "invalid" }; }
   let items = [];
   if (requested.length) {
-    try { ({ items, total } = await priceOrder(requested, { customPricing: true })); }
-    catch { finish("catalogue", id); }
+    try { ({ items, total } = await priceOrder(requested, { customPricing: true, existingItems })); }
+    catch { return { error: "catalogue" }; }
     details = "Bon de commande catalogue";
   }
-  if (!details || details.length > 4000 || Number.isNaN(total) || total > 99999999) finish("invalid", id);
-  if (discount && total === null) finish("invalid", id);
+  if (!details || details.length > 4000 || Number.isNaN(total) || total > 99999999) return { error: "invalid" };
+  if (discount && total === null) return { error: "invalid" };
   const { net, savings } = orderTotals(total, discount, shipping);
+  return { values: {
+    details, total_cents: net, shipping_cents: shipping, items,
+    order_discount: discount ? { ...discount, applied_cents: savings } : null,
+  } };
+}
+
+export async function addOrder(form) {
+  const client = await consultantClient();
+  const id = form.get("client_id");
+  if (!uuid.test(id)) finish("invalid");
+  const { values, error: pricingError } = await readOrderPricing(form);
+  if (pricingError) finish(pricingError, id);
   const { data: seller } = await client.from("crm_seller_profiles").select("name").maybeSingle();
   if (!seller) finish("seller_required", id);
-  const { error } = await client.from("crm_orders").insert({
-    client_id: id, details, total_cents: net, shipping_cents: shipping, items,
-    ...(discount && { order_discount: { ...discount, applied_cents: savings } }),
-  });
+  const { error } = await client.from("crm_orders").insert({ client_id: id, ...values });
   finish(error ? "error" : "order", id);
+}
+
+export async function editOrder(id, clientId, form) {
+  const client = await consultantClient();
+  if (!uuid.test(id) || !uuid.test(clientId)) finish("invalid");
+  const params = new URLSearchParams({ view: "history", client: clientId });
+  const { data: order } = await client.from("crm_orders").select("items")
+    .eq("id", id).eq("client_id", clientId).maybeSingle();
+  let result = "error";
+  if (order) {
+    const { values, error: pricingError } = await readOrderPricing(form, order.items);
+    if (pricingError) {
+      params.set("edit", id);
+      result = pricingError;
+    } else {
+      const { data, error } = await client.from("crm_orders").update(values)
+        .eq("id", id).eq("client_id", clientId).select("id").maybeSingle();
+      if (data && !error) result = "order";
+      else params.set("edit", id);
+    }
+  }
+  params.set("result", result);
+  redirect(path + "?" + params);
 }
 
 export async function updateOrder(form) {
