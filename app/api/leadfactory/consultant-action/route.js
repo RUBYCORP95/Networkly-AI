@@ -34,6 +34,9 @@ export async function POST(request) {
     p_allocation_id: allocationId
   });
   if (!error && data) return reply(data);
+  if (error?.message === "verified lead team membership required") {
+    return reply({ error: "Ton accès consultant CHOGAN doit être validé pour générer avec le quota gratuit." }, 403);
+  }
   if (error?.code === "42501") return reply({ error: "Accès LeadFactory non autorisé." }, 403);
   if (error?.message === "valid sector and geolocation required" || error?.message === "location required") {
     return reply({ error: "Choisis une commune et un rayon entre 5 et 50 km." }, 422);
