@@ -45,6 +45,13 @@ export default function LeadFactoryPage(){
  const [prospectAvailability,setProspectAvailability]=useState(null);
  const [contactRevealBusy,setContactRevealBusy]=useState(null);
  const [contactReveal,setContactReveal]=useState(null);
+ const contactDetails=useRef(null);
+ useEffect(()=>{
+  const details=contactDetails.current;
+  if(!contactReveal||!details)return;
+  details.focus({preventScroll:true});
+  details.scrollIntoView({block:"nearest",inline:"nearest"});
+ },[contactReveal]);
  const [usage,setUsage]=useState(null);
 
  const [searchingProspects,setSearchingProspects]=useState(false);
@@ -147,7 +154,7 @@ export default function LeadFactoryPage(){
   setContactRevealBusy(candidate.contact_id);
   try{
    const contact=await consultantAction("claim_"+kind,candidate.contact_id);
-   setContactReveal({company:candidate.company,phone:contact.phone,email:contact.email});
+   setContactReveal({name:[contact.first_name,contact.last_name].filter(Boolean).join(" ")||candidate.company,phone:contact.phone,email:contact.email});
    setState(current=>({...current,revealed:{...current.revealed,[contact.allocation_id]:contact}}));
    setProspectAvailability(current=>current?{...current,results:current.results.filter(item=>item.contact_id!==candidate.contact_id)}:current);
    if(contact.newly_revealed)setUsage(current=>current?{...current,[kind+"_used"]:current[kind+"_used"]+1}:current);
@@ -235,6 +242,12 @@ export default function LeadFactoryPage(){
     </div>}
    </div>
    <div className={styles.panel}>
+    {contactReveal&&<section ref={contactDetails} tabIndex={-1} aria-labelledby="leadfactory-contact-details" className={styles.panel} style={{position:"sticky",top:16,zIndex:1,marginBottom:16,overflowWrap:"anywhere"}}>
+      <h2 id="leadfactory-contact-details">{contactReveal.name||"Coordonnées du contact"}</h2>
+      {contactReveal.phone&&<p>Téléphone <a href={"tel:"+contactReveal.phone}>{contactReveal.phone}</a></p>}
+      {contactReveal.email&&<p>E-mail <a href={"mailto:"+contactReveal.email}>{contactReveal.email}</a></p>}
+      <button className={styles.buttonSecondary} type="button" onClick={()=>setContactReveal(null)}>Fermer</button>
+    </section>}
     <h2>🎯 Mes quotas du jour</h2><p className={styles.muted}>Retrouve ici tes quotas et le statut de ta demande quotidienne.</p>
     <div className={styles.quota}><span>Contacts CHOGAN</span><strong>{klaviyo}</strong></div>
     <div className={styles.quota}><span>Prospects professionnels</span><strong>{professional}</strong></div>
@@ -262,7 +275,6 @@ export default function LeadFactoryPage(){
   </div>}
   {adviceOpen&&<div id="leadfactory-advice" className={styles.advice}><h2>Comment démarrer la discussion ?</h2><p className={styles.muted}>Sélectionne une approche et personnalise le texte selon l’activité du professionnel.</p><div className={styles.adviceTabs}>{Object.entries(adviceTemplates).map(([key,item])=><button key={key} className={adviceType===key?styles.tab+" "+styles.tabActive:styles.tab} onClick={()=>{setAdviceType(key);setAdviceCopied(false);}} aria-pressed={adviceType===key}>{item.title}</button>)}</div><h3>{currentAdvice.title}</h3><p>{currentAdvice.tip}</p><div className={styles.script}>{currentAdvice.message}</div><div style={{marginTop:14}}><button className={styles.button} onClick={async()=>{try{await navigator.clipboard.writeText(currentAdvice.message);setAdviceCopied(true);}catch{setAdviceCopied(false);}}}>{adviceCopied?"Message copié !":"Copier le message"}</button></div><p className={styles.footnote}>Respecte les règles de prospection professionnelle, les refus et les demandes d’opposition. Ne promets pas de revenus.</p></div>}
   {demo&&<div className={styles.demoPanel} role="region" aria-label="Démonstration avec prospects fictifs"><strong>🧪 Simulation bêta — données 100 % fictives</strong><p>Voici un aperçu de cinq contacts clients CHOGAN et cinq prospects professionnels. Aucun vrai contact n’est attribué, aucun quota n’est consommé et aucune coordonnée personnelle n’est révélée.</p><div className={styles.demoGrid}>{Array.from({length:10},(_,i)=><div className={styles.demoItem} key={i}><strong>{i<5?"Client CHOGAN":"Professionnel"} · Démo {i%5+1}</strong><span>{i<5?"Panier abandonné fictif":"Entreprise fictive"} · Exemple uniquement</span><button className={styles.buttonSecondary} type="button" onClick={()=>{setAdviceOpen(true);setAdviceType(i<5?"products":"partnership");setAdviceCopied(false);}}>Préparer un message</button></div>)}</div></div>}
-  {contactReveal&&<div className={styles.panel} role="status" style={{marginBottom:16}}><strong>Coordonnées révélées — {contactReveal.company}</strong><p>Ce prospect a été retiré de la liste à contacter.</p><p>Téléphone : {contactReveal.phone?<a href={"tel:"+contactReveal.phone}>{contactReveal.phone}</a>:"Non renseigné"}</p><p>E-mail : {contactReveal.email?<a href={"mailto:"+contactReveal.email}>{contactReveal.email}</a>:"Non renseigné"}</p><button className={styles.buttonSecondary} type="button" onClick={()=>setContactReveal(null)}>Fermer</button></div>}
 
 
  </div>;
