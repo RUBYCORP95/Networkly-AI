@@ -21,9 +21,11 @@ export async function POST(request) {
 
   const body = await request.json().catch(() => null);
   const action = body?.action;
-  const allocationId = action === "reveal" ? body?.allocationId : null;
+  const needsId = action === "reveal" || action === "claim_klaviyo" || action === "claim_professional";
+  const allocationId = needsId ? body?.allocationId : null;
   const uuid = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i;
-  if (action !== "generate" && (action !== "reveal" || typeof allocationId !== "string" || !uuid.test(allocationId))) {
+  if ((!needsId && action !== "search_klaviyo" && action !== "search_professional") ||
+      (needsId && (typeof allocationId !== "string" || !uuid.test(allocationId)))) {
     return reply({ error: "Action invalide." }, 400);
   }
 
@@ -41,10 +43,13 @@ export async function POST(request) {
   if (error?.message === "valid sector and geolocation required" || error?.message === "location required") {
     return reply({ error: "Choisis une commune et un rayon entre 5 et 50 km." }, 422);
   }
-  if (action === "reveal" && (error?.message === "allocation expired or unavailable" || error?.message === "contact no longer eligible")) {
+  if (error?.message === "allocation expired or unavailable" || error?.message === "contact no longer eligible" || error?.message === "phone unavailable") {
     return reply({ error: "Ce contact n’est plus disponible." }, 404);
   }
   if (error?.message === "request not pending") return reply({ error: "La demande du jour ne peut plus être traitée." }, 409);
+  if (error?.message === "daily quota exceeded" || error?.message === "daily quota unavailable") {
+    return reply({ error: "Quota quotidien atteint pour cette catégorie." }, 429);
+  }
   console.error("LeadFactory action failed", { action, code: error?.code });
   return reply({ error: "LeadFactory est temporairement indisponible." }, 503);
 }
