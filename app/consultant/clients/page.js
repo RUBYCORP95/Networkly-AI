@@ -81,10 +81,12 @@ function orderEmailDraft(order, recipient) {
 function OrderControls({ order, clientId, clientEmail, returnFilter }) {
   return <>
     <OrderReceipt order={order} />
-    <p><Link className={styles.crmAction} href={"?" + new URLSearchParams({ client: clientId, view: "history", edit: order.id })}>Modifier le bon</Link></p>
-    <p><a className={styles.crmAction} href={`/api/consultant/orders/${order.id}/pdf`}>Télécharger le PDF</a></p>
-    {clientEmail ? <p><a className={`${styles.crmAction} ${styles.orderEmailAction}`} href={orderEmailDraft(order, clientEmail)}><Mail size={17} aria-hidden="true" /> Envoyer le bon par e-mail</a></p>
-      : <p>Ajoute l’adresse e-mail du client pour préparer l’envoi.</p>}
+    <div className={styles.orderActions}>
+      <Link className={styles.crmAction} href={"?" + new URLSearchParams({ client: clientId, view: "history", edit: order.id })}>Modifier le bon</Link>
+      <a className={styles.crmAction} href={`/api/consultant/orders/${order.id}/pdf`}>Télécharger le PDF</a>
+      {clientEmail && <a className={`${styles.crmAction} ${styles.orderEmailAction}`} href={orderEmailDraft(order, clientEmail)}><Mail size={17} aria-hidden="true" /> Envoyer le bon par e-mail</a>}
+    </div>
+    {!clientEmail && <p>Ajoute l’adresse e-mail du client pour préparer l’envoi.</p>}
     <form action={updateOrder} className={styles.form}>
       <input name="id" type="hidden" value={order.id} />
       {returnFilter && <input name="order_filter" type="hidden" value={returnFilter} />}
