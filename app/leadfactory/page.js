@@ -49,6 +49,10 @@ export default function LeadFactoryPage(){
  useEffect(()=>{
   const details=contactDetails.current;
   if(!contactReveal||!details)return;
+  if(contactReveal.mobile){
+   if(!details.open)details.showModal();
+   return;
+  }
   details.focus({preventScroll:true});
   details.scrollIntoView({block:"nearest",inline:"nearest"});
  },[contactReveal]);
@@ -154,7 +158,7 @@ export default function LeadFactoryPage(){
   setContactRevealBusy(candidate.contact_id);
   try{
    const contact=await consultantAction("claim_"+kind,candidate.contact_id);
-   setContactReveal({name:[contact.first_name,contact.last_name].filter(Boolean).join(" ")||candidate.company,phone:contact.phone,email:contact.email});
+   showContactDetails(contact,candidate.company);
    setState(current=>({...current,revealed:{...current.revealed,[contact.allocation_id]:contact}}));
    setProspectAvailability(current=>current?{...current,results:current.results.filter(item=>item.contact_id!==candidate.contact_id)}:current);
    if(contact.newly_revealed)setUsage(current=>current?{...current,[kind+"_used"]:current[kind+"_used"]+1}:current);
@@ -162,10 +166,20 @@ export default function LeadFactoryPage(){
   }catch(error){setProspectSearchMessage(error.message||"Contact indisponible.");}
   finally{setContactRevealBusy(null);}
  }
+ function showContactDetails(contact,fallbackName){
+  setContactReveal({
+   name:[contact.first_name,contact.last_name].filter(Boolean).join(" ")||fallbackName,
+   phone:contact.phone,
+   email:contact.email,
+   mobile:window.matchMedia("(max-width: 767px)").matches
+  });
+ }
+
  async function reveal(id){
   setBusy(id);
   try{
    const contact=await consultantAction("reveal",id);
+   if(window.matchMedia("(max-width: 767px)").matches)showContactDetails(contact,contact.company);
    setState(s=>({...s,revealed:{...s.revealed,[id]:contact}}));
    if(contact.newly_revealed)setUsage(current=>current?{...current,[contact.kind+"_used"]:current[contact.kind+"_used"]+1}:current);
    await load();
@@ -182,7 +196,17 @@ export default function LeadFactoryPage(){
    <a className={styles.button} href="/demande-consultant">Demander ou suivre mon accès consultant</a>
  </main>;
 
+ const contactContent=contactReveal&&<>
+      <h2 id="leadfactory-contact-details">{contactReveal.name||"Coordonnées du contact"}</h2>
+      {contactReveal.phone&&<p>Téléphone <a href={"tel:"+contactReveal.phone}>{contactReveal.phone}</a></p>}
+      {contactReveal.email&&<p>E-mail <a href={"mailto:"+contactReveal.email}>{contactReveal.email}</a></p>}
+      <button className={styles.buttonSecondary} type="button" onClick={()=>setContactReveal(null)}>Fermer</button>
+ </>;
+
  return <div className={styles.page}>
+  {contactReveal?.mobile&&<dialog ref={contactDetails} aria-labelledby="leadfactory-contact-details" className={styles.panel} onCancel={()=>setContactReveal(null)} style={{position:"fixed",inset:0,margin:"auto",width:"min(420px, calc(100% - 32px))",maxHeight:"calc(100dvh - 32px)",boxSizing:"border-box",overflow:"auto",overflowWrap:"anywhere"}}>
+   {contactContent}
+  </dialog>}
   <a href="/consultant" style={{display:"inline-block",marginBottom:16}}>← Retour à l’espace Consultant</a>
   <div className={styles.hero}>
    <div><div className={styles.eyebrow}>TESAMI · Espace consultant</div><h1>LeadFactory</h1><p>Développe ton réseau local, découvre tes prospects et prépare des prises de contact professionnelles avec les bons outils.</p></div>
@@ -237,11 +261,8 @@ export default function LeadFactoryPage(){
     {!prospectAvailability&&prospectSearchMessage&&<p role="status">{prospectSearchMessage}</p>}
    </div>
    <div className={styles.panel}>
-    {contactReveal&&<section ref={contactDetails} tabIndex={-1} aria-labelledby="leadfactory-contact-details" className={styles.panel} style={{position:"sticky",top:16,zIndex:1,marginBottom:16,overflowWrap:"anywhere"}}>
-      <h2 id="leadfactory-contact-details">{contactReveal.name||"Coordonnées du contact"}</h2>
-      {contactReveal.phone&&<p>Téléphone <a href={"tel:"+contactReveal.phone}>{contactReveal.phone}</a></p>}
-      {contactReveal.email&&<p>E-mail <a href={"mailto:"+contactReveal.email}>{contactReveal.email}</a></p>}
-      <button className={styles.buttonSecondary} type="button" onClick={()=>setContactReveal(null)}>Fermer</button>
+    {contactReveal&&!contactReveal.mobile&&<section ref={contactDetails} tabIndex={-1} aria-labelledby="leadfactory-contact-details" className={styles.panel} style={{position:"sticky",top:16,zIndex:1,marginBottom:16,overflowWrap:"anywhere"}}>
+      {contactContent}
     </section>}
     <h2>🎯 Mes quotas du jour</h2><p className={styles.muted}>Retrouve ici tes quotas et le statut de ta demande quotidienne.</p>
     <div className={styles.quota}><span>Contacts CHOGAN</span><strong>{klaviyo}</strong></div>
