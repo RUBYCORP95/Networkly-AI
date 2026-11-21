@@ -70,15 +70,16 @@ export default function LeadFactoryPage(){
    });
    const status=await response.json();
    if(!response.ok){if(response.status===403){setState(s=>({...s,loading:false,error:"",status:null,cards:[],limited:true}));return;}throw new Error(status.error||"Statut indisponible");}
-   // Le statut principal est disponible même si la liste des contacts est lente.
+   const {data:pref,error:prefError}=await supabase.from("lead_preferences").select("city,radius_km,latitude,longitude").eq("user_id",session.user.id).maybeSingle().abortSignal(AbortSignal.timeout(12000));
+   if(prefError)throw prefError;
+   if(pref){setCityQuery(pref.city||"");setRadius(pref.radius_km||25);if(pref.latitude!=null&&pref.longitude!=null)setSelectedCity({name:pref.city,latitude:pref.latitude,longitude:pref.longitude});}
+   // Le secteur est prêt avant d'afficher les commandes.
    setState(s=>({...s,loading:false,error:"",status,cards:s.cards,limited:false}));
    const {data:cards,error}=await Promise.race([
      supabase.rpc("my_lead_allocation_cards"),
      new Promise((_,reject)=>setTimeout(()=>reject(new Error("Le chargement des contacts prend trop de temps. Réessaie.")),12000))
    ]);
    if(error)throw error;
-   const {data:pref}=await supabase.from("lead_preferences").select("city,radius_km,latitude,longitude").eq("user_id",session.user.id).maybeSingle().abortSignal(AbortSignal.timeout(12000));
-   if(pref){setCityQuery(pref.city||"");setRadius(pref.radius_km||25);if(pref.latitude!=null&&pref.longitude!=null)setSelectedCity({name:pref.city,latitude:pref.latitude,longitude:pref.longitude});}
    setState(s=>({...s,loading:false,error:"",status,cards:cards||[],limited:false}));
   }catch(e){setState(s=>({...s,loading:false,error:e.name==="TimeoutError"?"Le chargement prend trop de temps. Réessaie.":e.message||"Erreur de chargement"}));}
  },[]);
