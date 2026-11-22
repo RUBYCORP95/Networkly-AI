@@ -1,5 +1,5 @@
 import { requireConsultant } from "../../../../lib/auth/consultant";
-import { invoiceAccount, invoiceIssuer, invoicePeriod, maxInvoiceBytes, uuid } from "../../../../lib/crm/invoice-archive.mjs";
+import { invoiceAccount, invoiceIssuer, invoiceNature, invoicePeriod, maxInvoiceBytes, uuid } from "../../../../lib/crm/invoice-archive.mjs";
 import { exportInvoicePage } from "../../../../lib/crm/invoice-data";
 import { invoiceMessages, inspectImportedInvoice, storeImportedInvoice, suggestInvoiceAccount } from "../../../../lib/crm/invoice-import";
 import { streamInvoiceZip } from "../../../../lib/crm/invoice-zip.mjs";
@@ -33,17 +33,29 @@ export async function POST(request) {
         return code === "saved" ? Response.json({ code }, { status: 201 }) : failed(code);
       }
       case "suggest":
-        return Response.json({ account: await suggestInvoiceAccount(db, owner, form.get("issuer_name")) });
+        return Response.json({ account: await suggestInvoiceAccount(db, owner, form.get("issuer_name"), invoiceNature(form.get("document_nature"))) });
+      case "nature_accounts": {
+        const rawSubscription = form.get("subscription_account");
+        const rawEquipment = form.get("equipment_account");
+        const subscription_account = invoiceAccount(rawSubscription);
+        const equipment_account = invoiceAccount(rawEquipment);
+        if ((rawSubscription && !subscription_account) || (rawEquipment && !equipment_account)) return failed("metadata");
+        const { error } = await db.from("crm_invoice_nature_accounts").upsert({ subscription_account, equipment_account },
+          { onConflict: "owner_id" });
+        return error ? failed("error") : Response.json({ code: "saved" });
+      }
       case "classify": {
         const id = form.get("id");
         const rawIssuer = form.get("issuer_name");
         const rawAccount = form.get("account_number");
+        const rawNature = form.get("document_nature");
+        const document_nature = invoiceNature(rawNature);
         const issuer_name = invoiceIssuer(rawIssuer);
         const account_number = invoiceAccount(rawAccount);
-        if (typeof id !== "string" || !uuid.test(id) || (rawIssuer && !issuer_name) || (rawAccount && !account_number)) {
+        if (typeof id !== "string" || !uuid.test(id) || (rawIssuer && !issuer_name) || (rawAccount && !account_number) || (rawNature && !document_nature)) {
           return failed("metadata");
         }
-        const { data, error } = await db.from("crm_client_invoices").update({ issuer_name, account_number })
+        const { data, error } = await db.from("crm_client_invoices").update({ issuer_name, account_number, ...(rawNature !== null ? { document_nature } : {}) })
           .eq("owner_id", owner).eq("id", id).select("id").maybeSingle();
         if (error) return failed(error.code === "23505" ? "duplicate" : "error");
         return data ? Response.json({ code: "saved" }) : failed("missing");

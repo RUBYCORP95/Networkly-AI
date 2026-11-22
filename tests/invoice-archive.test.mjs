@@ -75,3 +75,11 @@ test("uploads for the same issuer retain selection order", () => {
   const items = [{ issuer: "Maison Exemple" }, { issuer: "Autre SAS" }, { issuer: " MAISON   EXEMPLE " }];
   assert.deepEqual(invoiceUploadGroups(items), [[items[0], items[2]], [items[1]]]);
 });
+
+test("invoice content recognises subscriptions and equipment without guessing on mixed bills", () => {
+  assert.equal(parseInvoiceText("Offre Premium\nAbonnement annuel du 1 janvier au 31 décembre").nature, "subscription");
+  assert.equal(parseInvoiceText("Désignation : Ordinateur portable – 14 pouces").nature, "equipment");
+  assert.equal(parseInvoiceText("Ligne 1 : imprimante\nLigne 2 : abonnement mensuel").nature, null);
+  assert.equal(parseInvoiceText("Ligne 1 : imprimante\nLigne 2 : abonnement mensuel").natureAmbiguous, true);
+  assert.equal(parseInvoiceText("Prestation de conseil\nConditions générales de votre abonnement").nature, null);
+});
