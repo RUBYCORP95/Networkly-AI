@@ -32,6 +32,10 @@ async function consultantAction(action,allocationId){
  return data;
 }
 
+function LeadKindBadge({ kind }) {
+ return <span className={styles.kindBadge}>{kind==="klaviyo"?"Client CHOGAN":"Prospect professionnel"}</span>;
+}
+
 function LeadConversion({ card, busy, onConvert }) {
  if(!card)return null;
  if(card.client_id)return <p><strong>Converti en client</strong>{" · "}
@@ -288,11 +292,11 @@ export default function LeadFactoryPage(){
   {state.error&&<div className={styles.alert} role="alert"><p>{state.error}</p><button type="button" className={styles.button} onClick={load}>Réessayer le chargement</button>{state.error.includes("Connecte-toi")&&<a className={styles.loginLink} href="/login?next=%2Fleadfactory">Se connecter à TESAMI</a>}</div>}
   {state.limited&&<div className={styles.betaNotice} role="status"><strong>Bienvenue dans la bêta publique !</strong><p>Tu peux tester gratuitement les dix contacts fictifs, les conseils de prospection et l’interface. Les vrais contacts CHOGAN et professionnels ne sont pas accessibles aux comptes bêta non autorisés.</p><a href="/login?next=%2Fleadfactory">Gérer mon compte</a></div>}
   {(s||state.limited)&&<div className={styles.layout}>
-   <div className={styles.panel}>
+   <div className={styles.panel+" "+styles.sectorPanel} data-lead-kind={sectorTab}>
     <h2>📍 Choisir mon secteur</h2><p className={styles.muted}>Choisis une commune et un rayon pour retrouver tes prospects professionnels et tes contacts clients CHOGAN au même endroit. Les contacts non attribués restent privés.</p>
     <div role="tablist" aria-label="Type de prospects" className={styles.sectorTabs}>
-      <button type="button" role="tab" aria-selected={sectorTab==="professional"} className={sectorTab==="professional"?styles.button:styles.buttonSecondary} onClick={()=>setSectorTab("professional")}>🏢 Prospects professionnels</button>
-      <button type="button" role="tab" aria-selected={sectorTab==="klaviyo"} className={sectorTab==="klaviyo"?styles.button:styles.buttonSecondary} onClick={()=>setSectorTab("klaviyo")}>👤 Clients CHOGAN</button>
+      <button type="button" role="tab" aria-selected={sectorTab==="professional"} className={styles.sectorTab+" "+styles.buttonSecondary} data-lead-kind="professional" onClick={()=>setSectorTab("professional")}>🏢 Prospects professionnels</button>
+      <button type="button" role="tab" aria-selected={sectorTab==="klaviyo"} className={styles.sectorTab+" "+styles.buttonSecondary} data-lead-kind="klaviyo" onClick={()=>setSectorTab("klaviyo")}>👤 Clients CHOGAN</button>
     </div>
     <p className={styles.muted}>{sectorTab==="professional"?"Recherche des professionnels dans le rayon sélectionné.":"Recherche des clients CHOGAN dans le rayon sélectionné. Le premier affichage d’un numéro compte dans ton quota."}</p>
     <label className={styles.label} htmlFor="lf-city">Ville ou code postal</label>
@@ -310,7 +314,8 @@ export default function LeadFactoryPage(){
       <h3>Résultats de recherche</h3>
       <p role="status">{quotaReached?"Quota atteint pour aujourd’hui. Revenez demain.":prospectSearchMessage}</p>
       <div className={styles.cards}>
-        {prospectAvailability.results.map(candidate=><article className={styles.leadCard} key={candidate.contact_id}>
+        {prospectAvailability.results.map(candidate=><article className={styles.leadCard} data-lead-kind={sectorTab} key={candidate.contact_id}>
+          <LeadKindBadge kind={sectorTab} />
           <h3>{candidate.company||(sectorTab==="klaviyo"?"Client potentiel CHOGAN":"Prospect professionnel")}</h3>
           <p>{[candidate.city,candidate.department].filter(Boolean).join(" · ")} · {candidate.distance_km.toFixed(1)} km</p>
           <button type="button" className={styles.button} disabled={quotaReached||!!contactRevealBusy||busy!==null} onClick={()=>claimCandidate(candidate,sectorTab)}>{contactRevealBusy===candidate.contact_id?"Ouverture…":"Contacter"}</button>
@@ -334,7 +339,8 @@ export default function LeadFactoryPage(){
   <div id="lf-my-prospects" className={styles.sectionHeading}><h2>{sectorTab==="klaviyo"?"Mes clients CHOGAN attribués":"Mes prospects professionnels attribués"}</h2><button className={styles.buttonSecondary} onClick={()=>setAdviceOpen(v=>!v)}>{adviceOpen?"Masquer les conseils":"💬 Conseils pour contacter un pro"}</button></div>
   {s&&<p><a href="/consultant/rendez-vous#nouveau" className={styles.buttonSecondary}>Planifier un rendez-vous</a></p>}
   {s&&(assignedCards.length>0?<div className={styles.cards}>
-    {assignedCards.map(card=><article key={card.allocation_id} className={styles.leadCard}>
+    {assignedCards.map(card=><article key={card.allocation_id} className={styles.leadCard} data-lead-kind={card.contact_kind}>
+      <LeadKindBadge kind={card.contact_kind} />
       <h3>{card.display_name||card.company||(card.contact_kind==="klaviyo"?"Contact CHOGAN":"Prospect professionnel")}</h3>
       <p>{[card.city,card.department].filter(Boolean).join(" · ")||"Localisation non renseignée"}</p>
       {!card.contact_revealed&&<button type="button" className={styles.buttonSecondary}
@@ -354,7 +360,8 @@ export default function LeadFactoryPage(){
   {archivedCards.length>0&&<details className={styles.panel}>
     <summary>Prospects archivés ({archivedCards.length})</summary>
     <ul>
-     {archivedCards.map(card=><li className={styles.leadCard} key={card.allocation_id}>
+     {archivedCards.map(card=><li className={styles.leadCard} data-lead-kind={card.contact_kind} key={card.allocation_id}>
+       <LeadKindBadge kind={card.contact_kind} />
        <strong>{card.display_name||(card.contact_kind==="klaviyo"?"Client CHOGAN":"Prospect professionnel")}</strong>
        {card.city&&<p>{card.city}</p>}
        {card.client_id&&<LeadConversion card={card} busy={converting} onConvert={convertLead} />}
@@ -363,7 +370,7 @@ export default function LeadFactoryPage(){
     </ul>
   </details>}
   {adviceOpen&&<div id="leadfactory-advice" className={styles.advice}><h2>Comment démarrer la discussion ?</h2><p className={styles.muted}>Sélectionne une approche et personnalise le texte selon l’activité du professionnel.</p><div className={styles.adviceTabs}>{Object.entries(adviceTemplates).map(([key,item])=><button key={key} className={adviceType===key?styles.tab+" "+styles.tabActive:styles.tab} onClick={()=>{setAdviceType(key);setAdviceCopied(false);}} aria-pressed={adviceType===key}>{item.title}</button>)}</div><h3>{currentAdvice.title}</h3><p>{currentAdvice.tip}</p><div className={styles.script}>{currentAdvice.message}</div><div style={{marginTop:14}}><button className={styles.button} onClick={async()=>{try{await navigator.clipboard.writeText(currentAdvice.message);setAdviceCopied(true);}catch{setAdviceCopied(false);}}}>{adviceCopied?"Message copié !":"Copier le message"}</button></div><p className={styles.footnote}>Respecte les règles de prospection professionnelle, les refus et les demandes d’opposition. Ne promets pas de revenus.</p></div>}
-  {demo&&<div className={styles.demoPanel} role="region" aria-label="Démonstration avec prospects fictifs"><strong>🧪 Simulation bêta — données 100 % fictives</strong><p>Voici un aperçu de cinq contacts clients CHOGAN et cinq prospects professionnels. Aucun vrai contact n’est attribué, aucun quota n’est consommé et aucune coordonnée personnelle n’est révélée.</p><div className={styles.demoGrid}>{Array.from({length:10},(_,i)=><div className={styles.demoItem} key={i}><strong>{i<5?"Client CHOGAN":"Professionnel"} · Démo {i%5+1}</strong><span>{i<5?"Panier abandonné fictif":"Entreprise fictive"} · Exemple uniquement</span><button className={styles.buttonSecondary} type="button" onClick={()=>{setAdviceOpen(true);setAdviceType(i<5?"products":"partnership");setAdviceCopied(false);}}>Préparer un message</button></div>)}</div></div>}
+  {demo&&<div className={styles.demoPanel} role="region" aria-label="Démonstration avec prospects fictifs"><strong>🧪 Simulation bêta — données 100 % fictives</strong><p>Voici un aperçu de cinq contacts clients CHOGAN et cinq prospects professionnels. Aucun vrai contact n’est attribué, aucun quota n’est consommé et aucune coordonnée personnelle n’est révélée.</p><div className={styles.demoGrid}>{Array.from({length:10},(_,i)=><div className={styles.demoItem} data-lead-kind={i<5?"klaviyo":"professional"} key={i}><LeadKindBadge kind={i<5?"klaviyo":"professional"} /><strong>Démo {i%5+1}</strong><span>{i<5?"Panier abandonné fictif":"Entreprise fictive"} · Exemple uniquement</span><button className={styles.buttonSecondary} type="button" onClick={()=>{setAdviceOpen(true);setAdviceType(i<5?"products":"partnership");setAdviceCopied(false);}}>Préparer un message</button></div>)}</div></div>}
 
 
  </div>;

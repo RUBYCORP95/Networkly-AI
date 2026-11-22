@@ -64,3 +64,82 @@ a.button, a.buttonSecondary {
 @media (max-width: 360px) {
   .page > .stats { grid-template-columns: minmax(0, 1fr) !important; }
 }
+
+.page [data-lead-kind="professional"] {
+  --lead-surface: #fff9e6;
+  --lead-badge: #ffedb2;
+  --lead-border: #d2aa42;
+  --lead-accent: #987013;
+  --lead-ink: #573b08;
+}
+
+.page [data-lead-kind="klaviyo"] {
+  --lead-surface: #f0f7ff;
+  --lead-badge: #dcecff;
+  --lead-border: #92b6e4;
+  --lead-accent: #3465a2;
+  --lead-ink: #173f74;
+}
+
+.page .sectorPanel,
+.page .leadCard,
+.page .demoItem {
+  background: var(--lead-surface, white);
+  border-color: var(--lead-border, #e6e2ef);
+}
+
+.page .sectorPanel {
+  border-width: 2px;
+  border-color: var(--lead-accent);
+}
+
+.page .sectorPanel .input {
+  border-color: var(--lead-accent);
+}
+
+.page .sectorPanel .range {
+  accent-color: var(--lead-accent);
+}
+
+.page .sectorPanel .rangeLabels {
+  color: var(--lead-ink);
+}
+
+.page .sectorPanel .input:focus,
+.page .sectorPanel .range:focus-visible,
+.page .sectorTab:focus-visible {
+  outline: 2px solid var(--lead-accent);
+  outline-offset: 2px;
+}
+
+.page .sectorTab {
+  background: white;
+  border-color: var(--lead-accent);
+  color: var(--lead-ink);
+}
+
+.page .sectorTab[aria-selected="true"] {
+  background: var(--lead-badge);
+  box-shadow: inset 0 -2px var(--lead-accent);
+}
+
+.page .kindBadge {
+  display: inline-block;
+  max-width: 100%;
+  margin: 0 0 8px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--lead-badge, #f7f4ff);
+  color: var(--lead-ink, #412895);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.demoItem .kindBadge {
+  margin-bottom: 0;
+}
+
+.leadCard > .kindBadge + strong {
+  display: block;
+}
