@@ -35,6 +35,11 @@ function sessionUrl(kind, id, order) {
   return root + "?" + params;
 }
 
+function closingShipping(session, mode) {
+  const rate = mode === "grouped" ? session.grouped_shipping_cents : session.individual_shipping_cents;
+  return formatEuros(rate ?? session.shipping_cents);
+}
+
 function SessionForm({ kind, session, today, clients }) {
   const isCase = kind === "case";
   return <form action={saveHost} className={styles.form}>
@@ -55,6 +60,15 @@ function SessionForm({ kind, session, today, clients }) {
       <label>Adresse de livraison chez l’hôte (si différente du lieu)
         <textarea name="delivery_address" maxLength={500} defaultValue={session?.delivery_address ?? ""} rows={2} />
       </label>
+      <label>Prix par bon livré chez l’hôte (€)
+        <input name="grouped_shipping" inputMode="decimal" required
+          defaultValue={((session?.grouped_shipping_cents ?? (session?.delivery_mode === "grouped" ? session.shipping_cents : 0)) / 100).toFixed(2)} />
+        <small>Indique 0 € pour proposer la livraison gratuite chez l’hôte.</small>
+      </label>
+      <label>Prix par bon livré chez le client (€)
+        <input name="individual_shipping" inputMode="decimal" required
+          defaultValue={((session?.individual_shipping_cents ?? session?.shipping_cents ?? 0) / 100).toFixed(2)} />
+      </label>
       <label>Invités (un par ligne)<textarea name="guests" maxLength={4000} defaultValue={session?.guests} rows={3} /></label>
     </>}
     <label>Statut<select name="status" defaultValue={session?.status ?? "planned"}>
@@ -62,8 +76,8 @@ function SessionForm({ kind, session, today, clients }) {
         .filter(([value]) => isCase || value !== "closed" || session?.status === "closed")
         .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
     </select></label>
-    <label>Livraison par commande (€)<input name="shipping" inputMode="decimal"
-      defaultValue={session ? (session.shipping_cents / 100).toFixed(2) : "0,00"} /></label>
+    {isCase && <label>Livraison par commande (€)<input name="shipping" inputMode="decimal"
+      defaultValue={session ? (session.shipping_cents / 100).toFixed(2) : "0,00"} /></label>}
     <button>{session ? "Enregistrer la session" : "Créer la session"}</button>
   </form>;
 }
@@ -96,7 +110,7 @@ export default async function HostsPage({ searchParams }) {
     db.from("crm_clients").select("id,name").order("name").order("id"),
   ]);
   const { data: session } = id ? await db.from("crm_host_sessions")
-    .select("id,kind,host_name,host_client_id,starts_on,ends_on,venue,guests,status,shipping_cents,delivery_mode,delivery_address,order_token,tracking_token").eq("id", id).eq("kind", kind).maybeSingle() : {};
+    .select("id,kind,host_name,host_client_id,starts_on,ends_on,venue,guests,status,shipping_cents,grouped_shipping_cents,individual_shipping_cents,delivery_mode,delivery_address,order_token,tracking_token").eq("id", id).eq("kind", kind).maybeSingle() : {};
   const [sales, gifts, orders, linkedOrders, affiliates] = session ? await Promise.all([
     db.from("crm_host_sales").select("paid_orders,paid_cents").eq("session_id", id).maybeSingle(),
     db.from("crm_host_gifts").select("id,label,threshold_cents,delivered_at").eq("session_id", id).order("threshold_cents"),
@@ -191,9 +205,11 @@ export default async function HostsPage({ searchParams }) {
         {!canClose && <p>Valide chaque bon rattaché pour pouvoir clôturer la réunion.</p>}
         <form className={styles.form} action={closeMeeting}>
           <input type="hidden" name="session_id" value={session.id} />
+          <p>Le tarif choisi sera appliqué aux bons à payer plus tard. Les montants déjà payés sont conservés.</p>
           <label>Mode de livraison final<select name="delivery_mode" defaultValue={session.delivery_mode ?? ""} required>
             <option value="" disabled>Choisir le mode de livraison</option>
-            {Object.entries(meetingDeliveryModes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            {Object.entries(meetingDeliveryModes).map(([value, label]) =>
+              <option key={value} value={value}>{label} · {closingShipping(session, value)} par bon</option>)}
           </select></label>
           <label>Adresse de livraison chez l’hôte (si différente du lieu)
             <textarea name="delivery_address" maxLength={500} rows={2} defaultValue={session.delivery_address ?? ""} />

@@ -45,12 +45,15 @@ export async function saveHost(form) {
   const guests = kind === "meeting" ? field(form, "guests") : null;
   const status = field(form, "status");
   const shipping_cents = parseCents(field(form, "shipping")) ?? 0;
+  const grouped_shipping_cents = kind === "meeting" ? parseCents(field(form, "grouped_shipping")) ?? 0 : null;
+  const individual_shipping_cents = kind === "meeting" ? parseCents(field(form, "individual_shipping")) ?? 0 : null;
   if (!host_name || host_name.length > 120 || !isDate(starts_on) || !Object.hasOwn(hostStatuses, status) ||
       !Number.isInteger(shipping_cents) || (kind === "case" && (!isDate(ends_on) || ends_on < starts_on)) ||
-      (kind === "meeting" && (!venue || venue.length > 240 || guests.length > 4000 || !Object.hasOwn(meetingDeliveryModes, delivery_mode))) ||
+      (kind === "meeting" && (!venue || venue.length > 240 || guests.length > 4000 || !Object.hasOwn(meetingDeliveryModes, delivery_mode) ||
+        !Number.isInteger(grouped_shipping_cents) || !Number.isInteger(individual_shipping_cents))) ||
       (delivery_address && (delivery_address.length < 5 || delivery_address.length > 500))) finish(kind, existing?.id, "invalid");
   if (kind === "meeting" && status === "closed" && existing?.status !== "closed") finish(kind, id, "review-required");
-  const values = { host_client_id, host_name, starts_on, ends_on, venue, guests, status, shipping_cents, delivery_mode, delivery_address };
+  const values = { host_client_id, host_name, starts_on, ends_on, venue, guests, status, shipping_cents, delivery_mode, delivery_address, grouped_shipping_cents, individual_shipping_cents };
   const table = db.from("crm_host_sessions");
   const query = existing ? table.update(values).eq("id", id).eq("owner_id", owner) : table.insert({ ...values, kind });
   const { data, error } = await query.select("id").single();
