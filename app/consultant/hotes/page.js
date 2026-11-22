@@ -29,12 +29,16 @@ function sessionUrl(kind, id, order) {
   return root + "?" + params;
 }
 
-function SessionForm({ kind, session, today }) {
+function SessionForm({ kind, session, today, clients }) {
   const isCase = kind === "case";
   return <form action={saveHost} className={styles.form}>
     <input type="hidden" name="kind" value={kind} />
     {session && <input type="hidden" name="session_id" value={session.id} />}
     <label>Nom de l’hôte ou de l’hôtesse<input name="host_name" maxLength={120} defaultValue={session?.host_name} required /></label>
+    <label>Fiche client de l’hôte (facultative)<select name="host_client_id" defaultValue={session?.host_client_id ?? ""}>
+      <option value="">Aucune fiche liée</option>
+      {clients.map(client => <option key={client.id} value={client.id}>{client.name}</option>)}
+    </select></label>
     <label>{isCase ? "Date de remise" : "Date de la réunion"}<input name="starts_on" type="date" defaultValue={session?.starts_on ?? today} required /></label>
     {isCase ? <label>Date de retour<input name="ends_on" type="date" defaultValue={session?.ends_on} required /></label> : <>
       <label>Lieu<input name="venue" maxLength={240} defaultValue={session?.venue} required /></label>
@@ -71,19 +75,21 @@ export default async function HostsPage({ searchParams }) {
   const id = typeof query.session === "string" && hostUuid.test(query.session) ? query.session : null;
   const db = await createServerSupabase();
   const today = parisDate();
-  const [sessions, seller] = await Promise.all([
+  const [sessions, seller, clients] = await Promise.all([
     db.from("crm_host_sessions").select("id,kind,host_name,starts_on,status").eq("kind", kind).order("starts_on", { ascending: false }).order("id"),
     db.from("crm_seller_profiles").select("name").maybeSingle(),
+    db.from("crm_clients").select("id,name").order("name").order("id"),
   ]);
   const { data: session } = id ? await db.from("crm_host_sessions")
-    .select("id,kind,host_name,starts_on,ends_on,venue,guests,status,shipping_cents,order_token,tracking_token").eq("id", id).eq("kind", kind).maybeSingle() : {};
-  const [sales, gifts, orders, linkedOrders] = session ? await Promise.all([
+    .select("id,kind,host_name,host_client_id,starts_on,ends_on,venue,guests,status,shipping_cents,order_token,tracking_token").eq("id", id).eq("kind", kind).maybeSingle() : {};
+  const [sales, gifts, orders, linkedOrders, affiliates] = session ? await Promise.all([
     db.from("crm_host_sales").select("paid_orders,paid_cents").eq("session_id", id).maybeSingle(),
     db.from("crm_host_gifts").select("id,label,threshold_cents,delivered_at").eq("session_id", id).order("threshold_cents"),
     (order ? db.from("crm_orders").select("id,order_date,total_cents,shipping_cents").eq("id", order).is("host_session_id", null)
       : db.from("crm_orders").select("id,order_date,total_cents,shipping_cents").is("host_session_id", null).order("order_date", { ascending: false }).limit(30)),
     db.from("crm_orders").select("id,client_id,order_date,total_cents,shipping_cents,status,payment_status")
       .eq("host_session_id", id).order("order_date", { ascending: false }).order("id").limit(30),
+    db.from("crm_host_clients").select("client_id,crm_clients(name)", { count: "exact" }).eq("session_id", id).order("client_id").limit(30),
   ]) : [];
 
   return <main className={styles.page}>
@@ -108,16 +114,25 @@ export default async function HostsPage({ searchParams }) {
         </li>)}</ul>}
       <details open={!session && !order} className={styles.panel}>
         <summary>Créer une session</summary>
-        <SessionForm kind={kind} today={today} />
+        <SessionForm kind={kind} today={today} clients={clients.data ?? []} />
       </details>
     </section>
     {id && !session && <p role="alert">Cette session est introuvable.</p>}
     {session && <>
       <section className={styles.panel}>
         <h2>{session.host_name}</h2>
-        <SessionForm key={session.id} kind={kind} session={session} today={today} />
+        <SessionForm key={session.id} kind={kind} session={session} today={today} clients={clients.data ?? []} />
         <p>Commandes {seller.data && hostLinkActive(session, today) ? "ouvertes" : "fermées"}.</p>
         <HostLinks key={session.id} orderPath={"/hote/commande/" + session.order_token} trackingPath={"/hote/suivi/" + session.tracking_token} />
+      </section>
+      <section className={styles.panel}>
+        <h2>Clients rattachés à cette session</h2>
+        {affiliates.error ? <p role="alert">Le suivi des clients est temporairement indisponible.</p> :
+          affiliates.count ? <><p>{affiliates.count} client(s) rattaché(s)</p><ul className={styles.trips}>
+            {affiliates.data.map(client => <li key={client.client_id}><Link href={"/consultant/clients?client=" + client.client_id}>
+              {client.crm_clients?.name ?? "Fiche client"}
+            </Link></li>)}
+          </ul></> : <p>Aucun client rattaché pour le moment.</p>}
       </section>
       <ExistingOrders session={session} orders={orders.data} />
       <section className={styles.panel}>

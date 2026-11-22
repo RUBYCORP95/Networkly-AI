@@ -34,6 +34,8 @@ export async function saveHost(form) {
   const existing = id ? await ownedSession(db, owner, id) : null;
   const kind = existing?.kind ?? field(form, "kind");
   if ((id && !existing) || !Object.hasOwn(hostKinds, kind)) finish("meeting", null, "invalid");
+  const host_client_id = field(form, "host_client_id") || null;
+  if (host_client_id && !hostUuid.test(host_client_id)) finish(kind, existing?.id, "invalid");
   const host_name = field(form, "host_name");
   const starts_on = field(form, "starts_on");
   const ends_on = kind === "case" ? field(form, "ends_on") : null;
@@ -44,7 +46,7 @@ export async function saveHost(form) {
   if (!host_name || host_name.length > 120 || !isDate(starts_on) || !Object.hasOwn(hostStatuses, status) ||
       !Number.isInteger(shipping_cents) || (kind === "case" && (!isDate(ends_on) || ends_on < starts_on)) ||
       (kind === "meeting" && (!venue || venue.length > 240 || guests.length > 4000))) finish(kind, existing?.id, "invalid");
-  const values = { host_name, starts_on, ends_on, venue, guests, status, shipping_cents };
+  const values = { host_client_id, host_name, starts_on, ends_on, venue, guests, status, shipping_cents };
   const table = db.from("crm_host_sessions");
   const query = existing ? table.update(values).eq("id", id).eq("owner_id", owner) : table.insert({ ...values, kind });
   const { data, error } = await query.select("id").single();

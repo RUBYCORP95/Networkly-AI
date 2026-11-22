@@ -10,6 +10,7 @@ import OrderReceipt from "./OrderReceipt";
 import ShareOrder from "./ShareOrder";
 import ShareRegistration from "./ShareRegistration";
 import { publicPaymentLinks } from "../../../lib/crm/payment-links.mjs";
+import CustomerAccountLink from "./CustomerAccountLink";
 import PaymentLinksForm from "./PaymentLinksForm";
 import OrderForm from "./OrderForm";
 import InvoiceUpload from "./InvoiceUpload";
@@ -250,12 +251,13 @@ export default async function ClientsPage({ searchParams }) {
   const today = parisDate();
   const db = await createServerSupabase();
   if (params.view === "orders") return <AllOrders db={db} params={params} />;
-  const [customers, seller, reminders, activeFollowups, orderCount] = await Promise.all([
+  const [customers, seller, reminders, activeFollowups, orderCount, customerInvite] = await Promise.all([
     db.from("crm_clients").select("id,name,email,phone,birth_date,birthday_notification", { count: "exact" }).order("name").order("id"),
     db.from("crm_seller_profiles").select("name,business,email,phone,address,registration,payment_links").maybeSingle(),
     db.from("crm_followups").select("id,client_id,due_date,notification,completed_at").order("due_date"),
     db.from("crm_followups").select("id", { count: "exact", head: true }).is("completed_at", null),
     db.from("crm_orders").select("id", { count: "exact", head: true }),
+    db.from("crm_customer_invites").select("token").maybeSingle(),
   ]);
   const clients = customers.data ?? [];
   const names = new Map(clients.map(customer => [customer.id, customer.name]));
@@ -295,6 +297,10 @@ export default async function ClientsPage({ searchParams }) {
     customers.error || (!history && !invoices && reminders.error) ? <p role="alert">Le CRM est temporairement indisponible.</p> : <>
       {dueNotifications > 0 && <p className={styles.notice} role="status">{dueNotifications} notification(s) TESAMI à consulter.</p>}
       {!selected && <>
+        {customerInvite.data?.token && <section className={styles.panel}>
+          <h2>Inviter des clients</h2><p>Partage le formulaire de fiche client ou le lien de commande directe. Les commandes suivantes se rattachent à la fiche dans ton CRM.</p>
+          <CustomerAccountLink token={customerInvite.data.token} />
+        </section>}
         <dl className={styles.crmStats}>
           {stats.map(([Icon, label, count]) => <div className={styles.crmStat} key={label}>
             <span className={styles.crmAvatar} aria-hidden="true"><Icon size={19} /></span>
