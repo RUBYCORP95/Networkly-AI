@@ -12,10 +12,35 @@ const base = { id: "00000000-0000-0000-0000-000000000001", sale_date: "2026-11-1
   invoice_id: "linked", invoice_name: "Bon.pdf" };
 
 test("periods keep Paris calendar dates and correctly cross year boundaries", () => {
-  assert.equal(financePeriod({ period: "month", year: "2025", month: "12" }, today).end, "2026-01-01");
+  assert.equal(financePeriod({ period: "month", year: "2025", month: "12" }, today).to, "2025-12-31");
   assert.equal(financePeriod({ period: "quarter", quarter: "4" }, today).start, "2026-10-01");
-  assert.equal(financePeriod({ period: "year" }, today).end, "2027-01-01");
+  assert.equal(financePeriod({ period: "year" }, today).to, "2026-12-31");
   assert.equal(financePeriod({ period: ["month"], year: ["2025"] }, today).year, 2026);
+});
+
+test("custom dates default to the current month to date and keep both boundaries", () => {
+  assert.equal(period.type, "range");
+  assert.equal(period.label, "du 01/11/26 au 22/11/26");
+  const leapDay = financePeriod({ period: "range", from: "2024-02-29", to: "2024-02-29" }, today);
+  assert.equal(leapDay.start, leapDay.to);
+  assert.equal(leapDay.query, "period=range&from=2024-02-29&to=2024-02-29");
+  for (const [from, to] of [["2026-03-01", "2026-02-28"], ["2025-02-29", "2025-03-02"], ["2025-02-28", ""]]) {
+    assert.equal(financePeriod({ period: "range", from, to }, today).invalid, true);
+  }
+});
+
+test("chart groups respect custom boundaries across months and years", () => {
+  const range = (from, to) => financePeriod({ period: "range", from, to }, today);
+  const sale = date => ({ ...base, sale_date: date });
+  const weekly = financeReport(range("2025-12-28", "2026-01-10"), [sale("2025-12-28"), sale("2026-01-10")], []);
+  assert.deepEqual(weekly.buckets.map(({ key, revenue }) => [key, revenue]),
+    [["2025-12-28", 12500], ["2026-01-04", 12500]]);
+  const monthly = financeReport(range("2025-11-20", "2026-02-02"), [sale("2026-02-02")], []);
+  assert.deepEqual(monthly.buckets.map(({ key }) => key), ["2025-11", "2025-12", "2026-01", "2026-02"]);
+  assert.equal(monthly.buckets.at(-1).revenue, 12500);
+  const yearly = financeReport(range("2000-01-01", "2026-11-22"), [sale("2026-11-22")], []);
+  assert.ok(yearly.buckets.length <= 12);
+  assert.equal(yearly.buckets.at(-1).revenue, 12500);
 });
 
 test("linked invoices count once and unknown costs keep the result provisional", () => {
