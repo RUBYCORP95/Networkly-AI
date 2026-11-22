@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { formatDate, parisDate } from "../../../lib/crm/dates.mjs";
-import { hostCaseStatuses, hostKinds, hostLinkActive, hostStatuses, hostUuid } from "../../../lib/crm/hosts.mjs";
+import { hostCaseStatuses, hostKinds, hostLinkActive, hostStatuses, hostUuid, meetingDeliveryModes } from "../../../lib/crm/hosts.mjs";
 import { formatEuros } from "../../../lib/crm/money.mjs";
 import { orderStatuses, paymentStatuses, receiptNumber } from "../../../lib/crm/order-receipt.mjs";
 import styles from "../consultant.module.css";
@@ -16,6 +16,7 @@ const root = "/consultant/hotes";
 const notices = {
   saved: "Enregistré.",
   invalid: "Vérifie les champs renseignés et les dates.",
+  "delivery-locked": "Le mode de livraison est déjà associé aux bons de cette réunion.",
   error: "L’enregistrement a échoué. Réessaie dans un instant.",
   "duplicate-gift": "Un cadeau est déjà configuré pour ce palier.",
   threshold: "Le chiffre d’affaires validé ne suffit pas encore pour remettre ce cadeau.",
@@ -42,6 +43,13 @@ function SessionForm({ kind, session, today, clients }) {
     <label>{isCase ? "Date de remise" : "Date de la réunion"}<input name="starts_on" type="date" defaultValue={session?.starts_on ?? today} required /></label>
     {isCase ? <label>Date de retour<input name="ends_on" type="date" defaultValue={session?.ends_on} required /></label> : <>
       <label>Lieu<input name="venue" maxLength={240} defaultValue={session?.venue} required /></label>
+      <label>Mode de livraison<select name="delivery_mode" defaultValue={session?.delivery_mode ?? ""} required>
+        <option value="" disabled>Choisir le mode de livraison</option>
+        {Object.entries(meetingDeliveryModes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select></label>
+      <label>Adresse de livraison chez l’hôte (si différente du lieu)
+        <textarea name="delivery_address" maxLength={500} defaultValue={session?.delivery_address ?? ""} rows={2} />
+      </label>
       <label>Invités (un par ligne)<textarea name="guests" maxLength={4000} defaultValue={session?.guests} rows={3} /></label>
     </>}
     <label>Statut<select name="status" defaultValue={session?.status ?? "planned"}>
@@ -81,13 +89,13 @@ export default async function HostsPage({ searchParams }) {
     db.from("crm_clients").select("id,name").order("name").order("id"),
   ]);
   const { data: session } = id ? await db.from("crm_host_sessions")
-    .select("id,kind,host_name,host_client_id,starts_on,ends_on,venue,guests,status,shipping_cents,order_token,tracking_token").eq("id", id).eq("kind", kind).maybeSingle() : {};
+    .select("id,kind,host_name,host_client_id,starts_on,ends_on,venue,guests,status,shipping_cents,delivery_mode,delivery_address,order_token,tracking_token").eq("id", id).eq("kind", kind).maybeSingle() : {};
   const [sales, gifts, orders, linkedOrders, affiliates] = session ? await Promise.all([
     db.from("crm_host_sales").select("paid_orders,paid_cents").eq("session_id", id).maybeSingle(),
     db.from("crm_host_gifts").select("id,label,threshold_cents,delivered_at").eq("session_id", id).order("threshold_cents"),
     (order ? db.from("crm_orders").select("id,order_date,total_cents,shipping_cents").eq("id", order).is("host_session_id", null)
       : db.from("crm_orders").select("id,order_date,total_cents,shipping_cents").is("host_session_id", null).order("order_date", { ascending: false }).limit(30)),
-    db.from("crm_orders").select("id,client_id,order_date,total_cents,shipping_cents,status,payment_status")
+    db.from("crm_orders").select("id,client_id,order_date,total_cents,shipping_cents,status,payment_status,delivery_address")
       .eq("host_session_id", id).order("order_date", { ascending: false }).order("id").limit(30),
     db.from("crm_host_clients").select("client_id,crm_clients(name)", { count: "exact" }).eq("session_id", id).order("client_id").limit(30),
   ]) : [];
@@ -134,6 +142,13 @@ export default async function HostsPage({ searchParams }) {
             </Link></li>)}
           </ul></> : <p>Aucun client rattaché pour le moment.</p>}
       </section>
+      {session.kind === "meeting" && session.delivery_mode === "grouped" && <section className={styles.panel}>
+        <h2>Bon de livraison groupée</h2>
+        <p>Livraison chez {session.host_name} · {session.delivery_address || session.venue}</p>
+        {session.status === "closed" ?
+          <Link className={styles.crmAction} href={"/api/consultant/hotes/" + session.id + "/livraison"}>Télécharger le bon groupé (PDF)</Link> :
+          <p>Clôture la réunion pour obtenir le bon groupé des commandes rattachées.</p>}
+      </section>}
       <ExistingOrders session={session} orders={orders.data} />
       <section className={styles.panel}>
         <h2>Bons rattachés</h2>
@@ -143,6 +158,9 @@ export default async function HostsPage({ searchParams }) {
               {receiptNumber(order.id)}
             </Link> · {formatDate(order.order_date)} · {new Map(orderStatuses).get(order.status)} · {new Map(paymentStatuses).get(order.payment_status)}
             {order.total_cents != null && " · " + formatEuros(order.total_cents + order.shipping_cents)}
+            {session.delivery_mode === "individual" && <div style={{ whiteSpace: "pre-line" }}>
+              {order.delivery_address || "Adresse de livraison à confirmer"}
+            </div>}
           </li>)}</ul> : <p>Aucun bon rattaché pour le moment.</p>}
       </section>
       <section className={styles.panel}>

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { requireConsultant } from "../../../lib/auth/consultant";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { isDate } from "../../../lib/crm/dates.mjs";
-import { hostKinds, hostStatuses, hostUuid } from "../../../lib/crm/hosts.mjs";
+import { hostKinds, hostStatuses, hostUuid, meetingDeliveryModes } from "../../../lib/crm/hosts.mjs";
 import { parseCents } from "../../../lib/crm/money.mjs";
 
 const root = "/consultant/hotes";
@@ -40,17 +40,20 @@ export async function saveHost(form) {
   const starts_on = field(form, "starts_on");
   const ends_on = kind === "case" ? field(form, "ends_on") : null;
   const venue = kind === "meeting" ? field(form, "venue") : null;
+  const delivery_mode = kind === "meeting" ? field(form, "delivery_mode") : null;
+  const delivery_address = delivery_mode === "grouped" ? field(form, "delivery_address") || null : null;
   const guests = kind === "meeting" ? field(form, "guests") : null;
   const status = field(form, "status");
   const shipping_cents = parseCents(field(form, "shipping")) ?? 0;
   if (!host_name || host_name.length > 120 || !isDate(starts_on) || !Object.hasOwn(hostStatuses, status) ||
       !Number.isInteger(shipping_cents) || (kind === "case" && (!isDate(ends_on) || ends_on < starts_on)) ||
-      (kind === "meeting" && (!venue || venue.length > 240 || guests.length > 4000))) finish(kind, existing?.id, "invalid");
-  const values = { host_client_id, host_name, starts_on, ends_on, venue, guests, status, shipping_cents };
+      (kind === "meeting" && (!venue || venue.length > 240 || guests.length > 4000 || !Object.hasOwn(meetingDeliveryModes, delivery_mode))) ||
+      (delivery_address && (delivery_address.length < 5 || delivery_address.length > 500))) finish(kind, existing?.id, "invalid");
+  const values = { host_client_id, host_name, starts_on, ends_on, venue, guests, status, shipping_cents, delivery_mode, delivery_address };
   const table = db.from("crm_host_sessions");
   const query = existing ? table.update(values).eq("id", id).eq("owner_id", owner) : table.insert({ ...values, kind });
   const { data, error } = await query.select("id").single();
-  finish(kind, data?.id ?? existing?.id, error ? "error" : "saved");
+  finish(kind, data?.id ?? existing?.id, error?.code === "P0001" ? "delivery-locked" : error ? "error" : "saved");
 }
 
 export async function manageGift(form) {
