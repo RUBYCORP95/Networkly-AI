@@ -23,3 +23,7 @@
 .documents form { margin-top: 8px; }
 .pagination { display: flex; flex-wrap: wrap; gap: 12px; }
 .pagination a { color: #513397; font-weight: 650; }
+
+.batchProgress { width: 100%; display: grid; gap: 10px; }
+.batchProgress progress { display: block; width: min(100%, 350px); margin-top: 4px; }
+.batch .pagination { align-items: center; gap: 8px; }

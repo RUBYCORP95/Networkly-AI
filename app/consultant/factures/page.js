@@ -2,12 +2,12 @@ import Link from "next/link";
 import { Download, FileText } from "lucide-react";
 import { requireConsultant } from "../../../lib/auth/consultant";
 import { formatDate } from "../../../lib/crm/dates.mjs";
-import { invoiceApi, invoicePageSize, invoicePath, invoicePeriod, issuerKey } from "../../../lib/crm/invoice-archive.mjs";
-import { invoiceCustomers, listInvoices } from "../../../lib/crm/invoice-data";
+import { invoiceApi, invoiceNatures, invoicePageSize, invoicePath, invoicePeriod, issuerKey } from "../../../lib/crm/invoice-archive.mjs";
+import { invoiceCustomers, invoiceNatureAccounts, listInvoices } from "../../../lib/crm/invoice-data";
 import { formatEuros } from "../../../lib/crm/money.mjs";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import shared from "../consultant.module.css";
-import BatchInvoiceUpload, { InvoiceClassification } from "./BatchInvoiceUpload";
+import BatchInvoiceUpload, { InvoiceClassification, InvoiceNatureAccounts } from "./BatchInvoiceUpload";
 import InvoiceFilters from "./InvoiceFilters";
 import styles from "./invoices.module.css";
 
@@ -36,7 +36,8 @@ function InvoiceFolders({ invoices, customers }) {
             <div>
               <strong>{invoice.document_number ?? "Sans numéro"}</strong>
               <small>{formatDate(invoice.document_date)}{invoice.order_id && " · Bon de commande"}
-                {customers.has(invoice.client_id) && " · " + customers.get(invoice.client_id)}</small>
+                {customers.has(invoice.client_id) && " · " + customers.get(invoice.client_id)}
+                {invoice.document_nature && " · " + invoiceNatures[invoice.document_nature]}</small>
             </div>
             {invoice.finance_declared_cents !== null && <strong>{formatEuros(invoice.finance_declared_cents)}</strong>}
             <a className={shared.crmAction} aria-label={"Télécharger " + invoice.filename} href={invoiceApi + "/" + invoice.id} download>
@@ -65,9 +66,10 @@ export default async function AllInvoices({ searchParams }) {
   if (!access.ok) return null;
   const owner = access.user.id;
 
-  const [list, clients] = await Promise.all([
+  const [list, clients, natureAccounts] = await Promise.all([
     listInvoices(db, owner, period, page),
     invoiceCustomers(db, owner).catch(() => null),
+    invoiceNatureAccounts(db, owner),
   ]);
   const query = new URLSearchParams(period.query);
   query.set("format", "zip");
@@ -84,6 +86,9 @@ export default async function AllInvoices({ searchParams }) {
 
     <section className={styles.panel}>
       <h2>Importer des factures</h2>
+      {natureAccounts.error
+        ? <p role="alert">Les comptes par type sont temporairement indisponibles.</p>
+        : <InvoiceNatureAccounts accounts={natureAccounts.data} />}
       <BatchInvoiceUpload customers={clients ?? []} today={period.today} />
     </section>
 

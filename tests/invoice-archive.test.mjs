@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { unzipSync } from "fflate";
 import { PDFDocument } from "pdf-lib";
-import { invoiceNumberKey, invoicePeriod, issuerKey } from "../lib/crm/invoice-archive.mjs";
+import { invoiceNumberKey, invoicePeriod, invoiceUploadGroups, issuerKey, maxInvoiceBatch, processInvoiceBatch } from "../lib/crm/invoice-archive.mjs";
 import { parseInvoiceText, readInvoice } from "../lib/crm/invoice-pdf.mjs";
 import { invoiceZipPath, streamInvoiceZip } from "../lib/crm/invoice-zip.mjs";
 
@@ -53,4 +53,33 @@ test("streams original PDF bytes into safe nested ZIP folders", async () => {
   assert.match(invoiceZipPath(base), /^607000\/_Maison Exemple\/2026-11-20_FA_49_/);
   assert.deepEqual(result[invoiceZipPath(base)], base.pdf);
   assert.match(invoiceZipPath(other), /^Compte à classer\//);
+});
+
+test("500 PDFs are processed once with peak parallelism capped at four", async () => {
+  const items = Array.from({ length: maxInvoiceBatch }, (_, index) => index);
+  const processed = new Set();
+  let active = 0;
+  let peak = 0;
+  await processInvoiceBatch(items, async index => {
+    peak = Math.max(peak, ++active);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(processed.has(index), false);
+    processed.add(index);
+    active--;
+  });
+  assert.equal(processed.size, 500);
+  assert.equal(peak, 4);
+});
+
+test("uploads for the same issuer retain selection order", () => {
+  const items = [{ issuer: "Maison Exemple" }, { issuer: "Autre SAS" }, { issuer: " MAISON   EXEMPLE " }];
+  assert.deepEqual(invoiceUploadGroups(items), [[items[0], items[2]], [items[1]]]);
+});
+
+test("invoice content recognises subscriptions and equipment without guessing on mixed bills", () => {
+  assert.equal(parseInvoiceText("Offre Premium\nAbonnement annuel du 1 janvier au 31 décembre").nature, "subscription");
+  assert.equal(parseInvoiceText("Désignation : Ordinateur portable – 14 pouces").nature, "equipment");
+  assert.equal(parseInvoiceText("Ligne 1 : imprimante\nLigne 2 : abonnement mensuel").nature, null);
+  assert.equal(parseInvoiceText("Ligne 1 : imprimante\nLigne 2 : abonnement mensuel").natureAmbiguous, true);
+  assert.equal(parseInvoiceText("Prestation de conseil\nConditions générales de votre abonnement").nature, null);
 });
