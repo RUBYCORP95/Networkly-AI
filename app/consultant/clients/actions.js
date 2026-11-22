@@ -9,6 +9,7 @@ import { isDate, parisDate } from "../../../lib/crm/dates.mjs";
 import { orderTotals, readDiscount } from "../../../lib/crm/order-pricing.mjs";
 import { priceOrder, readLines } from "../../../lib/crm/order";
 import { randomBytes, createHash } from "node:crypto";
+import { paymentLinksFromForm } from "../../../lib/crm/payment-links.mjs";
 import { sellerFields } from "../../../lib/crm/order-receipt.mjs";
 import { parseCents } from "../../../lib/crm/money.mjs";
 
@@ -208,4 +209,15 @@ export async function createRegistrationLink() {
   const token_hash = createHash("sha256").update(token).digest("hex");
   const {error} = await client.from("crm_registration_links").insert({token_hash});
   return error ? {error: "Le lien n’a pas pu être créé."} : {token};
+}
+
+export async function savePaymentLinks(form) {
+  const db = await consultantClient();
+  const payment_links = paymentLinksFromForm(form);
+  let result = "invalid_payment";
+  if (payment_links) {
+    const { error, data } = await db.from("crm_seller_profiles").update({ payment_links }).select("owner_id").maybeSingle();
+    result = error || !data ? "error" : "payment_saved";
+  }
+  redirect("/consultant/clients?" + new URLSearchParams({ view: "settings", result }));
 }

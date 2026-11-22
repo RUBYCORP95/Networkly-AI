@@ -28,7 +28,7 @@ function DiscountFields({ label, type, value, onType, onValue, global = false })
   </>;
 }
 
-export default function OrderForm({ clientId, token, fixedShipping = 0, order, today, submitAction = addOrder }) {
+export default function OrderForm({ clientId, token, fixedShipping = 0, order, today, children, submitAction = addOrder }) {
   const [{ mode, query }, setSearch] = useState({ mode: "code", query: "" });
   const [items, setItems] = useState([]);
   const [lines, setLines] = useState(() => (order?.items ?? []).map(item => ({
@@ -139,6 +139,7 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, order, t
       }}>Réessayer la recherche</button>}
     </div>
     <form action={submitAction} className={styles.form}>
+      {children}
       {clientId && <input name="client_id" type="hidden" value={clientId} />}
       {!token && <label>Date de commande
         <input name="order_date" type="date" required max={today} defaultValue={order ? orderDate(order) : today} />

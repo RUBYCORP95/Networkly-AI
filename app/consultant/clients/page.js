@@ -9,6 +9,8 @@ import CustomerList from "./CustomerList";
 import OrderReceipt from "./OrderReceipt";
 import ShareOrder from "./ShareOrder";
 import ShareRegistration from "./ShareRegistration";
+import { publicPaymentLinks } from "../../../lib/crm/payment-links.mjs";
+import PaymentLinksForm from "./PaymentLinksForm";
 import OrderForm from "./OrderForm";
 import InvoiceUpload from "./InvoiceUpload";
 import styles from "../consultant.module.css";
@@ -19,6 +21,8 @@ const notices = new Map([
   ["client", "Fiche client enregistrée."],
   ["followup", "Relance programmée."],
   ["catalogue", "Un produit ou un prix du catalogue est indisponible. Relance la recherche."],
+  ["invalid_payment", "Renseigne un nom et un lien HTTPS valide pour chaque moyen de paiement."],
+  ["payment_saved", "Moyens de paiement enregistrés."],
   ["seller_required", "Enregistre d’abord tes coordonnées professionnelles."],
   ["seller", "Coordonnées professionnelles enregistrées."],
   ["order", "Commande enregistrée."],
@@ -78,22 +82,25 @@ function SellerForm({ seller }) {
   </section>;
 }
 
-function orderEmailDraft(order, recipient) {
+function orderEmailDraft(order, recipient, paymentLinks) {
   const address = encodeURIComponent(recipient).replace(/%40/g, "@");
   const subject = encodeURIComponent("Votre bon de commande " + receiptNumber(order.id));
-  const body = encodeURIComponent(receiptEmailText(order).replace(/\n/g, "\r\n"));
+  const body = encodeURIComponent(receiptEmailText(order, paymentLinks).replace(/\n/g, "\r\n"));
   return `mailto:${address}?subject=${subject}&body=${body}`;
 }
 
-function OrderControls({ order, clientId, clientEmail, returnFilter, dates }) {
+function OrderControls({ order, clientId, clientEmail, returnFilter, dates, paymentLinks }) {
   return <>
     <OrderReceipt order={order} />
     <div className={styles.orderActions}>
       <Link className={styles.crmAction} href={"?" + new URLSearchParams({ client: clientId, view: "history", edit: order.id })}>Modifier le bon</Link>
+      <Link className={styles.crmAction} href={order.host_session_id ? "/consultant/hotes" : "/consultant/hotes?order=" + order.id}>
+        {order.host_session_id ? "Commande rattachée à un hôte" : "Rattacher à un hôte"}
+      </Link>
       <form action={`/api/consultant/orders/${order.id}/pdf`} method="post">
         <button className={styles.crmAction}>Télécharger le PDF</button>
       </form>
-      {clientEmail && <a className={`${styles.crmAction} ${styles.orderEmailAction}`} href={orderEmailDraft(order, clientEmail)}><Mail size={17} aria-hidden="true" /> Envoyer le bon par e-mail</a>}
+      {clientEmail && <a className={`${styles.crmAction} ${styles.orderEmailAction}`} href={orderEmailDraft(order, clientEmail, paymentLinks)}><Mail size={17} aria-hidden="true" /> Envoyer le bon par e-mail</a>}
     </div>
     {!clientEmail && <p>Ajoute l’adresse e-mail du client pour préparer l’envoi.</p>}
     <form action={updateOrder} className={styles.form}>
@@ -133,13 +140,14 @@ function filterOrders(query, filter) {
 }
 
 async function AllOrders({ db, params }) {
+  const paymentProfile = await db.from("crm_seller_profiles").select("payment_links").maybeSingle();
   const filter = ["pending", "processed"].includes(params.filter) ? params.filter : "all";
   const dates = {};
   for (const key of ["from", "to"]) if (isDate(params[key])) dates[key] = params[key];
   const parsedPage = Number(params.page);
   const page = Number.isSafeInteger(parsedPage) && parsedPage > 0 && parsedPage <= 1000000 ? parsedPage : 1;
   const size = 20;
-  const query = db.from("crm_orders").select(orderFields + ",client_id,crm_clients(name,email)", { count: "exact" })
+  const query = db.from("crm_orders").select(orderFields + ",host_session_id,client_id,crm_clients(name,email)", { count: "exact" })
     .order("order_date", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).range((page - 1) * size, page * size - 1);
   const [orders, pending, processed] = await Promise.all([
     filterOrders(filterOrderDates(query, dates), filter),
@@ -173,7 +181,7 @@ async function AllOrders({ db, params }) {
       <ul className={styles.trips}>
         {orders.data.map(order => <li key={order.id} className={styles.panel}>
           <h2><Link className={styles.crmAction} href={"?client=" + order.client_id}>{order.crm_clients?.name ?? "Fiche client"}</Link></h2>
-          <OrderControls order={order} clientId={order.client_id} clientEmail={order.crm_clients?.email?.trim()} returnFilter={filter} dates={dates} />
+          <OrderControls order={order} clientId={order.client_id} clientEmail={order.crm_clients?.email?.trim()} returnFilter={filter} dates={dates} paymentLinks={paymentProfile.data?.payment_links} />
         </li>)}
       </ul>
       {(page > 1 || page * size < orders.count) && <nav aria-label="Pages des commandes" className={styles.orderNavigation}>
@@ -184,7 +192,7 @@ async function AllOrders({ db, params }) {
   </main>;
 }
 
-function OrderHistory({ orders, clientId, clientEmail, editId, today }) {
+function OrderHistory({ orders, clientId, clientEmail, editId, today, paymentLinks }) {
   const orderToEdit = editId && orders.data?.find(order => order.id === editId);
   if (orderToEdit) return <section>
     <h2>Modifier le bon de commande {receiptNumber(orderToEdit.id)}</h2>
@@ -197,7 +205,7 @@ function OrderHistory({ orders, clientId, clientEmail, editId, today }) {
     {orders.error ? <p role="alert">L’historique est temporairement indisponible.</p> : <>
       {orders.data.length === 0 ? <p>Aucune commande pour ce client.</p> : <ul className={styles.trips}>
         {orders.data.map(order => <li key={order.id} className={styles.panel}>
-          <OrderControls order={order} clientId={clientId} clientEmail={clientEmail} />
+          <OrderControls order={order} clientId={clientId} clientEmail={clientEmail} paymentLinks={paymentLinks} />
         </li>)}
       </ul>}
     </>}
@@ -244,7 +252,7 @@ export default async function ClientsPage({ searchParams }) {
   if (params.view === "orders") return <AllOrders db={db} params={params} />;
   const [customers, seller, reminders, activeFollowups, orderCount] = await Promise.all([
     db.from("crm_clients").select("id,name,email,phone,birth_date,birthday_notification", { count: "exact" }).order("name").order("id"),
-    db.from("crm_seller_profiles").select("name,business,email,phone,address,registration").maybeSingle(),
+    db.from("crm_seller_profiles").select("name,business,email,phone,address,registration,payment_links").maybeSingle(),
     db.from("crm_followups").select("id,client_id,due_date,notification,completed_at").order("due_date"),
     db.from("crm_followups").select("id", { count: "exact", head: true }).is("completed_at", null),
     db.from("crm_orders").select("id", { count: "exact", head: true }),
@@ -255,7 +263,7 @@ export default async function ClientsPage({ searchParams }) {
   const history = selected && params.view === "history";
   const invoices = selected && params.view === "invoices";
   const orders = history ? await db.from("crm_orders")
-    .select(orderFields).eq("client_id", selected.id)
+    .select(orderFields + ",host_session_id").eq("client_id", selected.id)
     .order("order_date", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }) : null;
   const active = (reminders.data ?? []).filter(item => !item.completed_at && names.has(item.client_id))
     .map(item => ({...item, name: names.get(item.client_id), date: item.due_date}));
@@ -277,7 +285,13 @@ export default async function ClientsPage({ searchParams }) {
     </header>
     {notices.has(params.result) && <p className={styles.notice} role="status">{notices.get(params.result)}</p>}
     {settings ? (seller.error ? <p role="alert">Les coordonnées professionnelles sont temporairement indisponibles.</p> :
-      <div className={styles.panel}><SellerForm seller={seller.data} /></div>) :
+      <><div className={styles.panel}><SellerForm seller={seller.data} /></div>
+       <section className={styles.panel} id="moyens-de-paiement">
+         <h2>Moyens de paiement</h2>
+         <p>Ces liens sont proposés dans les e-mails des commandes à payer.</p>
+         {seller.data ? <PaymentLinksForm links={publicPaymentLinks(seller.data.payment_links)} /> :
+           <p>Enregistre tes coordonnées professionnelles pour ajouter des liens.</p>}
+       </section></>) :
     customers.error || (!history && !invoices && reminders.error) ? <p role="alert">Le CRM est temporairement indisponible.</p> : <>
       {dueNotifications > 0 && <p className={styles.notice} role="status">{dueNotifications} notification(s) TESAMI à consulter.</p>}
       {!selected && <>
@@ -301,7 +315,7 @@ export default async function ClientsPage({ searchParams }) {
           <Link className={styles.crmAction} href={"?client=" + selected.id + "&view=history"} aria-current={history ? "page" : undefined}>Historique des commandes</Link>
           <Link className={styles.crmAction} href={"?client=" + selected.id + "&view=invoices"} aria-current={invoices ? "page" : undefined}>Factures</Link>
         </nav>
-        {history ? <OrderHistory orders={orders} clientId={selected.id} clientEmail={selected.email?.trim()} editId={params.edit} today={today} /> :
+        {history ? <OrderHistory orders={orders} clientId={selected.id} clientEmail={selected.email?.trim()} editId={params.edit} today={today} paymentLinks={seller.data?.payment_links} /> :
           invoices ? <ClientInvoices db={db} clientId={selected.id} today={today} params={params} /> : <>
           <section>
             <h2>Partager un bon de commande</h2>

@@ -2,6 +2,8 @@ import { createServerSupabase } from "../../../../lib/supabase/server";
 import { requireConsultant } from "../../../../lib/auth/consultant";
 import { findProducts, getVariants, matchesArticleCode, requireEuroCatalogue } from "../../../../lib/crm/catalogue";
 
+import { availableHostOrder } from "../../../../lib/crm/host-public";
+import { hostUuid } from "../../../../lib/crm/hosts.mjs";
 import { availableOrderLink } from "../../../../lib/crm/order-link";
 
 function rankByArticleCode(items, query) {
@@ -22,7 +24,7 @@ export async function GET(request) {
   const params = new URL(request.url).searchParams;
   const token = request.headers.get("X-Order-Link");
   if (token) {
-    if (!await availableOrderLink(token)) return Response.json({ error: "Lien expiré ou utilisé." }, { status: 403 });
+    if (!await (hostUuid.test(token) ? availableHostOrder(token) : availableOrderLink(token))) return Response.json({ error: "Lien expiré ou utilisé." }, { status: 403 });
   } else {
     const access = await requireConsultant(await createServerSupabase());
     if (!access.ok) return Response.json({ error: access.error }, { status: access.status });
