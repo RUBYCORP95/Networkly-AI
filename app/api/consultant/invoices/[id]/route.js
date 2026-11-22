@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireConsultant } from "../../../../../lib/auth/consultant";
-import { isDate, parisDate } from "../../../../../lib/crm/dates.mjs";
+import { maxInvoiceBytes, uuid } from "../../../../../lib/crm/invoice-archive.mjs";
+import { storeImportedInvoice } from "../../../../../lib/crm/invoice-import";
 import { createServerSupabase } from "../../../../../lib/supabase/server";
-
-import { parseCents } from "../../../../../lib/crm/money.mjs";
-
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const maxPdfBytes = 3 * 1024 * 1024;
 
 export async function POST(request, { params }) {
   const { id } = await params;
@@ -22,25 +18,16 @@ export async function POST(request, { params }) {
   const db = await createServerSupabase();
   const access = await requireConsultant(db);
   if (!access.ok) return new Response(null, { status: access.status });
-  if (Number(request.headers.get("content-length")) > maxPdfBytes + 8192) return finish("invoice_invalid");
-
+  if (Number(request.headers.get("content-length")) > maxInvoiceBytes + 16384) return finish("invoice_invalid");
   const form = await request.formData().catch(() => null);
-  const declared = parseCents(form?.get("document_amount"));
-  if (declared === null || !Number.isInteger(declared) ||
-      form?.get("confirmed_cents") !== String(declared)) return finish("invoice_amount");
-  const file = form?.get("invoice");
-  const document_date = form?.get("document_date");
-  if (!isDate(document_date) || document_date > parisDate()) return finish("invoice_invalid");
-  if (!(file instanceof Blob) || !file.name || !/\.pdf$/i.test(file.name) ||
-      file.size < 6 || file.size > maxPdfBytes) return finish("invoice_invalid");
-  const bytes = Buffer.from(await file.arrayBuffer());
-  if (bytes.toString("ascii", 0, 5) !== "%PDF-") return finish("invoice_invalid");
-  const filename = Array.from(file.name.replace(/[\p{C}/\\]/gu, "_").trim().replace(/\.pdf$/i, ""))
-    .slice(0, 176).join("") + ".pdf";
-  const { error } = await db.from("crm_client_invoices").insert({
-    client_id: id, document_date, filename, finance_declared_cents: declared, pdf: "\\x" + bytes.toString("hex"),
-  });
-  return finish(error ? "error" : "invoice");
+  if (!form) return finish("invoice_invalid");
+  try {
+    const code = await storeImportedInvoice(db, access.user.id, form, id);
+    return finish(({ saved: "invoice", duplicate: "invoice_duplicate", amount: "invoice_amount",
+      metadata: "invoice_metadata", number: "invoice_metadata", invalid: "invoice_invalid" })[code] ?? "error");
+  } catch {
+    return finish("error");
+  }
 }
 
 export async function GET(_request, { params }) {

@@ -23,6 +23,8 @@ const notices = new Map([
   ["seller", "Coordonnées professionnelles enregistrées."],
   ["order", "Commande enregistrée."],
   ["invoice", "Facture importée."],
+  ["invoice_duplicate", "Cette facture est déjà archivée."],
+  ["invoice_metadata", "Vérifie les informations inscrites sur le PDF."],
   ["invoice_amount", "Saisis le montant exact indiqué sur le PDF et confirme-le avant l’import."],
   ["invoice_invalid", "Vérifie la date de facture et choisis un PDF valide de 3 Mo maximum."],
   ["updated", "Relance mise à jour."],
@@ -211,6 +213,7 @@ async function ClientInvoices({ db, clientId, today, params }) {
   const { data, error } = await query;
   return <section>
     <h2>Factures du client</h2>
+    <p><Link className={styles.crmAction} href="/consultant/factures">Toutes mes factures</Link></p>
     <InvoiceUpload clientId={clientId} today={today} />
     <form method="get" className={styles.form}>
       <input name="client" type="hidden" value={clientId} />

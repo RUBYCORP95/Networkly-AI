@@ -1,0 +1,25 @@
+.page { max-width: 1120px; }
+.heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+.heading h1 { margin: 0; }
+.panel { background: #fff; border: 1px solid #e4dcf1; border-radius: 15px; padding: clamp(12px, 3vw, 22px); margin: 16px 0; }
+.panel h2 { margin-top: 0; }
+.muted { color: #574e69; font-size: .9rem; }
+.batch { display: grid; justify-items: start; gap: 10px; }
+.batch p { margin: 0; }
+.pick { display: grid; gap: 6px; font-weight: 650; width: min(100%, 350px); }
+.pick input { width: 100%; max-width: 100%; }
+.file { width: 100%; min-width: 0; border: 1px solid #dcd0ef; padding: 10px; border-radius: 10px; }
+.file legend { max-width: 100%; padding: 0 5px; font-weight: 650; overflow-wrap: anywhere; }
+.file p { margin-top: 7px; }
+.account { border: 1px solid #e4dcf1; border-radius: 10px; padding: 10px; margin: 9px 0; }
+.account > summary, .company > summary { font-weight: 700; }
+.company { padding: 7px 0 3px 10px; }
+.page summary { cursor: pointer; color: #513397; overflow-wrap: anywhere; }
+.documents { display: grid; gap: 6px; list-style: none; padding: 0; margin: 8px 0; }
+.documents li { padding: 9px; background: #f9f6ff; border-radius: 8px; overflow-wrap: anywhere; min-width: 0; }
+.document { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+.document > div { flex: 1 1 140px; }
+.document small { display: block; color: #574e69; }
+.documents form { margin-top: 8px; }
+.pagination { display: flex; flex-wrap: wrap; gap: 12px; }
+.pagination a { color: #513397; font-weight: 650; }
