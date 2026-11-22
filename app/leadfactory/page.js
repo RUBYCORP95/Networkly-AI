@@ -32,9 +32,30 @@ async function consultantAction(action,allocationId){
  return data;
 }
 
+function LeadConversion({ card, busy, onConvert }) {
+ if(!card)return null;
+ if(card.client_id)return <p><strong>Converti en client</strong>{" · "}
+  <a href={"/consultant/clients?client="+encodeURIComponent(card.client_id)}>Ouvrir la fiche client</a>
+ </p>;
+ if(!card.can_convert)return null;
+ return <button type="button" className={styles.button} disabled={busy!==null}
+  onClick={()=>onConvert(card.allocation_id)}>{busy===card.allocation_id?"Ajout en cours…":"Vente conclue"}</button>;
+}
+
+function LeadArchiveButton({ card, busy, onArchive }) {
+ if(!card?.contact_revealed)return null;
+ return <button type="button" className={styles.buttonSecondary} disabled={busy!==null}
+  onClick={()=>onArchive(card.allocation_id,!card.archived)}>
+  {busy===card.allocation_id?"Enregistrement…":card.archived?"Restaurer":"Archiver"}
+ </button>;
+}
+
 export default function LeadFactoryPage(){
  const [state,setState]=useState({loading:true,error:"",status:null,cards:[],revealed:{},limited:false});
  const [busy,setBusy]=useState(null);
+ const [converting,setConverting]=useState(null);
+ const [archiving,setArchiving]=useState(null);
+ const [actionError,setActionError]=useState("");
  const [demo,setDemo]=useState(false);
  const [adviceOpen,setAdviceOpen]=useState(false);
  const [adviceType,setAdviceType]=useState("partnership");
@@ -83,7 +104,7 @@ export default function LeadFactoryPage(){
    // Le secteur est prêt avant d'afficher les commandes.
    setState(s=>({...s,loading:false,error:"",status,cards:s.cards,limited:false}));
    const {data:cards,error}=await Promise.race([
-     supabase.rpc("my_lead_allocation_cards_with_names"),
+     supabase.rpc("my_lead_conversion_cards"),
      new Promise((_,reject)=>setTimeout(()=>reject(new Error("Le chargement des contacts prend trop de temps. Réessaie.")),12000))
    ]);
    if(error)throw error;
@@ -168,6 +189,7 @@ export default function LeadFactoryPage(){
  }
  function showContactDetails(contact,fallbackName){
   setContactReveal({
+   allocationId:contact.allocation_id,
    name:[contact.first_name,contact.last_name].filter(Boolean).join(" ")||fallbackName,
    phone:contact.phone,
    email:contact.email,
@@ -186,13 +208,41 @@ export default function LeadFactoryPage(){
   }catch(e){setState(s=>({...s,error:e.message||"Impossible de révéler le contact"}));}
   finally{setBusy(null);}
  }
+ async function convertLead(id){
+  setConverting(id);
+  setActionError("");
+  try{
+   const {data,error}=await createClient().rpc("convert_my_lead_to_client",{p_allocation_id:id});
+   if(error?.code==="42501")throw new Error("Ton accès au CRM consultant doit être validé.");
+   if(error||!data)throw new Error("Ce prospect ne peut plus être ajouté à tes clients.");
+   setState(s=>({...s,error:"",cards:s.cards.map(card=>card.allocation_id===id?{...card,client_id:data}:card)}));
+  }catch(error){
+   setActionError(error.message||"La conversion a échoué. Tu peux réessayer.");
+  }finally{setConverting(null);}
+ }
+
+ async function archiveLead(id,archived){
+  setArchiving(id);
+  setActionError("");
+  try{
+   const {data,error}=await createClient().rpc("set_my_lead_archived",{p_allocation_id:id,p_archived:archived});
+   if(error||!data)throw new Error("Impossible de mettre à jour cette archive.");
+   setState(s=>({...s,cards:s.cards.map(card=>card.allocation_id===id?{...card,archived}:card)}));
+   if(archived)setContactReveal(contact=>contact?.allocationId===id?null:contact);
+  }catch(error){
+   setActionError(error.message||"Impossible de mettre à jour cette archive.");
+  }finally{setArchiving(null);}
+ }
+
  const adviceTemplates={partnership:{title:"Proposer un partenariat",tip:"Commence par comprendre les besoins de l’établissement et propose un échange sans engagement.",message:"Bonjour, je suis consultant indépendant Chogan et j’accompagne des professionnels qui souhaitent découvrir de nouvelles possibilités de partenariat autour des parfums et des produits du quotidien. Votre établissement m’a intéressé. Seriez-vous disponible pour un court échange afin de voir si une collaboration pourrait avoir du sens pour vous ?"},products:{title:"Présenter les produits",tip:"Propose une découverte adaptée à l’activité, sans affirmer de résultats non vérifiés.",message:"Bonjour, je suis consultant indépendant Chogan. Je propose une gamme de parfums et de produits pour le quotidien qui pourrait éventuellement intéresser votre établissement ou votre clientèle. Est-ce que je peux vous présenter quelques références adaptées à votre activité ?"},consultant:{title:"Devenir consultant",tip:"Présente l’activité comme une possibilité, jamais comme une garantie de revenus.",message:"Bonjour, je suis consultant indépendant Chogan. En complément de votre activité professionnelle, il existe aussi la possibilité de devenir consultant pour découvrir et proposer les produits à votre rythme. Si cela vous intéresse, je peux vous expliquer le fonctionnement, les conditions et le temps à prévoir, sans engagement."}};
  const currentAdvice=adviceTemplates[adviceType];
  const s=state.status;
  const klaviyo=s?.quotas?.klaviyo||0, professional=s?.quotas?.professional||0;
  const activeQuota=sectorTab==="klaviyo"?klaviyo:professional;
  const quotaReached=!!usage&&usage[sectorTab+"_used"]>=activeQuota;
- const visibleCards=state.cards; // Existing allocations remain owned by the consultant even if their saved sector changes.
+ const visibleCards=state.cards.filter(card=>!card.archived);
+ const archivedCards=state.cards.filter(card=>card.archived);
+ const openContact=state.cards.find(card=>card.allocation_id===contactReveal?.allocationId);
  if(state.limited)return <main className={styles.page}>
    <h1>LeadFactory</h1><p>Pour accéder aux quotas gratuits, envoie ta demande d’accès consultant CHOGAN.</p>
    <a className={styles.button} href="/demande-consultant">Demander ou suivre mon accès consultant</a>
@@ -202,6 +252,9 @@ export default function LeadFactoryPage(){
       <h2 id="leadfactory-contact-details">{contactReveal.name||"Coordonnées du contact"}</h2>
       {contactReveal.phone&&<p>Téléphone <a href={"tel:"+contactReveal.phone}>{contactReveal.phone}</a></p>}
       {contactReveal.email&&<p>E-mail <a href={"mailto:"+contactReveal.email}>{contactReveal.email}</a></p>}
+      <LeadConversion card={openContact} busy={converting} onConvert={convertLead} />
+      <LeadArchiveButton card={openContact} busy={archiving} onArchive={archiveLead} />
+      {actionError&&<p role="alert">{actionError}</p>}
       <button className={styles.buttonSecondary} type="button" onClick={()=>setContactReveal(null)}>Fermer</button>
  </>;
 
@@ -227,6 +280,7 @@ export default function LeadFactoryPage(){
    <p><strong>Exemple de premier message</strong></p>
    <p>« Bonjour, je suis conseiller(ère) indépendant(e) CHOGAN dans votre région. Vous aviez commencé une commande de produits CHOGAN il y a quelque temps sans la finaliser. Je me permets de vous proposer mon aide si vous avez des questions ou souhaitez des renseignements. Si vous ne souhaitez pas être recontacté(e), dites-le-moi simplement. Belle journée ! »</p>
   </section>
+  {actionError&&!contactReveal&&<p role="alert" className={styles.panel}>{actionError}</p>}
   {state.loading&&<div className={styles.panel} role="status">Chargement de ton espace LeadFactory…</div>}
   {state.error&&<div className={styles.alert} role="alert"><p>{state.error}</p><button type="button" className={styles.button} onClick={load}>Réessayer le chargement</button>{state.error.includes("Connecte-toi")&&<a className={styles.loginLink} href="/login?next=%2Fleadfactory">Se connecter à TESAMI</a>}</div>}
   {state.limited&&<div className={styles.betaNotice} role="status"><strong>Bienvenue dans la bêta publique !</strong><p>Tu peux tester gratuitement les dix contacts fictifs, les conseils de prospection et l’interface. Les vrais contacts CHOGAN et professionnels ne sont pas accessibles aux comptes bêta non autorisés.</p><a href="/login?next=%2Fleadfactory">Gérer mon compte</a></div>}
@@ -275,7 +329,7 @@ export default function LeadFactoryPage(){
     {sectorTab==="klaviyo"&&<div className={styles.panel} role="tabpanel" style={{marginTop:18}}>
       <h3>Mes clients CHOGAN attribués ({visibleCards.filter(card=>card.contact_kind==="klaviyo").length})</h3>
       <p className={styles.muted}>Ces contacts sont déjà attribués à ton compte. Ils ne sont pas encore filtrés par le rayon choisi.</p>
-      {visibleCards.filter(card=>card.contact_kind==="klaviyo").length===0?<p>Aucun client CHOGAN attribué pour le moment.</p>:<div className={styles.cards}>{visibleCards.filter(card=>card.contact_kind==="klaviyo").map(card=><article className={styles.leadCard} key={card.allocation_id}><strong>{card.display_name||"Client CHOGAN"}</strong><p>{[card.city,card.department].filter(Boolean).join(" · ")||"Localisation non renseignée"}</p><button type="button" className={styles.buttonSecondary} onClick={()=>reveal(card.allocation_id)} disabled={busy===card.allocation_id}>{busy===card.allocation_id?"Ouverture…":"Contacter"}</button>{state.revealed[card.allocation_id]?.phone&&<p><a href={"tel:"+state.revealed[card.allocation_id].phone}>{state.revealed[card.allocation_id].phone}</a></p>}{state.revealed[card.allocation_id]?.email&&<p><a href={"mailto:"+state.revealed[card.allocation_id].email}>{state.revealed[card.allocation_id].email}</a></p>}</article>)}</div>}
+      {visibleCards.filter(card=>card.contact_kind==="klaviyo").length===0?<p>Aucun client CHOGAN attribué pour le moment.</p>:<div className={styles.cards}>{visibleCards.filter(card=>card.contact_kind==="klaviyo").map(card=><article className={styles.leadCard} key={card.allocation_id}><strong>{card.display_name||"Client CHOGAN"}</strong><p>{[card.city,card.department].filter(Boolean).join(" · ")||"Localisation non renseignée"}</p><button type="button" className={styles.buttonSecondary} onClick={()=>reveal(card.allocation_id)} disabled={busy===card.allocation_id}>{busy===card.allocation_id?"Ouverture…":"Contacter"}</button>{state.revealed[card.allocation_id]?.phone&&<p><a href={"tel:"+state.revealed[card.allocation_id].phone}>{state.revealed[card.allocation_id].phone}</a></p>}{state.revealed[card.allocation_id]?.email&&<p><a href={"mailto:"+state.revealed[card.allocation_id].email}>{state.revealed[card.allocation_id].email}</a></p>}<LeadConversion card={card} busy={converting} onConvert={convertLead} /><LeadArchiveButton card={card} busy={archiving} onArchive={archiveLead} /></article>)}</div>}
     </div>}
    </div>
   </div>}
@@ -293,9 +347,22 @@ export default function LeadFactoryPage(){
         {(contact||card.contact_revealed)&&<p><a href={"/consultant/rendez-vous?lead="+encodeURIComponent(card.allocation_id)+"#nouveau"}>Planifier un rendez-vous</a></p>}
         {contact?.phone&&<p><a href={"tel:"+contact.phone}>{contact.phone}</a></p>}
         {contact?.email&&<p><a href={"mailto:"+contact.email}>{contact.email}</a></p>}
+        <LeadConversion card={card} busy={converting} onConvert={convertLead} />
+        <LeadArchiveButton card={card} busy={archiving} onArchive={archiveLead} />
       </article>;
     })}
   </div>}
+  {archivedCards.length>0&&<details className={styles.panel}>
+    <summary>Prospects archivés ({archivedCards.length})</summary>
+    <ul>
+     {archivedCards.map(card=><li className={styles.leadCard} key={card.allocation_id}>
+       <strong>{card.display_name||(card.contact_kind==="klaviyo"?"Client CHOGAN":"Prospect professionnel")}</strong>
+       {card.city&&<p>{card.city}</p>}
+       {card.client_id&&<LeadConversion card={card} busy={converting} onConvert={convertLead} />}
+       <LeadArchiveButton card={card} busy={archiving} onArchive={archiveLead} />
+     </li>)}
+    </ul>
+  </details>}
   {adviceOpen&&<div id="leadfactory-advice" className={styles.advice}><h2>Comment démarrer la discussion ?</h2><p className={styles.muted}>Sélectionne une approche et personnalise le texte selon l’activité du professionnel.</p><div className={styles.adviceTabs}>{Object.entries(adviceTemplates).map(([key,item])=><button key={key} className={adviceType===key?styles.tab+" "+styles.tabActive:styles.tab} onClick={()=>{setAdviceType(key);setAdviceCopied(false);}} aria-pressed={adviceType===key}>{item.title}</button>)}</div><h3>{currentAdvice.title}</h3><p>{currentAdvice.tip}</p><div className={styles.script}>{currentAdvice.message}</div><div style={{marginTop:14}}><button className={styles.button} onClick={async()=>{try{await navigator.clipboard.writeText(currentAdvice.message);setAdviceCopied(true);}catch{setAdviceCopied(false);}}}>{adviceCopied?"Message copié !":"Copier le message"}</button></div><p className={styles.footnote}>Respecte les règles de prospection professionnelle, les refus et les demandes d’opposition. Ne promets pas de revenus.</p></div>}
   {demo&&<div className={styles.demoPanel} role="region" aria-label="Démonstration avec prospects fictifs"><strong>🧪 Simulation bêta — données 100 % fictives</strong><p>Voici un aperçu de cinq contacts clients CHOGAN et cinq prospects professionnels. Aucun vrai contact n’est attribué, aucun quota n’est consommé et aucune coordonnée personnelle n’est révélée.</p><div className={styles.demoGrid}>{Array.from({length:10},(_,i)=><div className={styles.demoItem} key={i}><strong>{i<5?"Client CHOGAN":"Professionnel"} · Démo {i%5+1}</strong><span>{i<5?"Panier abandonné fictif":"Entreprise fictive"} · Exemple uniquement</span><button className={styles.buttonSecondary} type="button" onClick={()=>{setAdviceOpen(true);setAdviceType(i<5?"products":"partnership");setAdviceCopied(false);}}>Préparer un message</button></div>)}</div></div>}
 

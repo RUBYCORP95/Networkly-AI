@@ -6,7 +6,7 @@ import { readMeetingOrders } from "../../../lib/crm/meeting-orders";
 import { formatEuros } from "../../../lib/crm/money.mjs";
 import { orderStatuses, paymentStatuses, receiptNumber } from "../../../lib/crm/order-receipt.mjs";
 import styles from "../consultant.module.css";
-import { attachOrder, closeMeeting, manageGift, manageMeetingPromo, reviewMeetingOrder, saveHost, saveMeetingOrderGift } from "./actions";
+import { attachOrder, closeMeeting, manageGift, manageMeetingPromo, retryMeetingOrderEmail, reviewMeetingOrder, saveHost, saveMeetingOrderGift } from "./actions";
 import HostLinks from "./HostLinks";
 import HostSummary from "./HostSummary";
 
@@ -19,7 +19,9 @@ const notices = {
   "promo-saved": "Code promo enregistré.",
   "promo-duplicate": "Ce code existe déjà pour cette réunion.",
   "gift-saved": "Cadeau mis à jour.",
-  "meeting-closed": "Réunion clôturée.",
+  "meeting-closed": "Réunion clôturée. Les bons individuels sont mis en file d’envoi.",
+  "email-queued": "Bon individuel remis en file d’envoi.",
+  "email-unavailable": "Vérifie l’adresse e-mail dans la fiche client avant de relancer l’envoi.",
   "addresses-required": "Renseigne l’adresse sur chaque bon avant de choisir la livraison chez les clients.",
   "payment-reviewed": "Paiement du bon validé.",
   "review-required": "Valide le paiement de chaque bon avant de clôturer la réunion.",
@@ -36,6 +38,26 @@ function sessionUrl(kind, id, order) {
   if (id) params.set("session", id);
   if (order) params.set("order", order);
   return root + "?" + params;
+}
+
+const meetingEmailLabels = {
+  queued: "E-mail en attente d’envoi", sending: "Envoi en cours", sent: "Bon individuel envoyé",
+  failed: "Échec de l’envoi", missing_email: "Adresse e-mail manquante",
+};
+
+function MeetingOrderEmail({ state, sessionId, orderId }) {
+  return <div className={styles.orderActions}>
+    <span>{meetingEmailLabels[state]}</span>
+    {["failed", "missing_email"].includes(state) && <form action={retryMeetingOrderEmail}>
+      <input type="hidden" name="session_id" value={sessionId} />
+      <input type="hidden" name="order_id" value={orderId} />
+      <button>Relancer l’envoi du bon</button>
+    </form>}
+  </div>;
+}
+
+function pastMeeting(item, today) {
+  return item.starts_on < today || ["closed", "cancelled"].includes(item.status);
 }
 
 function SessionForm({ kind, session, today, clients }) {
@@ -138,7 +160,7 @@ export default async function HostsPage({ searchParams }) {
   ]);
   const { data: session } = id ? await db.from("crm_host_sessions")
     .select("id,kind,host_name,host_client_id,starts_on,ends_on,venue,guests,status,shipping_cents,grouped_shipping_cents,individual_shipping_cents,delivery_mode,delivery_address,order_token,tracking_token").eq("id", id).eq("kind", kind).maybeSingle() : {};
-  const [sales, gifts, orders, linkedOrders, affiliates, promos] = session ? await Promise.all([
+  const [sales, gifts, orders, linkedOrders, affiliates, promos, orderEmails] = session ? await Promise.all([
     db.from("crm_host_sales").select("paid_orders,paid_cents").eq("session_id", id).maybeSingle(),
     db.from("crm_host_gifts").select("id,label,threshold_cents,delivered_at").eq("session_id", id).order("threshold_cents"),
     (order ? db.from("crm_orders").select("id,order_number,order_date,total_cents,shipping_cents").eq("id", order).is("host_session_id", null)
@@ -148,8 +170,15 @@ export default async function HostsPage({ searchParams }) {
         .eq("host_session_id", id).order("order_date", { ascending: false }).order("id").limit(30),
     db.from("crm_host_clients").select("client_id,crm_clients(name)", { count: "exact" }).eq("session_id", id).order("client_id").limit(30),
     kind === "meeting" ? db.from("crm_meeting_promos").select("id,code,discount_bp,max_uses,active").eq("session_id", id).order("code") : null,
+    kind === "meeting" && session.status === "closed" ?
+      db.from("crm_meeting_order_emails").select("order_id,state").eq("session_id", id) : null,
   ]) : [];
 
+  const listedSessions = sessions.data ?? [];
+  const past = kind === "meeting" ? listedSessions.filter(item => pastMeeting(item, today)) : [];
+  const upcoming = kind === "meeting" ? listedSessions.filter(item => !pastMeeting(item, today)) : listedSessions;
+  const viewingPast = kind === "meeting" && session && pastMeeting(session, today);
+  const orderEmailStates = new Map((orderEmails?.data ?? []).map(row => [row.order_id, row.state]));
   const reviewedOrders = linkedOrders?.data ?? [];
   const remaining = kind === "meeting" ? reviewedOrders.filter(order => order.status !== "cancelled" && !meetingOrderReviewed(order)).length : 0;
   const grouped = kind === "meeting" && reviewedOrders.filter(order => order.status !== "cancelled" && meetingOrderDeliveryMode(order, session) === "grouped");
@@ -170,11 +199,23 @@ export default async function HostsPage({ searchParams }) {
     <section>
       <h2>{hostKinds[kind]}</h2>
       {sessions.error ? <p role="alert">Les sessions sont temporairement indisponibles.</p> :
-        <ul className={styles.trips}>{sessions.data.map(item => <li key={item.id}>
+        <ul className={styles.trips}>{upcoming.map(item => <li key={item.id}>
           <Link className={styles.crmAction} aria-current={item.id === id ? "page" : undefined} href={sessionUrl(kind, item.id, order)}>
             {item.host_name} · {formatDate(item.starts_on)} · {(kind === "case" ? hostCaseStatuses : hostStatuses)[item.status]}
           </Link>
         </li>)}</ul>}
+      {past.length > 0 && <section id="reunions-passees" className={styles.pastMeetings}>
+        <h3>Réunions passées</h3>
+        <ul>
+          {past.map(item => <li key={item.id}>
+            <div><strong>{item.host_name}</strong>
+              <span>{formatDate(item.starts_on)} · {hostStatuses[item.status]}</span>
+            </div>
+            <Link className={styles.crmAction} aria-label={"Détails de " + item.host_name + " du " + formatDate(item.starts_on)}
+              aria-current={item.id === id ? "page" : undefined} href={sessionUrl(kind, item.id, order) + "#details-reunion"}>Détails</Link>
+          </li>)}
+        </ul>
+      </section>}
       <details open={!session && !order} className={styles.panel}>
         <summary>Créer une session</summary>
         <SessionForm kind={kind} today={today} clients={clients.data ?? []} />
@@ -182,7 +223,10 @@ export default async function HostsPage({ searchParams }) {
     </section>
     {id && !session && <p role="alert">Cette session est introuvable.</p>}
     {session && <>
-      <section className={styles.panel}>
+      <section className={styles.panel} id={viewingPast ? "details-reunion" : undefined}>
+        {viewingPast && <Link className={styles.crmAction} href={sessionUrl(kind, null, order) + "#reunions-passees"}>
+          ← Retour aux réunions passées
+        </Link>}
         <h2>{session.host_name}</h2>
         <SessionForm key={session.id} kind={kind} session={session} today={today} clients={clients.data ?? []} />
         <p>Commandes {seller.data && hostLinkActive(session, today) ? "ouvertes" : "fermées"}.</p>
@@ -224,6 +268,8 @@ export default async function HostsPage({ searchParams }) {
               {session.status === "closed" && order.status !== "cancelled" && meetingOrderDeliveryMode(order, session) === "individual" &&
                 <a className={styles.crmAction} href={"/api/consultant/orders/" + order.id + "/pdf"}>Télécharger le bon individuel (PDF)</a>}
             </div>}
+            {order.status !== "cancelled" && orderEmailStates.has(order.id) &&
+              <MeetingOrderEmail state={orderEmailStates.get(order.id)} sessionId={session.id} orderId={order.id} />}
             {kind === "meeting" && order.status !== "cancelled" && <details>
               <summary>{order.gift_product ? "Cadeau offert · " + order.gift_quantity + " × " + order.gift_product : "Ajouter un cadeau"}</summary>
               <form action={saveMeetingOrderGift} className={styles.form}>

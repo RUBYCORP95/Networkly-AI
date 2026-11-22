@@ -188,3 +188,42 @@ main.crmPage {
 }
 .form .invoiceConfirmation input { width: 18px; height: 18px; flex: 0 0 18px; margin: 0; }
 .page button:disabled { opacity: .55; cursor: not-allowed; }
+
+.pastMeetings {
+  margin-block: 14px;
+}
+.pastMeetings h3 {
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+.pastMeetings ul {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  border: 1px solid #ded6f2;
+  border-radius: 10px;
+  background: #fff;
+}
+.pastMeetings li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+}
+.pastMeetings li + li {
+  border-top: 1px solid #eee8f9;
+}
+.pastMeetings li div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pastMeetings li span {
+  display: block;
+  font-size: .8rem;
+  color: #635c76;
+}
+.pastMeetings li a {
+  flex: none;
+  padding: 6px 10px;
+}

@@ -37,6 +37,8 @@ const notices = new Map([
   ["updated", "Relance mise à jour."],
 ]);
 
+const clientFields = "id,name,email,phone,birth_date,birthday_notification,lead_source,lead_location,lead_note";
+
 function CustomerForm({ customer, today }) {
   return <form action={saveClient} className={styles.form}>
     {customer && <input type="hidden" name="id" value={customer.id} />}
@@ -45,6 +47,9 @@ function CustomerForm({ customer, today }) {
     <label>Téléphone<input name="phone" type="tel" maxLength={40} defaultValue={customer?.phone ?? ""} /></label>
     <label>Date de naissance<input name="birth_date" type="date" max={today} defaultValue={customer?.birth_date ?? ""} /></label>
     <label>Notification annuelle d’anniversaire<input type="checkbox" name="birthday_notification" defaultChecked={customer?.birthday_notification ?? false} /></label>
+    {customer?.lead_source && <label>Annotation LeadFactory
+      <textarea name="lead_note" maxLength={500} defaultValue={customer.lead_note ?? ""} />
+    </label>}
     <button>{customer ? "Enregistrer" : "Ajouter le client"}</button>
   </form>;
 }
@@ -259,7 +264,7 @@ export default async function ClientsPage({ searchParams }) {
   const db = await createServerSupabase();
   if (params.view === "orders") return <AllOrders db={db} params={params} />;
   const [customers, seller, reminders, activeFollowups, orderCount, customerInvite] = await Promise.all([
-    db.from("crm_clients").select("id,name,email,phone,birth_date,birthday_notification", { count: "exact" }).order("name").order("id"),
+    db.from("crm_clients").select(clientFields, { count: "exact" }).order("name").order("id"),
     db.from("crm_seller_profiles").select("name,business,email,phone,address,registration,payment_links,order_prefix,order_namespace").maybeSingle(),
     db.from("crm_followups").select("id,client_id,due_date,notification,completed_at").order("due_date"),
     db.from("crm_followups").select("id", { count: "exact", head: true }).is("completed_at", null),
@@ -268,7 +273,11 @@ export default async function ClientsPage({ searchParams }) {
   ]);
   const clients = customers.data ?? [];
   const names = new Map(clients.map(customer => [customer.id, customer.name]));
-  const selected = clients.find(customer => customer.id === params.client);
+  let selected = clients.find(customer => customer.id === params.client);
+  if (!selected && typeof params.client === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(params.client)) {
+    const { data } = await db.from("crm_clients").select(clientFields).eq("id", params.client).maybeSingle();
+    selected = data;
+  }
   const history = selected && params.view === "history";
   const invoices = selected && params.view === "invoices";
   const orders = history ? await db.from("crm_orders")
@@ -323,6 +332,11 @@ export default async function ClientsPage({ searchParams }) {
       </div>}
       {selected && <p><Link className={styles.crmAction} href="?view=settings">Paramètres professionnels</Link></p>}
       {selected && <section id="fiche" key={selected.id}>
+        {selected.lead_source && <p>
+          <strong>{selected.lead_note || "Client issu de LeadFactory"}</strong>
+          {" · "}{selected.lead_source === "klaviyo" ? "Klaviyo" : "Prospect professionnel"}
+          {selected.lead_location && " · " + selected.lead_location}
+        </p>}
         <nav className={styles.orderNavigation} aria-label="Sections de la fiche client">
           <Link className={styles.crmAction} href={"?client=" + selected.id} aria-current={!history && !invoices ? "page" : undefined}>Fiche client</Link>
           <Link className={styles.crmAction} href={"?client=" + selected.id + "&view=history"} aria-current={history ? "page" : undefined}>Historique des commandes</Link>

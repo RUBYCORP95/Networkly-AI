@@ -165,3 +165,14 @@ export async function manageMeetingPromo(form) {
   });
   finish("meeting", session.id, error?.code === "23505" ? "promo-duplicate" : error ? "error" : "promo-saved");
 }
+
+export async function retryMeetingOrderEmail(form) {
+  const { db, owner } = await context();
+  const session = await ownedSession(db, owner, field(form, "session_id"));
+  const orderId = field(form, "order_id");
+  if (session?.kind !== "meeting" || session.status !== "closed" || !hostUuid.test(orderId)) {
+    finish("meeting", session?.id, "invalid");
+  }
+  const { data, error } = await db.rpc("retry_my_meeting_customer_bon", { p_order_id: orderId });
+  finish("meeting", session.id, error ? "error" : data ? "email-queued" : "email-unavailable");
+}

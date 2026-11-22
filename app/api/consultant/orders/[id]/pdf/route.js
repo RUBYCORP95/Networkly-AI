@@ -1,4 +1,5 @@
 import { requireConsultant } from "../../../../../../lib/auth/consultant";
+import { loadHostRewards } from "../../../../../../lib/crm/host-rewards.mjs";
 import { makeOrderPdf } from "../../../../../../lib/crm/order-pdf.mjs";
 import { orderDate, orderFields, receiptNumber } from "../../../../../../lib/crm/order-receipt.mjs";
 import { createServerSupabase } from "../../../../../../lib/supabase/server";
@@ -20,13 +21,16 @@ async function downloadOrder({ id }, archive) {
   if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id)) {
     return new Response(null, { status: 404 });
   }
-  const { data: order, error } = await db.from("crm_orders").select(orderFields + ",client_id,delivery_address,crm_host_sessions(delivery_mode)").eq("id", id).maybeSingle();
+  const { data: order, error } = await db.from("crm_orders").select(orderFields + ",client_id,delivery_address,host_session_id,crm_host_sessions(kind,delivery_mode)").eq("id", id).maybeSingle();
   if (error) return new Response(null, { status: 500 });
   if (!order) return new Response(null, { status: 404 });
 
   const mode = order.meeting_delivery_mode ?? order.crm_host_sessions?.delivery_mode;
   const address = mode === "individual" ? order.delivery_address : null;
-  const pdf = await makeOrderPdf(address ? { ...order, buyer: { ...order.buyer, address } } : order);
+  const { rewards, error: rewardsError } = order.crm_host_sessions?.kind === "meeting"
+    ? await loadHostRewards(db, access.user.id, order.host_session_id) : { rewards: [] };
+  if (rewardsError) return new Response(null, { status: 500 });
+  const pdf = await makeOrderPdf(address ? { ...order, buyer: { ...order.buyer, address } } : order, rewards);
   const filename = receiptNumber(order) + ".pdf";
   if (archive) {
     const { error: archiveError } = await db.from("crm_client_invoices").upsert({

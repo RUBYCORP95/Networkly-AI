@@ -1,5 +1,6 @@
 import { requireConsultant } from "../../../../../../lib/auth/consultant";
 import { hostUuid, meetingOrderDeliveryMode, meetingOrderReviewed } from "../../../../../../lib/crm/hosts.mjs";
+import { loadHostRewards } from "../../../../../../lib/crm/host-rewards.mjs";
 import { readMeetingOrders } from "../../../../../../lib/crm/meeting-orders";
 import { makeMeetingDeliveryPdf } from "../../../../../../lib/crm/meeting-delivery.mjs";
 import { createServerSupabase } from "../../../../../../lib/supabase/server";
@@ -26,7 +27,9 @@ export async function GET(_request, { params }) {
     return new Response("Valide les paiements des bons rattachés avant de télécharger le bon groupé.", { status: 409 });
   }
 
-  return new Response(await makeMeetingDeliveryPdf(session.data, orders), {
+  const { rewards, error: rewardsError } = await loadHostRewards(db, owner, id);
+  if (rewardsError) return new Response(null, { status: 500 });
+  return new Response(await makeMeetingDeliveryPdf(session.data, orders, rewards), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="livraison-reunion-${session.data.starts_on}.pdf"`,

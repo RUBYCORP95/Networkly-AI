@@ -1,6 +1,7 @@
 import {createAdminSupabase} from "../../../../lib/supabase/admin";
 import {publishTarget} from "../../../../lib/social/runner";
 import {syncKlaviyoBilling,syncQueuedCrmCustomers} from "../../../../lib/klaviyo";
+import {sendPendingMeetingOrders} from "../../../../lib/crm/meeting-order-emails";
 import {cancelMollieSubscription} from "../../../../lib/payments/mollie";
 import {cancelPayPalSubscription} from "../../../../lib/payments/paypal";
 
@@ -33,14 +34,17 @@ async function expireGrace(db){
 export async function GET(req){
  if(!authorized(req))return Response.json({error:"Non autorisé"},{status:401});
  const db=createAdminSupabase();
- const [publishJob,billingJob,crmJob]=await Promise.allSettled([publishDue(db),expireGrace(db),syncQueuedCrmCustomers(db)]);
+ const [publishJob,billingJob,crmJob,meetingOrdersJob]=await Promise.allSettled([
+  publishDue(db),expireGrace(db),syncQueuedCrmCustomers(db),sendPendingMeetingOrders(db)
+ ]);
  const published=publishJob.status==="fulfilled"?publishJob.value:[];
  const expired=billingJob.status==="fulfilled"?billingJob.value:0;
  const errors={};
  if(publishJob.status==="rejected")errors.publishing=publishJob.reason?.message||"Publication impossible";
  if(billingJob.status==="rejected")errors.billing=billingJob.reason?.message||"Traitement facturation impossible";
  if(crmJob.status==="rejected")errors.crmKlaviyo=crmJob.reason?.message||"Synchronisation Klaviyo indisponible";
+ if(meetingOrdersJob.status==="rejected")errors.meetingOrders="Envoi des bons de réunion indisponible";
  const ok=Object.keys(errors).length===0;
- return Response.json({ok,partial:!ok&&(publishJob.status==="fulfilled"||billingJob.status==="fulfilled"),published:published.length,publishResults:published,expiredGrace:expired,crmKlaviyo:crmJob.status==="fulfilled"?crmJob.value:null,errors}, {status:ok?200:207});
+ return Response.json({ok,partial:!ok&&(publishJob.status==="fulfilled"||billingJob.status==="fulfilled"),published:published.length,publishResults:published,expiredGrace:expired,crmKlaviyo:crmJob.status==="fulfilled"?crmJob.value:null,meetingOrders:meetingOrdersJob.status==="fulfilled"?meetingOrdersJob.value:null,errors}, {status:ok?200:207});
 }
 export const POST=GET;
