@@ -1,0 +1,68 @@
+.finance { max-width: 1240px; }
+.finance h1 { margin: 0 0 6px; }
+.finance h2 { margin: 0 0 10px; }
+.header { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin: 28px 0 22px; }
+.header p, .caption { color: #574e69; margin: 0; }
+.exports, .actions { display: flex; gap: 8px 14px; align-items: center; flex-wrap: wrap; }
+.exports a, .actions a { display: inline-flex; align-items: center; gap: 5px; color: #513397; font-weight: 650; overflow-wrap: anywhere; }
+.exports a { min-height: 40px; padding: 7px 12px; border: 1px solid #d8cbee; border-radius: 10px; background: #fff; text-decoration: none; }
+.fields { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.fields label { display: grid; min-width: 0; flex: 1 1 145px; gap: 4px; font-weight: 600; font-size: .88rem; }
+.finance > .fields label { flex: 0 1 164px; }
+.fields :is(input, select) { width: 100%; min-width: 0; padding: 9px; border: 1px solid #b8adc9; border-radius: 8px; background: white; color: inherit; font: inherit; }
+.fields .check { display: flex; align-items: flex-start; gap: 8px; flex-basis: 100%; }
+.fields .check input { flex: 0 0 18px; width: 18px; height: 18px; margin: 0; }
+.finance button.secondary { color: #513397; background: #fff; border-color: #c9bae6; }
+.metrics, .stats { display: grid; gap: 10px; }
+.metrics { grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); margin: 22px 0; }
+.stats { grid-template-columns: repeat(auto-fit, minmax(min(100%, 106px), 1fr)); margin: 12px 0; }
+.metrics div, .stats div { border: 1px solid #e4dcf1; background: #f9f6ff; border-radius: 12px; padding: 12px; overflow-wrap: anywhere; }
+.metrics div:last-child { background: #eee6fb; }
+.metrics dt, .stats dt { font-weight: 650; }
+.metrics dd, .stats dd { margin: 5px 0 0; }
+.metrics dd:first-of-type, .stats dd { font-size: 1.25rem; font-weight: 750; }
+.metrics dd:last-of-type, .row small, .caption { color: #574e69; font-size: .88rem; line-height: 1.45; }
+.info { margin: 14px 0; border-radius: 10px; background: #f3ecff; padding: 12px; }
+.panel { min-width: 0; padding: clamp(14px, 3vw, 22px); margin: 16px 0; background: #fff; border: 1px solid #e4dcf1; border-radius: 15px; }
+.ledgers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.ledgers .panel { margin-top: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; list-style: none; padding: 0; font-size: .875rem; }
+.legend li { display: flex; gap: 5px; align-items: center; }
+.legend span { width: 12px; height: 12px; border-radius: 3px; }
+.revenue { background: #6541b7; }
+.expenses { background: #b55232; }
+.commissions { background: #147d69; }
+.chartScroll { overflow-x: auto; }
+.chart { display: grid; grid-template-columns: repeat(var(--groups), minmax(0, 1fr)); gap: 5px; min-width: calc(var(--groups) * 24px); }
+.group { text-align: center; }
+.bars { height: 145px; border-bottom: 1px solid #e4dcf1; display: flex; gap: 2px; align-items: flex-end; justify-content: center; }
+.bars span { width: min(26%, 20px); border-radius: 4px 4px 0 0; }
+.dataTable { margin-top: 10px; }
+.dataTable table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+.dataTable :is(td, th) { padding: 6px; border-bottom: 1px solid #e4dcf1; text-align: left; }
+.rows { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 9px; }
+.rows li { border: 1px solid #e4dcf1; border-radius: 11px; padding: 12px; min-width: 0; overflow-wrap: anywhere; }
+.row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.row small { display: block; }
+.rows .actions { margin-top: 8px; font-size: .9rem; }
+.badge { background: #f0edf5; border-radius: 20px; padding: 4px 9px; font-size: .83rem; }
+.badge:is([data-state="paid"], [data-state="processed"]) { background: #dff4ed; color: #125648; }
+.badge:is([data-state="awaiting"], [data-state="archive"]) { background: #fff0dd; color: #774517; }
+.edit { margin-top: 9px; }
+.finance summary { cursor: pointer; color: #513397; font-weight: 650; }
+.edit form, .dataTable table { margin-top: 10px; }
+
+@media (max-width: 680px) {
+  .ledgers { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .finance > .fields label { flex: 1 1 110px; }
+  .finance :is(input, select) { font-size: 16px; }
+}
+.charts { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); gap: 16px; }
+.expenseBars { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+.expenseBars li > div:first-child { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px; font-size: .86rem; }
+.track { height: 5px; border-radius: 4px; background: #f0e8f8; margin-top: 4px; }
+.track span { display: block; height: 100%; border-radius: inherit; background: #b55232; }
+@media (max-width: 680px) {
+  .charts { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .charts .panel + .panel { margin-top: 0; }
+}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Bell, Mail, Package, Settings, Users } from "lucide-react";
 import { createServerSupabase } from "../../../lib/supabase/server";
+import { formatEuros } from "../../../lib/crm/money.mjs";
 import { formatDate, isDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
 import { addFollowup, editOrder, saveClient, saveSeller, updateFollowup, updateOrder } from "./actions";
 import { orderFields, orderStatuses, paymentStatuses, receiptNumber, receiptEmailText, sellerFields } from "../../../lib/crm/order-receipt.mjs";
@@ -22,6 +23,7 @@ const notices = new Map([
   ["seller", "Coordonnées professionnelles enregistrées."],
   ["order", "Commande enregistrée."],
   ["invoice", "Facture importée."],
+  ["invoice_amount", "Saisis le montant exact indiqué sur le PDF et confirme-le avant l’import."],
   ["invoice_invalid", "Vérifie la date de facture et choisis un PDF valide de 3 Mo maximum."],
   ["updated", "Relance mise à jour."],
 ]);
@@ -202,7 +204,7 @@ function OrderHistory({ orders, clientId, clientEmail, editId, today }) {
 
 async function ClientInvoices({ db, clientId, today, params }) {
   const invoiceDate = isDate(params.invoice_date) ? params.invoice_date : "";
-  let query = db.from("crm_client_invoices").select("id,filename,document_date,order_id")
+  let query = db.from("crm_client_invoices").select("id,filename,document_date,order_id,finance_declared_cents")
     .eq("client_id", clientId).order("document_date", { ascending: false })
     .order("uploaded_at", { ascending: false }).order("id", { ascending: false });
   if (invoiceDate) query = query.eq("document_date", invoiceDate);
@@ -222,6 +224,7 @@ async function ClientInvoices({ db, clientId, today, params }) {
       <ul className={styles.trips}>
         {data.map(invoice => <li className={styles.panel} key={invoice.id}>
           <p>{invoice.order_id ? "Bon de commande" : "Facture importée"} · <time dateTime={invoice.document_date}>{formatDate(invoice.document_date)}</time></p>
+          {invoice.finance_declared_cents !== null && <p>Montant confirmé à l’import · {formatEuros(invoice.finance_declared_cents)}</p>}
           <a className={styles.crmAction} style={{ overflowWrap: "anywhere" }}
             href={`/api/consultant/invoices/${invoice.id}`} download>{invoice.filename}</a>
         </li>)}

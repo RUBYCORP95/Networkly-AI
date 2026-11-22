@@ -1,8 +1,10 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireConsultant } from "../../../lib/auth/consultant";
 import { createServerSupabase } from "../../../lib/supabase/server";
+import { financePath } from "../../../lib/crm/finance.mjs";
 import { isDate, parisDate } from "../../../lib/crm/dates.mjs";
 import { orderTotals, readDiscount } from "../../../lib/crm/order-pricing.mjs";
 import { priceOrder, readLines } from "../../../lib/crm/order";
@@ -111,6 +113,7 @@ export async function addOrder(form) {
   const { data: seller } = await client.from("crm_seller_profiles").select("name").maybeSingle();
   if (!seller) finish("seller_required", id);
   const { error } = await client.from("crm_orders").insert({ client_id: id, order_date, ...state, ...values });
+  if (!error) revalidatePath(financePath);
   finish(error ? "error" : "order", id);
 }
 
@@ -131,8 +134,10 @@ export async function editOrder(id, clientId, form) {
     } else {
       const { data, error } = await client.from("crm_orders").update({ ...values, order_date })
         .eq("id", id).eq("client_id", clientId).select("id").maybeSingle();
-      if (data && !error) result = "order";
-      else params.set("edit", id);
+      if (data && !error) {
+        revalidatePath(financePath);
+        result = "order";
+      } else params.set("edit", id);
     }
   }
   params.set("result", result);
@@ -151,6 +156,7 @@ export async function updateOrder(form) {
   const { data, error } = await client.from("crm_orders").update({ status, payment_status, shipping_cents: shipping }).eq("id", id)
     .select("client_id").single();
   const result = error || !data ? "error" : "order";
+  if (result === "order") revalidatePath(financePath);
   const filter = form.get("order_filter");
   if (["all", "pending", "processed"].includes(filter)) {
     const params = new URLSearchParams({ view: "orders", filter, result });
