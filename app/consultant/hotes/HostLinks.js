@@ -11,11 +11,13 @@ export default function HostLinks({ orderPath, trackingPath }) {
       setStatus(label + " copié.");
     } catch { setStatus("Ouvre le lien, puis copie l’adresse dans ton navigateur."); }
   }
+  const orderLabel = "Lien de commande pour le client";
+  const trackingLabel = "Lien de suivi pour l’hôte";
   return <div className={styles.orderActions}>
-    <a href={orderPath} className={styles.crmAction}>Ouvrir la commande</a>
-    <button type="button" onClick={() => copy(orderPath, "Lien de commande")}>Copier le lien de commande</button>
-    <a href={trackingPath} className={styles.crmAction}>Ouvrir le suivi hôte</a>
-    <button type="button" onClick={() => copy(trackingPath, "Lien de suivi")}>Copier le lien de suivi</button>
+    <a href={orderPath} className={styles.crmAction}>{orderLabel}</a>
+    <button type="button" onClick={() => copy(orderPath, orderLabel)}>Copier le lien de commande pour le client</button>
+    <a href={trackingPath} className={styles.crmAction}>{trackingLabel}</a>
+    <button type="button" onClick={() => copy(trackingPath, trackingLabel)}>Copier le lien de suivi pour l’hôte</button>
     {status && <span role="status">{status}</span>}
   </div>;
 }
