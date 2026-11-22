@@ -27,3 +27,6 @@
 .batchProgress { width: 100%; display: grid; gap: 10px; }
 .batchProgress progress { display: block; width: min(100%, 350px); margin-top: 4px; }
 .batch .pagination { align-items: center; gap: 8px; }
+
+.bulkValidation { display: grid; gap: 10px; width: 100%; padding: 12px; border: 1px solid #dcd0ef; border-radius: 10px; background: #faf8ff; }
+.bulkValidation button { max-width: 100%; }
