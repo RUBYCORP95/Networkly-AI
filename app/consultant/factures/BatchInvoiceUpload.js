@@ -40,6 +40,7 @@ export default function BatchInvoiceUpload({ today, customers = [], clientId = n
   const [reviewPage, setReviewPage] = useState(0);
   const [progress, setProgress] = useState(null);
   const [notice, setNotice] = useState("");
+  const [bulkAcknowledged, setBulkAcknowledged] = useState(false);
 
   function patch(id, fields) {
     setRows(items => items.map(row => row.id === id ? { ...row, ...fields } : row));
@@ -57,9 +58,10 @@ export default function BatchInvoiceUpload({ today, customers = [], clientId = n
     setPhase("reading");
     setNotice("");
     setReviewPage(0);
+    setBulkAcknowledged(false);
     setProgress(null);
     const items = files.map((file, index) => ({ id: batch + "-" + index, file, state: "reading", client: clientId ?? "",
-      number: "", date: "", amount: "", issuer: "", nature: "", account: "", confirmed: false }));
+      number: "", date: "", amount: "", issuer: "", nature: "", account: "", confirmed: false, selectedForValidation: false }));
     setRows(items);
     await processInvoiceBatch(items, async row => {
       if (row.file.size > maxInvoiceBytes || !/\.pdf$/i.test(row.file.name)) {
@@ -103,6 +105,20 @@ export default function BatchInvoiceUpload({ today, customers = [], clientId = n
   const pageStart = page * invoiceReviewPageSize;
   const displayed = rows.slice(pageStart, pageStart + invoiceReviewPageSize);
   const readCount = rows.filter(row => row.state !== "reading").length;
+  const selectable = ready.filter(row => Number.isInteger(parseCents(row.amount)));
+  const selectedForValidation = selectable.filter(row => row.selectedForValidation);
+  const visibleSelectable = displayed.filter(row => row.state === "ready" && Number.isInteger(parseCents(row.amount)));
+  function selectRows(ids, checked) {
+    const idsSet = new Set(ids);
+    setRows(items => items.map(row => idsSet.has(row.id) ? { ...row, selectedForValidation: checked } : row));
+    setBulkAcknowledged(false);
+  }
+  function validateSelected() {
+    if (!bulkAcknowledged || !selectedForValidation.length) return;
+    const idsSet = new Set(selectedForValidation.map(row => row.id));
+    setRows(items => items.map(row => idsSet.has(row.id) ? { ...row, confirmed: true, selectedForValidation: false } : row));
+    setBulkAcknowledged(false);
+  }
 
   function changePage(next, scrollBack) {
     setReviewPage(next);
@@ -160,6 +176,22 @@ export default function BatchInvoiceUpload({ today, customers = [], clientId = n
       {phase === "saving" && progress && <p>Import des PDF · {progress.done} sur {progress.total}
         <progress aria-label="Import des PDF" value={progress.done} max={progress.total} /></p>}
       {!busy && ready.length > 0 && <p>{confirmed} sur {ready.length} PDF prêts à être importés.</p>}
+      {!busy && selectable.length > 0 && <section className={styles.bulkValidation}>
+        <strong>Validation multiple des montants</strong>
+        <div className={styles.pagination}>
+          <button type="button" onClick={() => selectRows(visibleSelectable.map(row => row.id), true)}>Sélectionner cette page</button>
+          <button type="button" onClick={() => selectRows(selectable.map(row => row.id), true)}>Sélectionner tous les montants ({selectable.length})</button>
+          <button type="button" onClick={() => selectRows(selectable.map(row => row.id), false)}>Tout désélectionner</button>
+        </div>
+        <p>{selectedForValidation.length} facture(s) sélectionnée(s). Vérifie les montants affichés avant de confirmer.</p>
+        <label className={shared.invoiceConfirmation}>
+          <input type="checkbox" checked={bulkAcknowledged} onChange={event => setBulkAcknowledged(event.target.checked)} />
+          Je confirme avoir vérifié les montants des {selectedForValidation.length} factures sélectionnées sur les PDF d’origine.
+        </label>
+        <button type="button" disabled={!bulkAcknowledged || !selectedForValidation.length} onClick={validateSelected}>
+          Valider les {selectedForValidation.length} montants sélectionnés
+        </button>
+      </section>}
       {pageButtons("en haut")}
     </div>}
     {displayed.map(row => {
@@ -167,7 +199,7 @@ export default function BatchInvoiceUpload({ today, customers = [], clientId = n
       const change = (field, value) => {
         const updates = {
           [field]: value,
-          ...(field === "amount" ? { confirmed: false } : {}),
+          ...(field === "amount" ? { confirmed: false, selectedForValidation: false } : {}),
           ...(field === "account" ? { accountSuggested: false } : {}),
           ...((field === "issuer" || field === "nature") && row.accountSuggested ? { account: "", accountSuggested: false } : {}),
         };
@@ -178,6 +210,11 @@ export default function BatchInvoiceUpload({ today, customers = [], clientId = n
         <legend>{row.file.name}</legend>
         {row.state === "reading" && <p>Lecture du PDF…</p>}
         {row.state === "ready" && <div className={shared.form}>
+          <label className={shared.invoiceConfirmation}>
+            <input type="checkbox" disabled={busy || !Number.isInteger(amount)} checked={Boolean(row.selectedForValidation)}
+              onChange={event => { patch(row.id, { selectedForValidation: event.target.checked }); setBulkAcknowledged(false); }} />
+            Sélectionner pour validation multiple — {Number.isInteger(amount) ? formatEuros(amount) : "montant manquant"}
+          </label>
           <label>Numéro sur le PDF<input value={row.number} maxLength={80} required readOnly={row.numberRead}
             disabled={busy} onChange={event => change("number", event.target.value)} /></label>
           <label>Date de la facture<input type="date" value={row.date} max={today} required
