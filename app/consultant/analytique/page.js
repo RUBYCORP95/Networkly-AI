@@ -156,7 +156,7 @@ function Sales({ report }) {
   </section>;
 }
 
-function Ledger({ report, commission }) {
+function Ledger({ report, commission = false }) {
   const rows = report.entries.filter(entry => (entry.category === "commission") === commission);
   return <section className={styles.panel}>
     <h2>{commission ? "Commissions Chogan reçues" : "Dépenses"}</h2>
