@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { invoiceAccount, invoiceApi, invoiceIssuer, invoiceNumber, maxInvoiceBatch, maxInvoiceBytes, validInvoiceDate } from "../../../lib/crm/invoice-archive.mjs";
+import { invoiceAccount, invoiceApi, invoiceIssuer, invoiceNumber, invoiceReviewPageSize, invoiceUploadGroups, maxInvoiceBatch, maxInvoiceBytes, processInvoiceBatch, validInvoiceDate } from "../../../lib/crm/invoice-archive.mjs";
 import { formatEuros, parseCents } from "../../../lib/crm/money.mjs";
 import shared from "../consultant.module.css";
 import styles from "./invoices.module.css";
@@ -26,8 +26,12 @@ export default function BatchInvoiceUpload({ today, customers = [], clientId = n
   const router = useRouter();
   const selected = useRef(null);
   const selection = useRef(0);
+  const reviewStart = useRef(null);
   const [rows, setRows] = useState([]);
-  const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState(null);
+  const busy = phase !== null;
+  const [reviewPage, setReviewPage] = useState(0);
+  const [progress, setProgress] = useState(null);
   const [notice, setNotice] = useState("");
 
   function patch(id, fields) {
@@ -43,15 +47,17 @@ export default function BatchInvoiceUpload({ today, customers = [], clientId = n
       return;
     }
     const batch = ++selection.current;
-    setBusy(true);
+    setPhase("reading");
     setNotice("");
+    setReviewPage(0);
+    setProgress(null);
     const items = files.map((file, index) => ({ id: batch + "-" + index, file, state: "reading", client: clientId ?? "",
       number: "", date: "", amount: "", issuer: "", account: "", confirmed: false }));
     setRows(items);
-    for (const row of items) {
+    await processInvoiceBatch(items, async row => {
       if (row.file.size > maxInvoiceBytes || !/\.pdf$/i.test(row.file.name)) {
         patch(row.id, { state: "blocked", message: "Choisis un PDF de 3 Mo maximum." });
-        continue;
+        return;
       }
       try {
         const details = await send("inspect", { invoice: row.file });
@@ -65,8 +71,8 @@ export default function BatchInvoiceUpload({ today, customers = [], clientId = n
       } catch (error) {
         patch(row.id, { state: "blocked", message: error.message });
       }
-    }
-    setBusy(false);
+    });
+    setPhase(null);
     if (selected.current) selected.current.value = "";
   }
 
@@ -82,29 +88,56 @@ export default function BatchInvoiceUpload({ today, customers = [], clientId = n
   }
 
   const ready = rows.filter(row => row.state === "ready");
+  const confirmed = ready.filter(row => canSave(row, today)).length;
+  const pageCount = Math.max(1, Math.ceil(rows.length / invoiceReviewPageSize));
+  const page = Math.min(reviewPage, pageCount - 1);
+  const pageStart = page * invoiceReviewPageSize;
+  const displayed = rows.slice(pageStart, pageStart + invoiceReviewPageSize);
+  const readCount = rows.filter(row => row.state !== "reading").length;
+
+  function changePage(next, scrollBack) {
+    setReviewPage(next);
+    if (scrollBack) reviewStart.current?.focus();
+  }
+
+  function pageButtons(position) {
+    if (pageCount === 1) return null;
+    return <nav className={styles.pagination} aria-label={"Pages du lot, " + position}>
+      <button type="button" disabled={page === 0} onClick={() => changePage(page - 1, position === "en bas")}>Précédents</button>
+      <span>PDF {pageStart + 1} à {pageStart + displayed.length} sur {rows.length}</span>
+      <button type="button" disabled={page + 1 === pageCount} onClick={() => changePage(page + 1, position === "en bas")}>Suivants</button>
+    </nav>;
+  }
   async function upload(event) {
     event.preventDefault();
-    if (busy || !ready.length || !ready.every(row => canSave(row, today))) return;
-    setBusy(true);
+    if (busy || !ready.length || confirmed !== ready.length) return;
+    setPhase("saving");
     setNotice("");
+    setProgress({ done: 0, total: ready.length });
     let archived = 0;
-    for (const row of ready) {
-      try {
-        await send("save", {
-          invoice: row.file, document_number: row.number, document_date: row.date, issuer_name: row.issuer,
-          account_number: row.account, client_id: row.client, document_amount: row.amount,
-          confirmed_cents: String(parseCents(row.amount)),
-        });
-        ++archived;
-        patch(row.id, { state: "saved", message: "Archivée." });
-      } catch (error) {
-        if (error.message === "Cette facture est déjà archivée.") patch(row.id, { state: "duplicate", message: error.message });
-        else patch(row.id, { message: error.message });
+
+    // Keep each issuer in selection order so duplicates and learned accounts are resolved consistently.
+    await processInvoiceBatch(invoiceUploadGroups(ready), async group => {
+      for (const row of group) {
+        try {
+          await send("save", {
+            invoice: row.file, document_number: row.number, document_date: row.date, issuer_name: row.issuer,
+            account_number: row.account, client_id: row.client, document_amount: row.amount,
+            confirmed_cents: String(parseCents(row.amount)),
+          });
+          ++archived;
+          patch(row.id, { state: "saved", message: "Archivée." });
+        } catch (error) {
+          if (error.message === "Cette facture est déjà archivée.") patch(row.id, { state: "duplicate", message: error.message });
+          else patch(row.id, { message: error.message });
+        } finally {
+          setProgress(current => ({ ...current, done: current.done + 1 }));
+        }
       }
-    }
+    });
     if (archived) router.refresh();
     setNotice(archived + (archived === 1 ? " facture archivée." : " factures archivées."));
-    setBusy(false);
+    setPhase(null);
   }
 
   return <form onSubmit={upload} className={styles.batch}>
@@ -112,7 +145,15 @@ export default function BatchInvoiceUpload({ today, customers = [], clientId = n
       <input ref={selected} type="file" accept=".pdf,application/pdf" multiple disabled={busy} onChange={choose} />
     </label>
     <p className={styles.muted}>Jusqu’à {maxInvoiceBatch} PDF à la fois, 3 Mo par fichier. Complète les informations que TESAMI ne peut pas lire.</p>
-    {rows.map(row => {
+    {rows.length > 0 && <div ref={reviewStart} tabIndex={-1} className={styles.batchProgress}>
+      {phase === "reading" && <p>Lecture des PDF · {readCount} sur {rows.length}
+        <progress aria-label="Lecture des PDF" value={readCount} max={rows.length} /></p>}
+      {phase === "saving" && progress && <p>Import des PDF · {progress.done} sur {progress.total}
+        <progress aria-label="Import des PDF" value={progress.done} max={progress.total} /></p>}
+      {!busy && ready.length > 0 && <p>{confirmed} sur {ready.length} PDF prêts à être importés.</p>}
+      {pageButtons("en haut")}
+    </div>}
+    {displayed.map(row => {
       const amount = parseCents(row.amount);
       const change = (field, value) => patch(row.id, {
         [field]: value,
@@ -122,7 +163,7 @@ export default function BatchInvoiceUpload({ today, customers = [], clientId = n
       });
       return <fieldset key={row.id} className={styles.file}>
         <legend>{row.file.name}</legend>
-        {row.state === "reading" && <p role="status">Lecture du PDF…</p>}
+        {row.state === "reading" && <p>Lecture du PDF…</p>}
         {row.state === "ready" && <div className={shared.form}>
           <label>Numéro sur le PDF<input value={row.number} maxLength={80} required readOnly={row.numberRead}
             disabled={busy} onChange={event => change("number", event.target.value)} /></label>
@@ -152,7 +193,8 @@ export default function BatchInvoiceUpload({ today, customers = [], clientId = n
         {row.message && <p role={row.state === "ready" ? "alert" : "status"}>{row.message}</p>}
       </fieldset>;
     })}
-    {rows.length > 0 && <button disabled={busy || !ready.length || !ready.every(row => canSave(row, today))}>
+    {pageButtons("en bas")}
+    {rows.length > 0 && <button disabled={busy || !ready.length || confirmed !== ready.length}>
       {busy ? "Traitement en cours…" : "Importer les factures"}
     </button>}
     {notice && <p role="status">{notice}</p>}
