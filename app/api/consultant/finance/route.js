@@ -95,7 +95,7 @@ export async function POST(request) {
   const table = db.from("crm_finance_entries");
   const query = id ? table.update(values).eq("owner_id", owner).eq("id", id) : table.insert(values);
   const { data, error } = await query.select("id").maybeSingle();
-  return finish(data && !error ? (entry_date >= period.start && entry_date < period.end ? "saved" : "outside") : "error");
+  return finish(data && !error ? (entry_date >= period.start && entry_date <= period.to ? "saved" : "outside") : "error");
 }
 
 function download(content, name, type) {
@@ -130,7 +130,8 @@ export async function GET(request) {
   const format = params.get("format");
   if (format !== "xlsx" && format !== "pdf") return new Response(null, { status: 404 });
   const period = financePeriod(Object.fromEntries(params));
-  const basename = "tesami-finances-" + period.start + "-" + period.type;
+  if (period.invalid) return new Response("Vérifie les dates de début et de fin.", { status: 400 });
+  const basename = "tesami-finances-" + period.start + "-" + (period.type === "range" ? period.to : period.type);
   try {
     const data = await loadFinance(db, owner, period);
     return format === "pdf"

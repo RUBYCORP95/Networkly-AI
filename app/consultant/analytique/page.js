@@ -55,7 +55,7 @@ function Chart({ report }) {
   const max = Math.max(1, ...report.buckets.flatMap(row => series.map(([key]) => row[key])));
   return <section className={styles.panel} aria-labelledby="finance-chart">
     <h2 id="finance-chart">Évolution sur la période</h2>
-    <p className={styles.caption}>{report.period.type === "month" ? "Montants par tranche de 7 jours" : "Montants par mois"}</p>
+    <p className={styles.caption}>{report.chartCaption}</p>
     <ul className={styles.legend}>{series.map(([key, label]) =>
       <li key={key}><span className={styles[key]} aria-hidden="true" />{label}</li>)}</ul>
     <div className={styles.chartScroll}>
@@ -206,6 +206,7 @@ export default async function FinancePage({ searchParams }) {
       </nav>}
     </header>
     <Filters key={period.query} period={period} />
+    {period.invalid && <p className={styles.info} role="alert">Choisis deux dates, avec une date de fin égale ou postérieure à la date de début.</p>}
     {notice && <p className={styles.info} role="status">{notice}</p>}
     {report ? <>
       <Summary report={report} />

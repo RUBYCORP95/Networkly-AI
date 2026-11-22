@@ -40,10 +40,6 @@ export default function EntryForm({ period, entry, commission }) {
 }
 
 export function PeriodFields({ period }) {
-  return <>
-    <input type="hidden" name="period" value={period.type} />
-    <input type="hidden" name="year" value={period.year} />
-    <input type="hidden" name="month" value={period.month} />
-    <input type="hidden" name="quarter" value={period.quarter} />
-  </>;
+  return [...new URLSearchParams(period.query)].map(([name, value]) =>
+    <input key={name} type="hidden" name={name} value={value} />);
 }
