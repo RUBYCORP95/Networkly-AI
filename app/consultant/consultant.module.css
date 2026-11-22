@@ -179,3 +179,12 @@ main.crmPage {
   gap: 10px;
 }
 .orderFields :is(input, select) { box-sizing: border-box; font-size: 16px; }
+
+.form .invoiceConfirmation {
+  flex-basis: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+.form .invoiceConfirmation input { width: 18px; height: 18px; flex: 0 0 18px; margin: 0; }
+.page button:disabled { opacity: .55; cursor: not-allowed; }

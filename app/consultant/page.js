@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Briefcase, CalendarDays, FileText, GraduationCap, MapPin, Sparkles, Users } from "lucide-react";
+import { Briefcase, ChartNoAxesCombined, CalendarDays, FileText, GraduationCap, MapPin, Sparkles, Users } from "lucide-react";
 import styles from "./consultant.module.css";
 
 export const metadata = { title: "Espace Consultant · TESAMI" };
@@ -7,6 +7,7 @@ export const metadata = { title: "Espace Consultant · TESAMI" };
 const sections = [
   { title: "Clients", links: [
     ["/consultant/clients", "Mes clients et rappels", "Gère tes fiches, anniversaires et relances.", Users],
+    ["/consultant/analytique", "Analytique & Finances", "Suis tes ventes, tes dépenses et tes commissions Chogan.", ChartNoAxesCombined],
   ] },
   { title: "Prospection", links: [
     ["/leadfactory", "LeadFactory", "Trouve et suis tes prospects.", Users],

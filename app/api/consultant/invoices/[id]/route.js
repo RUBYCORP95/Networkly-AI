@@ -3,6 +3,8 @@ import { requireConsultant } from "../../../../../lib/auth/consultant";
 import { isDate, parisDate } from "../../../../../lib/crm/dates.mjs";
 import { createServerSupabase } from "../../../../../lib/supabase/server";
 
+import { parseCents } from "../../../../../lib/crm/money.mjs";
+
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const maxPdfBytes = 3 * 1024 * 1024;
 
@@ -23,6 +25,9 @@ export async function POST(request, { params }) {
   if (Number(request.headers.get("content-length")) > maxPdfBytes + 8192) return finish("invoice_invalid");
 
   const form = await request.formData().catch(() => null);
+  const declared = parseCents(form?.get("document_amount"));
+  if (declared === null || !Number.isInteger(declared) ||
+      form?.get("confirmed_cents") !== String(declared)) return finish("invoice_amount");
   const file = form?.get("invoice");
   const document_date = form?.get("document_date");
   if (!isDate(document_date) || document_date > parisDate()) return finish("invoice_invalid");
@@ -33,7 +38,7 @@ export async function POST(request, { params }) {
   const filename = Array.from(file.name.replace(/[\p{C}/\\]/gu, "_").trim().replace(/\.pdf$/i, ""))
     .slice(0, 176).join("") + ".pdf";
   const { error } = await db.from("crm_client_invoices").insert({
-    client_id: id, document_date, filename, pdf: "\\x" + bytes.toString("hex"),
+    client_id: id, document_date, filename, finance_declared_cents: declared, pdf: "\\x" + bytes.toString("hex"),
   });
   return finish(error ? "error" : "invoice");
 }
