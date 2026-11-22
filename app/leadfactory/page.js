@@ -51,7 +51,7 @@ function LeadArchiveButton({ card, busy, onArchive }) {
 }
 
 export default function LeadFactoryPage(){
- const [state,setState]=useState({loading:true,error:"",status:null,cards:[],revealed:{},limited:false});
+ const [state,setState]=useState({loading:true,error:"",status:null,cards:[],limited:false});
  const [busy,setBusy]=useState(null);
  const [converting,setConverting]=useState(null);
  const [archiving,setArchiving]=useState(null);
@@ -104,7 +104,7 @@ export default function LeadFactoryPage(){
    // Le secteur est prêt avant d'afficher les commandes.
    setState(s=>({...s,loading:false,error:"",status,cards:s.cards,limited:false}));
    const {data:cards,error}=await Promise.race([
-     supabase.rpc("my_lead_conversion_cards"),
+     supabase.rpc("my_lead_contact_cards"),
      new Promise((_,reject)=>setTimeout(()=>reject(new Error("Le chargement des contacts prend trop de temps. Réessaie.")),12000))
    ]);
    if(error)throw error;
@@ -180,7 +180,6 @@ export default function LeadFactoryPage(){
   try{
    const contact=await consultantAction("claim_"+kind,candidate.contact_id);
    showContactDetails(contact,candidate.company);
-   setState(current=>({...current,revealed:{...current.revealed,[contact.allocation_id]:contact}}));
    setProspectAvailability(current=>current?{...current,results:current.results.filter(item=>item.contact_id!==candidate.contact_id)}:current);
    if(contact.newly_revealed)setUsage(current=>current?{...current,[kind+"_used"]:current[kind+"_used"]+1}:current);
    await load();
@@ -202,7 +201,9 @@ export default function LeadFactoryPage(){
   try{
    const contact=await consultantAction("reveal",id);
    if(window.matchMedia("(max-width: 767px)").matches)showContactDetails(contact,contact.company);
-   setState(s=>({...s,revealed:{...s.revealed,[id]:contact}}));
+   setState(s=>({...s,cards:s.cards.map(card=>card.allocation_id===id?{
+    ...card,contact_revealed:true,phone:contact.phone,email:contact.email,company:contact.company
+   }:card)}));
    if(contact.newly_revealed)setUsage(current=>current?{...current,[contact.kind+"_used"]:current[contact.kind+"_used"]+1}:current);
    await load();
   }catch(e){setState(s=>({...s,error:e.message||"Impossible de révéler le contact"}));}
@@ -229,6 +230,7 @@ export default function LeadFactoryPage(){
    if(error||!data)throw new Error("Impossible de mettre à jour cette archive.");
    setState(s=>({...s,cards:s.cards.map(card=>card.allocation_id===id?{...card,archived}:card)}));
    if(archived)setContactReveal(contact=>contact?.allocationId===id?null:contact);
+   await load();
   }catch(error){
    setActionError(error.message||"Impossible de mettre à jour cette archive.");
   }finally{setArchiving(null);}
@@ -242,6 +244,7 @@ export default function LeadFactoryPage(){
  const quotaReached=!!usage&&usage[sectorTab+"_used"]>=activeQuota;
  const visibleCards=state.cards.filter(card=>!card.archived);
  const archivedCards=state.cards.filter(card=>card.archived);
+ const assignedCards=visibleCards.filter(card=>card.contact_kind===sectorTab);
  const openContact=state.cards.find(card=>card.allocation_id===contactReveal?.allocationId);
  if(state.limited)return <main className={styles.page}>
    <h1>LeadFactory</h1><p>Pour accéder aux quotas gratuits, envoie ta demande d’accès consultant CHOGAN.</p>
@@ -326,32 +329,28 @@ export default function LeadFactoryPage(){
     <p className={styles.muted}>Secteur : <strong>{s?.sector?.city||"Non renseigné"}</strong> · Rayon : <strong>{s?.sector?.radius_km||"—"} km</strong></p>
     <p className={styles.muted}>Les recherches sont libres. Le premier affichage du numéro de chaque fiche utilise une place dans la catégorie correspondante.</p>
     {usage&&<p role="status">Numéros ouverts aujourd’hui : {usage.klaviyo_used}/{klaviyo} clients CHOGAN · {usage.professional_used}/{professional} professionnels</p>}
-    {sectorTab==="klaviyo"&&<div className={styles.panel} role="tabpanel" style={{marginTop:18}}>
-      <h3>Mes clients CHOGAN attribués ({visibleCards.filter(card=>card.contact_kind==="klaviyo").length})</h3>
-      <p className={styles.muted}>Ces contacts sont déjà attribués à ton compte. Ils ne sont pas encore filtrés par le rayon choisi.</p>
-      {visibleCards.filter(card=>card.contact_kind==="klaviyo").length===0?<p>Aucun client CHOGAN attribué pour le moment.</p>:<div className={styles.cards}>{visibleCards.filter(card=>card.contact_kind==="klaviyo").map(card=><article className={styles.leadCard} key={card.allocation_id}><strong>{card.display_name||"Client CHOGAN"}</strong><p>{[card.city,card.department].filter(Boolean).join(" · ")||"Localisation non renseignée"}</p><button type="button" className={styles.buttonSecondary} onClick={()=>reveal(card.allocation_id)} disabled={busy===card.allocation_id}>{busy===card.allocation_id?"Ouverture…":"Contacter"}</button>{state.revealed[card.allocation_id]?.phone&&<p><a href={"tel:"+state.revealed[card.allocation_id].phone}>{state.revealed[card.allocation_id].phone}</a></p>}{state.revealed[card.allocation_id]?.email&&<p><a href={"mailto:"+state.revealed[card.allocation_id].email}>{state.revealed[card.allocation_id].email}</a></p>}<LeadConversion card={card} busy={converting} onConvert={convertLead} /><LeadArchiveButton card={card} busy={archiving} onArchive={archiveLead} /></article>)}</div>}
-    </div>}
    </div>
   </div>}
-  <div id="lf-my-prospects" className={styles.sectionHeading}><h2>Mes prospects — Google Sheets et CHOGAN</h2><button className={styles.buttonSecondary} onClick={()=>setAdviceOpen(v=>!v)}>{adviceOpen?"Masquer les conseils":"💬 Conseils pour contacter un pro"}</button></div>
+  <div id="lf-my-prospects" className={styles.sectionHeading}><h2>{sectorTab==="klaviyo"?"Mes clients CHOGAN attribués":"Mes prospects professionnels attribués"}</h2><button className={styles.buttonSecondary} onClick={()=>setAdviceOpen(v=>!v)}>{adviceOpen?"Masquer les conseils":"💬 Conseils pour contacter un pro"}</button></div>
   {s&&<p><a href="/consultant/rendez-vous#nouveau" className={styles.buttonSecondary}>Planifier un rendez-vous</a></p>}
-  {s&&visibleCards.length>0&&<div className={styles.cards}>
-    {visibleCards.map(card=>{
-      const contact=state.revealed[card.allocation_id];
-      return <article key={card.allocation_id} className={styles.leadCard}>
-        <h3>{card.contact_kind==="klaviyo"?(card.display_name||"Contact CHOGAN"):"Prospect professionnel"}</h3>
-        <p>{[card.city,card.department].filter(Boolean).join(" · ")}</p>
-        <button type="button" className={styles.buttonSecondary} onClick={()=>reveal(card.allocation_id)} disabled={busy===card.allocation_id}>
-          {busy===card.allocation_id?"Ouverture…":"Contacter"}
-        </button>
-        {(contact||card.contact_revealed)&&<p><a href={"/consultant/rendez-vous?lead="+encodeURIComponent(card.allocation_id)+"#nouveau"}>Planifier un rendez-vous</a></p>}
-        {contact?.phone&&<p><a href={"tel:"+contact.phone}>{contact.phone}</a></p>}
-        {contact?.email&&<p><a href={"mailto:"+contact.email}>{contact.email}</a></p>}
-        <LeadConversion card={card} busy={converting} onConvert={convertLead} />
-        <LeadArchiveButton card={card} busy={archiving} onArchive={archiveLead} />
-      </article>;
-    })}
-  </div>}
+  {s&&(assignedCards.length>0?<div className={styles.cards}>
+    {assignedCards.map(card=><article key={card.allocation_id} className={styles.leadCard}>
+      <h3>{card.display_name||card.company||(card.contact_kind==="klaviyo"?"Contact CHOGAN":"Prospect professionnel")}</h3>
+      <p>{[card.city,card.department].filter(Boolean).join(" · ")||"Localisation non renseignée"}</p>
+      {!card.contact_revealed&&<button type="button" className={styles.buttonSecondary}
+        onClick={()=>reveal(card.allocation_id)} disabled={busy===card.allocation_id}>
+        {busy===card.allocation_id?"Ouverture…":"Contacter"}
+      </button>}
+      {card.contact_revealed&&<>
+        {card.phone&&<p><a href={"tel:"+card.phone}>{card.phone}</a></p>}
+        {card.email&&<p><a href={"mailto:"+card.email}>{card.email}</a></p>}
+        {!card.phone&&!card.email&&<p>Coordonnées indisponibles.</p>}
+        <p><a href={"/consultant/rendez-vous?lead="+encodeURIComponent(card.allocation_id)+"#nouveau"}>Planifier un rendez-vous</a></p>
+      </>}
+      <LeadConversion card={card} busy={converting} onConvert={convertLead} />
+      <LeadArchiveButton card={card} busy={archiving} onArchive={archiveLead} />
+    </article>)}
+  </div>:<p>Aucun contact attribué dans cette catégorie.</p>)}
   {archivedCards.length>0&&<details className={styles.panel}>
     <summary>Prospects archivés ({archivedCards.length})</summary>
     <ul>
