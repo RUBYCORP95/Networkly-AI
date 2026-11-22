@@ -24,7 +24,7 @@ async function context() {
 
 async function ownedSession(db, owner, id) {
   if (!hostUuid.test(id)) return null;
-  const { data } = await db.from("crm_host_sessions").select("id,kind").eq("id", id).eq("owner_id", owner).maybeSingle();
+  const { data } = await db.from("crm_host_sessions").select("id,kind,status").eq("id", id).eq("owner_id", owner).maybeSingle();
   return data;
 }
 
@@ -49,6 +49,7 @@ export async function saveHost(form) {
       !Number.isInteger(shipping_cents) || (kind === "case" && (!isDate(ends_on) || ends_on < starts_on)) ||
       (kind === "meeting" && (!venue || venue.length > 240 || guests.length > 4000 || !Object.hasOwn(meetingDeliveryModes, delivery_mode))) ||
       (delivery_address && (delivery_address.length < 5 || delivery_address.length > 500))) finish(kind, existing?.id, "invalid");
+  if (kind === "meeting" && status === "closed" && existing?.status !== "closed") finish(kind, id, "review-required");
   const values = { host_client_id, host_name, starts_on, ends_on, venue, guests, status, shipping_cents, delivery_mode, delivery_address };
   const table = db.from("crm_host_sessions");
   const query = existing ? table.update(values).eq("id", id).eq("owner_id", owner) : table.insert({ ...values, kind });
@@ -87,4 +88,36 @@ export async function attachOrder(form) {
   const { data, error } = await db.from("crm_orders").update({ host_session_id: session.id })
     .eq("owner_id", owner).eq("id", order).is("host_session_id", null).select("id").maybeSingle();
   finish(session.kind, session.id, !error && data ? "saved" : "unavailable-order");
+}
+
+export async function reviewMeetingOrder(form) {
+  const { db } = await context();
+  const meeting = field(form, "session_id");
+  const order = field(form, "order_id");
+  const payment = field(form, "payment");
+  const destination = field(form, "delivery_address");
+  if (!hostUuid.test(meeting) || !hostUuid.test(order) || !["paid", "later"].includes(payment) ||
+      (destination && (destination.length < 5 || destination.length > 500))) {
+    finish("meeting", hostUuid.test(meeting) ? meeting : null, "invalid");
+  }
+  const { data, error } = await db.rpc("review_crm_meeting_order", { meeting, order_id: order, payment, destination: destination || null });
+  finish("meeting", meeting, !error && data ? "payment-reviewed" : "error");
+}
+
+export async function closeMeeting(form) {
+  const { db, owner } = await context();
+  const id = field(form, "session_id");
+  const delivery_mode = field(form, "delivery_mode");
+  const delivery_address = delivery_mode === "grouped" ? field(form, "delivery_address") || null : null;
+  if (!hostUuid.test(id) || !Object.hasOwn(meetingDeliveryModes, delivery_mode) ||
+      (delivery_address && (delivery_address.length < 5 || delivery_address.length > 500))) {
+    finish("meeting", hostUuid.test(id) ? id : null, "invalid");
+  }
+  const { data, error } = await db.from("crm_host_sessions").update({ status: "closed", delivery_mode, delivery_address })
+    .eq("owner_id", owner).eq("id", id).eq("kind", "meeting").in("status", ["active", "planned"]).select("id").maybeSingle();
+  const reasons = {
+    "Meeting orders require payment review": "review-required",
+    "Meeting orders require delivery addresses": "addresses-required",
+  };
+  finish("meeting", id, error ? reasons[error.message] ?? "error" : data ? "meeting-closed" : "invalid");
 }

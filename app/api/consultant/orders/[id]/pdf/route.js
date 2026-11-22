@@ -20,11 +20,12 @@ async function downloadOrder({ id }, archive) {
   if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id)) {
     return new Response(null, { status: 404 });
   }
-  const { data: order, error } = await db.from("crm_orders").select(orderFields + ",client_id").eq("id", id).maybeSingle();
+  const { data: order, error } = await db.from("crm_orders").select(orderFields + ",client_id,delivery_address,crm_host_sessions(delivery_mode)").eq("id", id).maybeSingle();
   if (error) return new Response(null, { status: 500 });
   if (!order) return new Response(null, { status: 404 });
 
-  const pdf = await makeOrderPdf(order);
+  const address = order.crm_host_sessions?.delivery_mode === "individual" ? order.delivery_address : null;
+  const pdf = await makeOrderPdf(address ? { ...order, buyer: { ...order.buyer, address } } : order);
   const filename = receiptNumber(id) + ".pdf";
   if (archive) {
     const { error: archiveError } = await db.from("crm_client_invoices").upsert({

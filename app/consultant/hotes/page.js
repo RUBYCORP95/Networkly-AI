@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { formatDate, parisDate } from "../../../lib/crm/dates.mjs";
-import { hostCaseStatuses, hostKinds, hostLinkActive, hostStatuses, hostUuid, meetingDeliveryModes } from "../../../lib/crm/hosts.mjs";
+import { hostCaseStatuses, hostKinds, hostLinkActive, hostStatuses, hostUuid, meetingDeliveryModes, meetingOrderReviewed } from "../../../lib/crm/hosts.mjs";
+import { readMeetingOrders } from "../../../lib/crm/meeting-orders";
 import { formatEuros } from "../../../lib/crm/money.mjs";
 import { orderStatuses, paymentStatuses, receiptNumber } from "../../../lib/crm/order-receipt.mjs";
 import styles from "../consultant.module.css";
-import { attachOrder, manageGift, saveHost } from "./actions";
+import { attachOrder, closeMeeting, manageGift, reviewMeetingOrder, saveHost } from "./actions";
 import HostLinks from "./HostLinks";
 import HostSummary from "./HostSummary";
 
@@ -15,6 +16,10 @@ export const metadata = { title: "Hôte / Hôtesse · TESAMI" };
 const root = "/consultant/hotes";
 const notices = {
   saved: "Enregistré.",
+  "meeting-closed": "Réunion clôturée.",
+  "addresses-required": "Renseigne l’adresse sur chaque bon avant de choisir la livraison chez les clients.",
+  "payment-reviewed": "Paiement du bon validé.",
+  "review-required": "Valide le paiement de chaque bon avant de clôturer la réunion.",
   invalid: "Vérifie les champs renseignés et les dates.",
   "delivery-locked": "Le mode de livraison est déjà associé aux bons de cette réunion.",
   error: "L’enregistrement a échoué. Réessaie dans un instant.",
@@ -53,7 +58,9 @@ function SessionForm({ kind, session, today, clients }) {
       <label>Invités (un par ligne)<textarea name="guests" maxLength={4000} defaultValue={session?.guests} rows={3} /></label>
     </>}
     <label>Statut<select name="status" defaultValue={session?.status ?? "planned"}>
-      {Object.entries(isCase ? hostCaseStatuses : hostStatuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      {Object.entries(isCase ? hostCaseStatuses : hostStatuses)
+        .filter(([value]) => isCase || value !== "closed" || session?.status === "closed")
+        .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
     </select></label>
     <label>Livraison par commande (€)<input name="shipping" inputMode="decimal"
       defaultValue={session ? (session.shipping_cents / 100).toFixed(2) : "0,00"} /></label>
@@ -95,10 +102,15 @@ export default async function HostsPage({ searchParams }) {
     db.from("crm_host_gifts").select("id,label,threshold_cents,delivered_at").eq("session_id", id).order("threshold_cents"),
     (order ? db.from("crm_orders").select("id,order_date,total_cents,shipping_cents").eq("id", order).is("host_session_id", null)
       : db.from("crm_orders").select("id,order_date,total_cents,shipping_cents").is("host_session_id", null).order("order_date", { ascending: false }).limit(30)),
-    db.from("crm_orders").select("id,client_id,order_date,total_cents,shipping_cents,status,payment_status,delivery_address")
-      .eq("host_session_id", id).order("order_date", { ascending: false }).order("id").limit(30),
+    kind === "meeting" ? readMeetingOrders(db, id, { includeCancelled: true }) :
+      db.from("crm_orders").select("id,client_id,order_date,total_cents,shipping_cents,status,payment_status")
+        .eq("host_session_id", id).order("order_date", { ascending: false }).order("id").limit(30),
     db.from("crm_host_clients").select("client_id,crm_clients(name)", { count: "exact" }).eq("session_id", id).order("client_id").limit(30),
   ]) : [];
+
+  const reviewedOrders = linkedOrders?.data ?? [];
+  const remaining = kind === "meeting" ? reviewedOrders.filter(order => order.status !== "cancelled" && !meetingOrderReviewed(order)).length : 0;
+  const canClose = kind !== "meeting" || (!linkedOrders?.error && remaining === 0);
 
   return <main className={styles.page}>
     <Link href="/consultant">← Espace Consultant</Link>
@@ -145,24 +157,50 @@ export default async function HostsPage({ searchParams }) {
       {session.kind === "meeting" && session.delivery_mode === "grouped" && <section className={styles.panel}>
         <h2>Bon de livraison groupée</h2>
         <p>Livraison chez {session.host_name} · {session.delivery_address || session.venue}</p>
-        {session.status === "closed" ?
+        {session.status === "closed" && canClose ?
           <Link className={styles.crmAction} href={"/api/consultant/hotes/" + session.id + "/livraison"}>Télécharger le bon groupé (PDF)</Link> :
-          <p>Clôture la réunion pour obtenir le bon groupé des commandes rattachées.</p>}
+          <p>{session.status === "closed" ? "Valide les paiements pour actualiser le bon groupé." :
+            "Valide les paiements puis clôture la réunion pour obtenir le bon groupé."}</p>}
       </section>}
-      <ExistingOrders session={session} orders={orders.data} />
+      {!(kind === "meeting" && session.status === "closed") && <ExistingOrders session={session} orders={orders.data} />}
       <section className={styles.panel}>
-        <h2>Bons rattachés</h2>
+        <h2>{kind === "meeting" ? "Validation des bons rattachés" : "Bons rattachés"}</h2>
+        {kind === "meeting" && remaining > 0 && <p className={styles.notice}>
+          {remaining} bon(s) à valider. Choisis « Payé » ou « À payer plus tard » pour chacun.
+        </p>}
         {linkedOrders.error ? <p role="alert">Les bons sont temporairement indisponibles.</p> :
           linkedOrders.data.length ? <ul className={styles.trips}>{linkedOrders.data.map(order => <li key={order.id}>
             <Link href={"/consultant/clients?" + new URLSearchParams({ client: order.client_id, view: "history" })}>
-              {receiptNumber(order.id)}
+              {receiptNumber(order.id)}{order.buyer?.name ? " · " + order.buyer.name : ""}
             </Link> · {formatDate(order.order_date)} · {new Map(orderStatuses).get(order.status)} · {new Map(paymentStatuses).get(order.payment_status)}
             {order.total_cents != null && " · " + formatEuros(order.total_cents + order.shipping_cents)}
-            {session.delivery_mode === "individual" && <div style={{ whiteSpace: "pre-line" }}>
-              {order.delivery_address || "Adresse de livraison à confirmer"}
-            </div>}
+            {kind === "meeting" && order.status !== "cancelled" && session.status !== "cancelled" && <form action={reviewMeetingOrder} className={styles.orderActions}>
+              <input type="hidden" name="session_id" value={session.id} />
+              <input type="hidden" name="order_id" value={order.id} />
+              <label>Adresse de livraison chez le client (si nécessaire)
+                <textarea name="delivery_address" minLength={5} maxLength={500} rows={2} defaultValue={order.delivery_address ?? ""} />
+              </label>
+              <span>{meetingOrderReviewed(order) ? "Paiement validé" : "Paiement à valider"}</span>
+              <button name="payment" value="paid">Valider comme payé</button>
+              <button name="payment" value="later">Valider comme à payer plus tard</button>
+            </form>}
           </li>)}</ul> : <p>Aucun bon rattaché pour le moment.</p>}
       </section>
+      {kind === "meeting" && ["planned", "active"].includes(session.status) && <section className={styles.panel}>
+        <h2>Validation finale de la réunion</h2>
+        {!canClose && <p>Valide chaque bon rattaché pour pouvoir clôturer la réunion.</p>}
+        <form className={styles.form} action={closeMeeting}>
+          <input type="hidden" name="session_id" value={session.id} />
+          <label>Mode de livraison final<select name="delivery_mode" defaultValue={session.delivery_mode ?? ""} required>
+            <option value="" disabled>Choisir le mode de livraison</option>
+            {Object.entries(meetingDeliveryModes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select></label>
+          <label>Adresse de livraison chez l’hôte (si différente du lieu)
+            <textarea name="delivery_address" maxLength={500} rows={2} defaultValue={session.delivery_address ?? ""} />
+          </label>
+          <button disabled={!canClose}>Valider et clôturer la réunion</button>
+        </form>
+      </section>}
       <section className={styles.panel}>
         {sales.error || gifts.error ? <p role="alert">Les ventes et cadeaux sont temporairement indisponibles.</p> :
           <HostSummary sales={sales.data} gifts={gifts.data} session={session} />}
