@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { formatDate, parisDate } from "../../../lib/crm/dates.mjs";
-import { hostCaseStatuses, hostKinds, hostLinkActive, hostStatuses, hostUuid, meetingDeliveryModes, meetingOrderReviewed } from "../../../lib/crm/hosts.mjs";
+import { hostCaseStatuses, hostKinds, hostLinkActive, hostStatuses, hostUuid, meetingDeliveryModes, meetingOrderDeliveryMode, meetingOrderReviewed, meetingShippingRate } from "../../../lib/crm/hosts.mjs";
 import { readMeetingOrders } from "../../../lib/crm/meeting-orders";
 import { formatEuros } from "../../../lib/crm/money.mjs";
 import { orderStatuses, paymentStatuses, receiptNumber } from "../../../lib/crm/order-receipt.mjs";
 import styles from "../consultant.module.css";
-import { attachOrder, closeMeeting, manageGift, reviewMeetingOrder, saveHost } from "./actions";
+import { attachOrder, closeMeeting, manageGift, manageMeetingPromo, reviewMeetingOrder, saveHost, saveMeetingOrderGift } from "./actions";
 import HostLinks from "./HostLinks";
 import HostSummary from "./HostSummary";
 
@@ -16,6 +16,9 @@ export const metadata = { title: "Hôte / Hôtesse · TESAMI" };
 const root = "/consultant/hotes";
 const notices = {
   saved: "Enregistré.",
+  "promo-saved": "Code promo enregistré.",
+  "promo-duplicate": "Ce code existe déjà pour cette réunion.",
+  "gift-saved": "Cadeau mis à jour.",
   "meeting-closed": "Réunion clôturée.",
   "addresses-required": "Renseigne l’adresse sur chaque bon avant de choisir la livraison chez les clients.",
   "payment-reviewed": "Paiement du bon validé.",
@@ -33,11 +36,6 @@ function sessionUrl(kind, id, order) {
   if (id) params.set("session", id);
   if (order) params.set("order", order);
   return root + "?" + params;
-}
-
-function closingShipping(session, mode) {
-  const rate = mode === "grouped" ? session.grouped_shipping_cents : session.individual_shipping_cents;
-  return formatEuros(rate ?? session.shipping_cents);
 }
 
 function SessionForm({ kind, session, today, clients }) {
@@ -89,11 +87,40 @@ function ExistingOrders({ session, orders }) {
     {orders?.length ? <form action={attachOrder} className={styles.form}>
       <input type="hidden" name="session_id" value={session.id} />
       <label>Bon de commande<select name="order_id" required>
-        {orders.map(order => <option key={order.id} value={order.id}>{receiptNumber(order.id)} · {formatDate(order.order_date)}
+        {orders.map(order => <option key={order.id} value={order.id}>{receiptNumber(order)} · {formatDate(order.order_date)}
           {order.total_cents != null ? " · " + formatEuros(order.total_cents + order.shipping_cents) : ""}</option>)}
       </select></label>
       <button>Rattacher le bon</button>
     </form> : <p>Aucun bon disponible à rattacher.</p>}
+  </section>;
+}
+
+function MeetingPromos({ session, promos, orders }) {
+  const editable = !["closed", "cancelled"].includes(session.status);
+  const uses = new Map();
+  for (const order of orders) {
+    if (order.meeting_promo_id) uses.set(order.meeting_promo_id, (uses.get(order.meeting_promo_id) ?? 0) + 1);
+  }
+  return <section className={styles.panel}>
+    <h2>Codes promo de la réunion</h2>
+    <p>Communique le code aux clients concernés. Ils pourront le saisir sur leur bon de commande.</p>
+    {promos.error ? <p role="alert">Les codes promo sont temporairement indisponibles.</p> :
+      <ul className={styles.trips}>{promos.data.map(promo => <li key={promo.id}>
+        <strong>{promo.code}</strong> · {promo.discount_bp / 100} % · {uses.get(promo.id) ?? 0}{promo.max_uses ? " / " + promo.max_uses : ""} utilisation(s)
+        {editable && <form action={manageMeetingPromo} className={styles.orderActions}>
+          <input type="hidden" name="session_id" value={session.id} />
+          <input type="hidden" name="promo_id" value={promo.id} />
+          <input type="hidden" name="active" value={String(!promo.active)} />
+          <button>{promo.active ? "Désactiver le code" : "Réactiver le code"}</button>
+        </form>}
+      </li>)}</ul>}
+    {editable && <form action={manageMeetingPromo} className={styles.form}>
+      <input type="hidden" name="session_id" value={session.id} />
+      <label>Code à communiquer<input name="code" minLength={3} maxLength={30} required placeholder="Ex. REUNION10" /></label>
+      <label>Remise (%)<input name="discount_percent" type="number" min="0.01" max="100" step="0.01" required /></label>
+      <label>Nombre maximum d’utilisations<input name="max_uses" type="number" min="1" max="99999" placeholder="Vide = illimité" /></label>
+      <button>Créer le code promo</button>
+    </form>}
   </section>;
 }
 
@@ -111,19 +138,21 @@ export default async function HostsPage({ searchParams }) {
   ]);
   const { data: session } = id ? await db.from("crm_host_sessions")
     .select("id,kind,host_name,host_client_id,starts_on,ends_on,venue,guests,status,shipping_cents,grouped_shipping_cents,individual_shipping_cents,delivery_mode,delivery_address,order_token,tracking_token").eq("id", id).eq("kind", kind).maybeSingle() : {};
-  const [sales, gifts, orders, linkedOrders, affiliates] = session ? await Promise.all([
+  const [sales, gifts, orders, linkedOrders, affiliates, promos] = session ? await Promise.all([
     db.from("crm_host_sales").select("paid_orders,paid_cents").eq("session_id", id).maybeSingle(),
     db.from("crm_host_gifts").select("id,label,threshold_cents,delivered_at").eq("session_id", id).order("threshold_cents"),
-    (order ? db.from("crm_orders").select("id,order_date,total_cents,shipping_cents").eq("id", order).is("host_session_id", null)
-      : db.from("crm_orders").select("id,order_date,total_cents,shipping_cents").is("host_session_id", null).order("order_date", { ascending: false }).limit(30)),
+    (order ? db.from("crm_orders").select("id,order_number,order_date,total_cents,shipping_cents").eq("id", order).is("host_session_id", null)
+      : db.from("crm_orders").select("id,order_number,order_date,total_cents,shipping_cents").is("host_session_id", null).order("order_date", { ascending: false }).limit(30)),
     kind === "meeting" ? readMeetingOrders(db, id, { includeCancelled: true }) :
-      db.from("crm_orders").select("id,client_id,order_date,total_cents,shipping_cents,status,payment_status")
+      db.from("crm_orders").select("id,order_number,client_id,order_date,total_cents,shipping_cents,status,payment_status")
         .eq("host_session_id", id).order("order_date", { ascending: false }).order("id").limit(30),
     db.from("crm_host_clients").select("client_id,crm_clients(name)", { count: "exact" }).eq("session_id", id).order("client_id").limit(30),
+    kind === "meeting" ? db.from("crm_meeting_promos").select("id,code,discount_bp,max_uses,active").eq("session_id", id).order("code") : null,
   ]) : [];
 
   const reviewedOrders = linkedOrders?.data ?? [];
   const remaining = kind === "meeting" ? reviewedOrders.filter(order => order.status !== "cancelled" && !meetingOrderReviewed(order)).length : 0;
+  const grouped = kind === "meeting" && reviewedOrders.filter(order => order.status !== "cancelled" && meetingOrderDeliveryMode(order, session) === "grouped");
   const canClose = kind !== "meeting" || (!linkedOrders?.error && remaining === 0);
 
   return <main className={styles.page}>
@@ -137,7 +166,7 @@ export default async function HostsPage({ searchParams }) {
     {typeof query.result === "string" && Object.hasOwn(notices, query.result) &&
       <p className={styles.notice} role="status">{notices[query.result]}</p>}
     {!seller.data && <p><Link href="/consultant/clients?view=settings">Configure tes coordonnées professionnelles</Link> pour ouvrir les commandes.</p>}
-    {order && !session && <p>Sélectionne la session à laquelle rattacher le bon {receiptNumber(order)}.</p>}
+    {order && !session && <p>Sélectionne la session à laquelle rattacher ce bon.</p>}
     <section>
       <h2>{hostKinds[kind]}</h2>
       {sessions.error ? <p role="alert">Les sessions sont temporairement indisponibles.</p> :
@@ -159,6 +188,7 @@ export default async function HostsPage({ searchParams }) {
         <p>Commandes {seller.data && hostLinkActive(session, today) ? "ouvertes" : "fermées"}.</p>
         <HostLinks key={session.id} orderPath={"/hote/commande/" + session.order_token} trackingPath={"/hote/suivi/" + session.tracking_token} />
       </section>
+      {kind === "meeting" && <MeetingPromos session={session} promos={promos} orders={reviewedOrders} />}
       <section className={styles.panel}>
         <h2>Clients rattachés à cette session</h2>
         {affiliates.error ? <p role="alert">Le suivi des clients est temporairement indisponible.</p> :
@@ -168,10 +198,10 @@ export default async function HostsPage({ searchParams }) {
             </Link></li>)}
           </ul></> : <p>Aucun client rattaché pour le moment.</p>}
       </section>
-      {session.kind === "meeting" && session.delivery_mode === "grouped" && <section className={styles.panel}>
+      {grouped?.length > 0 && <section className={styles.panel}>
         <h2>Bon de livraison groupée</h2>
         <p>Livraison chez {session.host_name} · {session.delivery_address || session.venue}</p>
-        {session.status === "closed" && canClose ?
+        {session.status === "closed" && grouped.every(meetingOrderReviewed) ?
           <Link className={styles.crmAction} href={"/api/consultant/hotes/" + session.id + "/livraison"}>Télécharger le bon groupé (PDF)</Link> :
           <p>{session.status === "closed" ? "Valide les paiements pour actualiser le bon groupé." :
             "Valide les paiements puis clôture la réunion pour obtenir le bon groupé."}</p>}
@@ -185,9 +215,25 @@ export default async function HostsPage({ searchParams }) {
         {linkedOrders.error ? <p role="alert">Les bons sont temporairement indisponibles.</p> :
           linkedOrders.data.length ? <ul className={styles.trips}>{linkedOrders.data.map(order => <li key={order.id}>
             <Link href={"/consultant/clients?" + new URLSearchParams({ client: order.client_id, view: "history" })}>
-              {receiptNumber(order.id)}{order.buyer?.name ? " · " + order.buyer.name : ""}
+              {receiptNumber(order)}{order.buyer?.name ? " · " + order.buyer.name : ""}
             </Link> · {formatDate(order.order_date)} · {new Map(orderStatuses).get(order.status)} · {new Map(paymentStatuses).get(order.payment_status)}
             {order.total_cents != null && " · " + formatEuros(order.total_cents + order.shipping_cents)}
+            {kind === "meeting" && <div className={styles.orderActions}>
+              <span>{meetingDeliveryModes[meetingOrderDeliveryMode(order, session)] || "Livraison à préciser"} · {formatEuros(order.shipping_cents)}</span>
+              <Link className={styles.crmAction} href={"/consultant/clients?" + new URLSearchParams({ client: order.client_id, view: "history", edit: order.id })}>Modifier le bon</Link>
+              {session.status === "closed" && order.status !== "cancelled" && meetingOrderDeliveryMode(order, session) === "individual" &&
+                <a className={styles.crmAction} href={"/api/consultant/orders/" + order.id + "/pdf"}>Télécharger le bon individuel (PDF)</a>}
+            </div>}
+            {kind === "meeting" && order.status !== "cancelled" && <details>
+              <summary>{order.gift_product ? "Cadeau offert · " + order.gift_quantity + " × " + order.gift_product : "Ajouter un cadeau"}</summary>
+              <form action={saveMeetingOrderGift} className={styles.form}>
+                <input type="hidden" name="session_id" value={session.id} />
+                <input type="hidden" name="order_id" value={order.id} />
+                <label>Nom du produit offert<input name="gift_product" maxLength={220} defaultValue={order.gift_product ?? ""} /></label>
+                <label>Quantité offerte<input name="gift_quantity" type="number" min="1" max="999" defaultValue={order.gift_quantity ?? 1} /></label>
+                <button>Enregistrer le cadeau</button>
+              </form>
+            </details>}
             {kind === "meeting" && order.status !== "cancelled" && session.status !== "cancelled" && <form action={reviewMeetingOrder} className={styles.orderActions}>
               <input type="hidden" name="session_id" value={session.id} />
               <input type="hidden" name="order_id" value={order.id} />
@@ -205,11 +251,11 @@ export default async function HostsPage({ searchParams }) {
         {!canClose && <p>Valide chaque bon rattaché pour pouvoir clôturer la réunion.</p>}
         <form className={styles.form} action={closeMeeting}>
           <input type="hidden" name="session_id" value={session.id} />
-          <p>Le tarif choisi sera appliqué aux bons à payer plus tard. Les montants déjà payés sont conservés.</p>
-          <label>Mode de livraison final<select name="delivery_mode" defaultValue={session.delivery_mode ?? ""} required>
+          <p>Les choix et les frais de livraison des clients sont conservés. Ce mode s’applique aux anciens bons sans choix de livraison.</p>
+          <label>Mode de livraison pour les bons sans choix<select name="delivery_mode" defaultValue={session.delivery_mode ?? ""} required>
             <option value="" disabled>Choisir le mode de livraison</option>
             {Object.entries(meetingDeliveryModes).map(([value, label]) =>
-              <option key={value} value={value}>{label} · {closingShipping(session, value)} par bon</option>)}
+              <option key={value} value={value}>{label} · {formatEuros(meetingShippingRate(session, value))} par bon</option>)}
           </select></label>
           <label>Adresse de livraison chez l’hôte (si différente du lieu)
             <textarea name="delivery_address" maxLength={500} rows={2} defaultValue={session.delivery_address ?? ""} />

@@ -25,6 +25,8 @@ const notices = new Map([
   ["invalid_payment", "Renseigne un nom et un lien HTTPS valide pour chaque moyen de paiement."],
   ["payment_saved", "Moyens de paiement enregistrés."],
   ["seller_required", "Enregistre d’abord tes coordonnées professionnelles."],
+  ["prefix_taken", "Ce préfixe est déjà réservé par un autre consultant."],
+  ["prefix_invalid", "Saisis 2 à 12 lettres ou chiffres en commençant par une lettre. Les préfixes BC suivis uniquement de chiffres sont réservés."],
   ["seller", "Coordonnées professionnelles enregistrées."],
   ["order", "Commande enregistrée."],
   ["invoice", "Facture importée."],
@@ -78,6 +80,11 @@ function SellerForm({ seller }) {
           <input name={key} type={key === "email" ? "email" : key === "phone" ? "tel" : "text"}
             required={key === "name" || key === "email"} maxLength={maxLength} defaultValue={seller?.[key]} />}
       </label>)}
+      <label>Préfixe des nouveaux bons de commande
+        <input name="order_prefix" maxLength={12} autoComplete="off" placeholder={seller?.order_namespace ? "BC" + seller.order_namespace : "Ex. RUBY"}
+          defaultValue={seller?.order_prefix ?? ""} />
+        <small>Ex. RUBY-000123. Vide, TESAMI attribue ton préfixe automatiquement.</small>
+      </label>
       <button>Enregistrer mes coordonnées</button>
     </form>
   </section>;
@@ -85,7 +92,7 @@ function SellerForm({ seller }) {
 
 function orderEmailDraft(order, recipient, paymentLinks) {
   const address = encodeURIComponent(recipient).replace(/%40/g, "@");
-  const subject = encodeURIComponent("Votre bon de commande " + receiptNumber(order.id));
+  const subject = encodeURIComponent("Votre bon de commande " + receiptNumber(order));
   const body = encodeURIComponent(receiptEmailText(order, paymentLinks).replace(/\n/g, "\r\n"));
   return `mailto:${address}?subject=${subject}&body=${body}`;
 }
@@ -196,7 +203,7 @@ async function AllOrders({ db, params }) {
 function OrderHistory({ orders, clientId, clientEmail, editId, today, paymentLinks }) {
   const orderToEdit = editId && orders.data?.find(order => order.id === editId);
   if (orderToEdit) return <section>
-    <h2>Modifier le bon de commande {receiptNumber(orderToEdit.id)}</h2>
+    <h2>Modifier le bon de commande {receiptNumber(orderToEdit)}</h2>
     <p><Link className={styles.crmAction} href={"?" + new URLSearchParams({ client: clientId, view: "history" })}>Annuler</Link></p>
     <OrderForm key={orderToEdit.id} order={orderToEdit} today={today} submitAction={editOrder.bind(null, orderToEdit.id, clientId)} />
   </section>;
@@ -253,7 +260,7 @@ export default async function ClientsPage({ searchParams }) {
   if (params.view === "orders") return <AllOrders db={db} params={params} />;
   const [customers, seller, reminders, activeFollowups, orderCount, customerInvite] = await Promise.all([
     db.from("crm_clients").select("id,name,email,phone,birth_date,birthday_notification", { count: "exact" }).order("name").order("id"),
-    db.from("crm_seller_profiles").select("name,business,email,phone,address,registration,payment_links").maybeSingle(),
+    db.from("crm_seller_profiles").select("name,business,email,phone,address,registration,payment_links,order_prefix,order_namespace").maybeSingle(),
     db.from("crm_followups").select("id,client_id,due_date,notification,completed_at").order("due_date"),
     db.from("crm_followups").select("id", { count: "exact", head: true }).is("completed_at", null),
     db.from("crm_orders").select("id", { count: "exact", head: true }),

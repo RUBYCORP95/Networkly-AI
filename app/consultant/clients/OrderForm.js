@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { formatEuros, parseCents } from "../../../lib/crm/money.mjs";
 import { discountCents, lineTotal, orderTotals, readDiscount, savedOrderTotals } from "../../../lib/crm/order-pricing.mjs";
 import { orderDate } from "../../../lib/crm/order-receipt.mjs";
+import { checkMeetingPromo } from "../../hote/commande/[token]/actions";
 import { addOrder } from "./actions";
 import styles from "../consultant.module.css";
 
@@ -28,7 +29,7 @@ function DiscountFields({ label, type, value, onType, onValue, global = false })
   </>;
 }
 
-export default function OrderForm({ clientId, token, fixedShipping = 0, order, today, children, submitAction = addOrder }) {
+export default function OrderForm({ clientId, token, fixedShipping = 0, deliveryOptions, defaultDeliveryMode, order, today, children, submitAction = addOrder }) {
   const [{ mode, query }, setSearch] = useState({ mode: "code", query: "" });
   const [items, setItems] = useState([]);
   const [lines, setLines] = useState(() => (order?.items ?? []).map(item => ({
@@ -37,6 +38,25 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, order, t
     discountType: item.discount?.type ?? "percent",
     discountValue: item.discount ? String(item.discount.amount / 100) : "",
   })));
+  const [promoInput, setPromoInput] = useState("");
+  const [promoCheck, setPromoCheck] = useState(null);
+  const [checkingPromo, setCheckingPromo] = useState(false);
+  const activePromo = promoCheck?.code === promoInput.trim().toUpperCase() ? promoCheck : null;
+
+  async function applyPromo() {
+    setCheckingPromo(true);
+    const code = promoInput.trim().toUpperCase();
+    try {
+      const match = await checkMeetingPromo(token, code);
+      setPromoCheck(match ?? { code, amount: null });
+    } catch {
+      setPromoCheck({ code, amount: null });
+    } finally {
+      setCheckingPromo(false);
+    }
+  }
+
+  const [deliveryMode, setDeliveryMode] = useState(defaultDeliveryMode ?? "grouped");
   const [shipping, setShipping] = useState(order ? String(order.shipping_cents / 100) : "");
   const legacyOrder = order && !order.items.length ? order : null;
   const legacySubtotal = legacyOrder ? savedOrderTotals(legacyOrder).subtotal : null;
@@ -109,8 +129,10 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, order, t
     discount: token ? null : previewDiscount(line.discountType, line.discountValue),
   }));
   const productTotal = lines.length ? pricedLines.reduce((sum, line) => sum + lineTotal(line), 0) : legacySubtotal;
-  const shippingCents = token ? fixedShipping : parseCents(shipping) ?? 0;
-  const { savings, total } = orderTotals(productTotal, token ? null : previewDiscount(discountType, discountValue), shippingCents);
+  const shippingCents = token ? deliveryOptions?.find(option => option.mode === deliveryMode)?.cents ?? fixedShipping : parseCents(shipping) ?? 0;
+  const discount = token ? (activePromo?.amount ? { type: "percent", amount: activePromo.amount } : null) :
+    previewDiscount(discountType, discountValue);
+  const { savings, total } = orderTotals(productTotal, discount, shippingCents);
   const displayAmount = amount => Number.isFinite(amount) ? formatEuros(amount) : "À confirmer";
   return <>
     <div className={styles.form}>
@@ -140,6 +162,30 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, order, t
     </div>
     <form action={submitAction} className={styles.form}>
       {children}
+      {deliveryOptions && <>
+        <label>Mode de livraison
+          <select name="meeting_delivery_mode" value={deliveryMode} onChange={event => setDeliveryMode(event.target.value)} required>
+            {deliveryOptions.map(({ mode, label, cents }) => <option key={mode} value={mode}>
+              {label} · {cents === 0 ? "Gratuite" : formatEuros(cents)}
+            </option>)}
+          </select>
+        </label>
+        {deliveryMode === "individual" && <label>Adresse de livraison
+          <textarea name="delivery_address" autoComplete="street-address" minLength={5} maxLength={500} rows={3} required
+            placeholder="Rue, code postal et ville" />
+        </label>}
+      </>}
+      {deliveryOptions && <div className={styles.orderActions}>
+        <label>Code promo (facultatif)
+          <input name="promo_code" maxLength={30} autoComplete="off" value={promoInput}
+            onChange={event => setPromoInput(event.target.value)} />
+        </label>
+        <button type="button" onClick={applyPromo} disabled={!promoInput.trim() || checkingPromo}>
+          {checkingPromo ? "Vérification…" : "Appliquer le code promo"}
+        </button>
+        {activePromo && <p role="status">{activePromo.amount ? "Code appliqué · " + activePromo.amount / 100 + " %" :
+          "Code promo invalide ou épuisé."}</p>}
+      </div>}
       {clientId && <input name="client_id" type="hidden" value={clientId} />}
       {!token && <label>Date de commande
         <input name="order_date" type="date" required max={today} defaultValue={order ? orderDate(order) : today} />
@@ -188,11 +234,12 @@ export default function OrderForm({ clientId, token, fixedShipping = 0, order, t
       </fieldset>}
       <dl className={`${styles.receiptTotals} ${styles.orderLines}`} aria-live="polite">
         <div><dt>Sous-total produits</dt><dd>{displayAmount(productTotal)}</dd></div>
-        {savings > 0 && <div><dt>Remise globale</dt><dd>−{displayAmount(savings)}</dd></div>}
+        {savings > 0 && <div><dt>{token ? "Code promo" : "Remise globale"}</dt><dd>−{displayAmount(savings)}</dd></div>}
         <div><dt>Livraison</dt><dd>{displayAmount(shippingCents)}</dd></div>
         <div><dt>Total à payer</dt><dd><strong>{displayAmount(total)}</strong></dd></div>
       </dl>
-      <button disabled={!lines.length && (!legacyOrder || (legacySubtotal === null && !!previewDiscount(discountType, discountValue)))}>{token ? "Envoyer mon bon de commande" : order ? "Enregistrer les modifications" : "Enregistrer le bon"}</button>
+      <button disabled={(deliveryOptions && Boolean(promoInput.trim()) && (checkingPromo || !activePromo?.amount)) ||
+        (!lines.length && (!legacyOrder || (legacySubtotal === null && !!previewDiscount(discountType, discountValue))))}>{token ? "Envoyer mon bon de commande" : order ? "Enregistrer les modifications" : "Enregistrer le bon"}</button>
     </form>
   </>;
 }

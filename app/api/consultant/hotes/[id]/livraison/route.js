@@ -1,5 +1,5 @@
 import { requireConsultant } from "../../../../../../lib/auth/consultant";
-import { hostUuid, meetingOrderReviewed } from "../../../../../../lib/crm/hosts.mjs";
+import { hostUuid, meetingOrderDeliveryMode, meetingOrderReviewed } from "../../../../../../lib/crm/hosts.mjs";
 import { readMeetingOrders } from "../../../../../../lib/crm/meeting-orders";
 import { makeMeetingDeliveryPdf } from "../../../../../../lib/crm/meeting-delivery.mjs";
 import { createServerSupabase } from "../../../../../../lib/supabase/server";
@@ -12,14 +12,16 @@ export async function GET(_request, { params }) {
   if (!access.ok) return new Response(null, { status: access.status });
 
   const owner = access.user.id;
-  const session = await db.from("crm_host_sessions").select("host_name,starts_on,delivery_address,venue")
+  const session = await db.from("crm_host_sessions").select("host_name,starts_on,delivery_address,delivery_mode,venue")
     .eq("id", id).eq("owner_id", owner).eq("kind", "meeting").eq("status", "closed")
-    .eq("delivery_mode", "grouped").maybeSingle();
+    .maybeSingle();
   if (session.error) return new Response(null, { status: 500 });
   if (!session.data) return new Response(null, { status: 404 });
 
-  const { data: orders, error } = await readMeetingOrders(db, id, { owner });
+  const { data, error } = await readMeetingOrders(db, id, { owner });
   if (error) return new Response(null, { status: 500 });
+  const orders = data.filter(order => meetingOrderDeliveryMode(order, session.data) === "grouped");
+  if (!orders.length) return new Response(null, { status: 404 });
   if (orders.some(order => !meetingOrderReviewed(order))) {
     return new Response("Valide les paiements des bons rattachés avant de télécharger le bon groupé.", { status: 409 });
   }

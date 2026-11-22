@@ -10,7 +10,7 @@ import { orderTotals, readDiscount } from "../../../lib/crm/order-pricing.mjs";
 import { priceOrder, readLines } from "../../../lib/crm/order";
 import { randomBytes, createHash } from "node:crypto";
 import { paymentLinksFromForm } from "../../../lib/crm/payment-links.mjs";
-import { sellerFields } from "../../../lib/crm/order-receipt.mjs";
+import { sellerFields, validOrderPrefix } from "../../../lib/crm/order-receipt.mjs";
 import { parseCents } from "../../../lib/crm/money.mjs";
 
 const path = "/consultant/clients";
@@ -197,8 +197,13 @@ export async function saveSeller(form) {
   const values = Object.fromEntries(sellerFields.map(([key]) => [key, String(form.get(key) ?? "").trim()]));
   if (!values.name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email) ||
       sellerFields.some(([key, , limit]) => values[key].length > limit)) finish("invalid");
-  const { error } = await client.from("crm_seller_profiles").upsert(values, { onConflict: "owner_id" });
-  finish(error ? "error" : "seller");
+  const order_prefix = String(form.get("order_prefix") ?? "").trim().toUpperCase();
+  let result = "prefix_invalid";
+  if (!order_prefix || validOrderPrefix(order_prefix)) {
+    const { error } = await client.from("crm_seller_profiles").upsert({ ...values, order_prefix: order_prefix || null }, { onConflict: "owner_id" });
+    result = error?.message === "Order prefix already reserved" ? "prefix_taken" : error ? "error" : "seller";
+  }
+  redirect(path + "?" + new URLSearchParams({ view: "settings", result }));
 }
 
 export async function createRegistrationLink() {

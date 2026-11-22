@@ -5,6 +5,7 @@ import { requireConsultant } from "../../../lib/auth/consultant";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { isDate } from "../../../lib/crm/dates.mjs";
 import { hostKinds, hostStatuses, hostUuid, meetingDeliveryModes } from "../../../lib/crm/hosts.mjs";
+import { meetingPromoCode } from "../../../lib/crm/meeting-promo.mjs";
 import { parseCents } from "../../../lib/crm/money.mjs";
 
 const root = "/consultant/hotes";
@@ -41,7 +42,7 @@ export async function saveHost(form) {
   const ends_on = kind === "case" ? field(form, "ends_on") : null;
   const venue = kind === "meeting" ? field(form, "venue") : null;
   const delivery_mode = kind === "meeting" ? field(form, "delivery_mode") : null;
-  const delivery_address = delivery_mode === "grouped" ? field(form, "delivery_address") || null : null;
+  const delivery_address = delivery_mode ? field(form, "delivery_address") || null : null;
   const guests = kind === "meeting" ? field(form, "guests") : null;
   const status = field(form, "status");
   const shipping_cents = parseCents(field(form, "shipping")) ?? 0;
@@ -111,7 +112,7 @@ export async function closeMeeting(form) {
   const { db, owner } = await context();
   const id = field(form, "session_id");
   const delivery_mode = field(form, "delivery_mode");
-  const delivery_address = delivery_mode === "grouped" ? field(form, "delivery_address") || null : null;
+  const delivery_address = delivery_mode ? field(form, "delivery_address") || null : null;
   if (!hostUuid.test(id) || !Object.hasOwn(meetingDeliveryModes, delivery_mode) ||
       (delivery_address && (delivery_address.length < 5 || delivery_address.length > 500))) {
     finish("meeting", hostUuid.test(id) ? id : null, "invalid");
@@ -123,4 +124,44 @@ export async function closeMeeting(form) {
     "Meeting orders require delivery addresses": "addresses-required",
   };
   finish("meeting", id, error ? reasons[error.message] ?? "error" : data ? "meeting-closed" : "invalid");
+}
+
+export async function saveMeetingOrderGift(form) {
+  const { db, owner } = await context();
+  const id = field(form, "session_id");
+  const session = await ownedSession(db, owner, id);
+  const orderId = field(form, "order_id");
+  if (session?.kind !== "meeting" || !hostUuid.test(orderId)) finish("meeting", session?.id, "invalid");
+  const gift_product = field(form, "gift_product") || null;
+  const qty = field(form, "gift_quantity") || "1";
+  if (gift_product && (gift_product.length > 220 || !/^[1-9]\d{0,2}$/.test(qty))) finish("meeting", id, "invalid");
+  const { data, error } = await db.from("crm_orders")
+    .update({ gift_product, gift_quantity: gift_product ? Number(qty) : null })
+    .eq("owner_id", owner).eq("host_session_id", id).eq("id", orderId).neq("status", "cancelled").select("id").maybeSingle();
+  finish("meeting", id, data && !error ? "gift-saved" : "error");
+}
+
+export async function manageMeetingPromo(form) {
+  const { db, owner } = await context();
+  const session = await ownedSession(db, owner, field(form, "session_id"));
+  if (session?.kind !== "meeting" || ["closed", "cancelled"].includes(session.status)) {
+    finish("meeting", session?.id, "invalid");
+  }
+  const id = field(form, "promo_id");
+  if (id) {
+    if (!hostUuid.test(id)) finish("meeting", session.id, "invalid");
+    const { data, error } = await db.from("crm_meeting_promos").update({ active: field(form, "active") === "true" })
+      .eq("id", id).eq("session_id", session.id).eq("owner_id", owner).select("id").maybeSingle();
+    finish("meeting", session.id, data && !error ? "promo-saved" : "error");
+  }
+
+  const code = meetingPromoCode(field(form, "code"));
+  const discount_bp = parseCents(field(form, "discount_percent"));
+  const limit = field(form, "max_uses");
+  if (!code || !Number.isInteger(discount_bp) || discount_bp < 1 || discount_bp > 10000 ||
+      (limit && !/^[1-9]\d{0,4}$/.test(limit))) finish("meeting", session.id, "invalid");
+  const { error } = await db.from("crm_meeting_promos").insert({
+    session_id: session.id, code, discount_bp, max_uses: limit ? Number(limit) : null,
+  });
+  finish("meeting", session.id, error?.code === "23505" ? "promo-duplicate" : error ? "error" : "promo-saved");
 }

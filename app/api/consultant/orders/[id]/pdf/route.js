@@ -24,9 +24,10 @@ async function downloadOrder({ id }, archive) {
   if (error) return new Response(null, { status: 500 });
   if (!order) return new Response(null, { status: 404 });
 
-  const address = order.crm_host_sessions?.delivery_mode === "individual" ? order.delivery_address : null;
+  const mode = order.meeting_delivery_mode ?? order.crm_host_sessions?.delivery_mode;
+  const address = mode === "individual" ? order.delivery_address : null;
   const pdf = await makeOrderPdf(address ? { ...order, buyer: { ...order.buyer, address } } : order);
-  const filename = receiptNumber(id) + ".pdf";
+  const filename = receiptNumber(order) + ".pdf";
   if (archive) {
     const { error: archiveError } = await db.from("crm_client_invoices").upsert({
       client_id: order.client_id, order_id: id, document_date: orderDate(order),
