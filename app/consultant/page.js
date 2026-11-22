@@ -10,6 +10,9 @@ const sections = [
     ["/consultant/factures", "Toutes mes factures", "Importe, classe et exporte tes factures.", FileText],
     ["/consultant/analytique", "Analytique & Finances", "Suis tes ventes, tes dépenses et tes commissions Chogan.", ChartNoAxesCombined],
   ] },
+  { title: "Hôte / Hôtesse", links: [
+    ["/consultant/hotes", "Hôte / Hôtesse", "Gère les réunions et mallettes, les commandes et les cadeaux.", Users],
+  ] },
   { title: "Prospection", links: [
     ["/leadfactory", "LeadFactory", "Trouve et suis tes prospects.", Users],
     ["/consultant/rendez-vous", "Calendrier des rendez-vous", "Planifie tes échanges avec tes prospects.", CalendarDays],

@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 import { orderLinkHash } from "../../../lib/crm/order-link";
-import { isDate, parisDate } from "../../../lib/crm/dates.mjs";
+import { readPublicCustomer } from "../../../lib/crm/public-customer.mjs";
+import PublicCustomerFields from "../../consultant/clients/PublicCustomerFields";
 import { createAdminSupabase } from "../../../lib/supabase/admin";
 import styles from "../../consultant/consultant.module.css";
 
@@ -12,20 +13,12 @@ async function register(token, form) {
   "use server";
   const hash = orderLinkHash(token);
   if (!hash) redirect("/inscription-client/invalide");
-  const name = String(form.get("name") ?? "").trim();
-  const email = String(form.get("email") ?? "").trim().toLowerCase();
-  const phone = String(form.get("phone") ?? "").trim();
-  const birth = String(form.get("birth_date") ?? "");
   const path = "/inscription-client/" + token;
-  if (!name || name.length > 120 || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
-      phone.length > 40 || phone.replace(/\D/g, "").length < 6 ||
-      (birth && (!isDate(birth) || birth > parisDate())) || form.get("consent") !== "on") {
-    redirect(path + "?erreur=1");
-  }
+  const customer = readPublicCustomer(form);
+  if (!customer || customer.customer_phone.replace(/\D/g, "").length < 6) redirect(path + "?erreur=1");
   const orderToken = randomBytes(32).toString("base64url");
-  const {data, error} = await createAdminSupabase().rpc("register_crm_customer", {
-    invite_hash: hash, next_hash: orderLinkHash(orderToken), customer_name: name,
-    customer_email: email, customer_phone: phone, customer_birth: birth || null,
+  const {data, error} = await createAdminSupabase().rpc("register_crm_customer_with_identity", {
+    invite_hash: hash, next_hash: orderLinkHash(orderToken), ...customer,
   });
   if (error) redirect(path + "?erreur=1");
   if (!data) redirect("/inscription-client/invalide");
@@ -47,11 +40,7 @@ export default async function ClientRegistration({params, searchParams}) {
         <p>Renseigne tes coordonnées pour accéder au bon de commande CHOGAN.</p>
         {query.erreur && <p role="alert">L’inscription n’a pas abouti. Vérifie tes informations et réessaie.</p>}
         <form className={styles.form} action={register.bind(null, token)}>
-          <label>Nom complet<input name="name" autoComplete="name" maxLength={120} required /></label>
-          <label>E-mail<input name="email" type="email" autoComplete="email" maxLength={254} required /></label>
-          <label>Téléphone<input name="phone" type="tel" autoComplete="tel" maxLength={40} required /></label>
-          <label>Date de naissance (facultative)<input name="birth_date" type="date" autoComplete="bday" max={parisDate()} /></label>
-          <label><input name="consent" type="checkbox" required /> J’accepte que mon consultant conserve mes coordonnées dans TESAMI pour gérer ma fiche et mes commandes, ainsi que ma date de naissance si je la renseigne.</label>
+          <PublicCustomerFields requirePhone />
           <button>Continuer vers le bon de commande</button>
         </form>
       </section>}
