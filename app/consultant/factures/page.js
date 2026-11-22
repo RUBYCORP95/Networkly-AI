@@ -3,11 +3,11 @@ import { Download, FileText } from "lucide-react";
 import { requireConsultant } from "../../../lib/auth/consultant";
 import { formatDate } from "../../../lib/crm/dates.mjs";
 import { invoiceApi, invoiceNatures, invoicePageSize, invoicePath, invoicePeriod, issuerKey } from "../../../lib/crm/invoice-archive.mjs";
-import { invoiceCustomers, invoiceNatureAccounts, listInvoices } from "../../../lib/crm/invoice-data";
+import { invoiceCustomers, listInvoices } from "../../../lib/crm/invoice-data";
 import { formatEuros } from "../../../lib/crm/money.mjs";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import shared from "../consultant.module.css";
-import BatchInvoiceUpload, { InvoiceClassification, InvoiceNatureAccounts } from "./BatchInvoiceUpload";
+import BatchInvoiceUpload, { InvoiceClassification } from "./BatchInvoiceUpload";
 import InvoiceFilters from "./InvoiceFilters";
 import styles from "./invoices.module.css";
 
@@ -66,10 +66,9 @@ export default async function AllInvoices({ searchParams }) {
   if (!access.ok) return null;
   const owner = access.user.id;
 
-  const [list, clients, natureAccounts] = await Promise.all([
+  const [list, clients] = await Promise.all([
     listInvoices(db, owner, period, page),
     invoiceCustomers(db, owner).catch(() => null),
-    invoiceNatureAccounts(db, owner),
   ]);
   const query = new URLSearchParams(period.query);
   query.set("format", "zip");
@@ -86,9 +85,6 @@ export default async function AllInvoices({ searchParams }) {
 
     <section className={styles.panel}>
       <h2>Importer des factures</h2>
-      {natureAccounts.error
-        ? <p role="alert">Les comptes par type sont temporairement indisponibles.</p>
-        : <InvoiceNatureAccounts accounts={natureAccounts.data} />}
       <BatchInvoiceUpload customers={clients ?? []} today={period.today} />
     </section>
 

@@ -287,35 +287,3 @@ export function InvoiceClassification({ invoice }) {
     </form>
   </details>;
 }
-
-export function InvoiceNatureAccounts({ accounts }) {
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("");
-
-  async function save(event) {
-    event.preventDefault();
-    setBusy(true);
-    setStatus("");
-    try {
-      await send("nature_accounts", Object.fromEntries(new FormData(event.currentTarget)));
-      setStatus("Comptes enregistrés pour les prochains imports.");
-    } catch (error) {
-      setStatus(error.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return <details className={styles.account}>
-    <summary>Comptes par type de facture</summary>
-    <p className={styles.muted}>TESAMI utilise ces comptes quand il reconnaît un type et qu’aucun compte ne figure sur le PDF.</p>
-    <form className={shared.form} onSubmit={save}>
-      <label>Compte pour les abonnements<input name="subscription_account" inputMode="numeric" pattern="[0-9]{1,20}" maxLength={20}
-        defaultValue={accounts?.subscription_account ?? ""} /></label>
-      <label>Compte pour le matériel<input name="equipment_account" inputMode="numeric" pattern="[0-9]{1,20}" maxLength={20}
-        defaultValue={accounts?.equipment_account ?? ""} /></label>
-      <button disabled={busy}>Enregistrer les comptes</button>
-    </form>
-    {status && <p role="status">{status}</p>}
-  </details>;
-}
