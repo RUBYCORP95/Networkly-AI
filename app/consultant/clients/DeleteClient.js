@@ -16,7 +16,7 @@ function ConfirmationButtons({ close }) {
   </div>;
 }
 
-export default function DeleteClient({ customer, detail, adminSearch }) {
+export default function DeleteClient({ customer, detail, adminSearch, owner }) {
   const dialog = useRef(null);
   const titleId = useId();
 
@@ -34,6 +34,7 @@ export default function DeleteClient({ customer, detail, adminSearch }) {
           <input type="hidden" name="q" value={adminSearch} />
         </>}
         <h2 id={titleId}>Supprimer {customer.name} ?</h2>
+        {owner && <p>Consultant · {owner}</p>}
         <p>La fiche sera retirée des clients actifs et des rappels. Les factures et les commandes resteront accessibles.</p>
         <ConfirmationButtons close={() => dialog.current.close()} />
       </form>

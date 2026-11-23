@@ -268,13 +268,19 @@ async function OtherConsultantsClients({ params, owner }) {
   const page = /^[1-9][0-9]{0,5}$/.test(params.page) ? Number(params.page) : 1;
   const size = 30;
   const from = (page - 1) * size;
-  let query = createAdminSupabase().from("crm_clients").select("id,name,email", { count: "exact" })
+  const admin = createAdminSupabase();
+  let query = admin.from("crm_clients").select("id,name,email,owner_id", { count: "exact" })
     .neq("owner_id", owner).is("archived_at", null);
   if (search) {
     const name = search.replace(/[\\%_*]/g, "\\$&");
     query = query.ilike("name", "%" + name + "%");
   }
   const { data, error, count } = await query.order("name").order("id").range(from, from + size - 1);
+  const ownerIds = [...new Set((data ?? []).map(customer => customer.owner_id))];
+  const { data: owners } = ownerIds.length
+    ? await admin.from("profiles").select("id,full_name").in("id", ownerIds)
+    : { data: [] };
+  const ownerNames = new Map((owners ?? []).map(profile => [profile.id, profile.full_name]));
   const pageLink = number => "?" + new URLSearchParams({ view: "manage", q: search, page: number });
 
   return <main className={`${styles.page} ${styles.crmPage}`}>
@@ -289,10 +295,17 @@ async function OtherConsultantsClients({ params, owner }) {
     {error ? <p role="alert">Le fichier clients est temporairement indisponible.</p> : <>
       <p role="status">{count} fiche(s) active(s)</p>
       <ul className={styles.crmClientList}>
-        {data.map(customer => <li key={customer.id} className={styles.crmClientRow}>
-          <span className={styles.crmManagedClient}><strong>{customer.name}</strong>{customer.email && <small>{customer.email}</small>}</span>
-          <DeleteClient customer={customer} adminSearch={search} />
-        </li>)}
+        {data.map(customer => {
+          const owner = ownerNames.get(customer.owner_id)?.trim() || customer.owner_id;
+          return <li key={customer.id} className={styles.crmClientRow}>
+            <span className={styles.crmManagedClient}>
+              <strong>{customer.name}</strong>
+              {customer.email && <small>{customer.email}</small>}
+              <small>Consultant · {owner}</small>
+            </span>
+            <DeleteClient customer={customer} adminSearch={search} owner={owner} />
+          </li>;
+        })}
       </ul>
       <nav className={styles.orderNavigation} aria-label="Pages des clients">
         {page > 1 && <Link className={styles.crmAction} href={pageLink(page - 1)}>Page précédente</Link>}
