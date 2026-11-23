@@ -350,3 +350,8 @@ main.tesami-pricing{display:block!important;grid-template-columns:none!important
   outline: 2px solid #1d4ed8;
   outline-offset: 2px;
 }
+
+.authbox .forgot-password-link{justify-self:end;color:#5930bb;text-decoration:underline;text-underline-offset:3px}
+.authbox a.linkbtn{display:block;width:fit-content;text-decoration:underline;text-underline-offset:3px}
+.authbox .notice p{margin-top:0}
+.authbox .notice p:last-child{margin-bottom:0}
