@@ -14,7 +14,7 @@ const sections = [
     ["/consultant/hotes", "Hôte / Hôtesse", "Gère les réunions et mallettes, les commandes et les cadeaux.", Users],
   ] },
   { title: "Prospection", links: [
-    ["/leadfactory", "LeadFactory", "Trouve et suis tes prospects.", Users],
+    ["/leadfactory", "Trouver des clients", "Recherche des clients CHOGAN et des prospects professionnels.", Users],
     ["/consultant/rendez-vous", "Calendrier des rendez-vous", "Planifie tes échanges avec tes prospects.", CalendarDays],
   ] },
   { title: "Ressources", links: [

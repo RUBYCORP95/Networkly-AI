@@ -65,7 +65,7 @@ export default function LeadFactoryPage(){
  const [adviceType,setAdviceType]=useState("partnership");
  const [adviceCopied,setAdviceCopied]=useState(false);
  const [cityQuery,setCityQuery]=useState("");
- const [sectorTab,setSectorTab]=useState("professional");
+ const [sectorTab,setSectorTab]=useState("klaviyo");
  const [prospectSearchMessage,setProspectSearchMessage]=useState("");
  const [prospectAvailability,setProspectAvailability]=useState(null);
  const [contactRevealBusy,setContactRevealBusy]=useState(null);
@@ -251,7 +251,7 @@ export default function LeadFactoryPage(){
  const assignedCards=visibleCards.filter(card=>card.contact_kind===sectorTab);
  const openContact=state.cards.find(card=>card.allocation_id===contactReveal?.allocationId);
  if(state.limited)return <main className={styles.page}>
-   <h1>LeadFactory</h1><p>Pour accéder aux quotas gratuits, envoie ta demande d’accès consultant CHOGAN.</p>
+   <h1>Trouver des clients</h1><p>Pour accéder aux quotas gratuits, envoie ta demande d’accès consultant CHOGAN.</p>
    <a className={styles.button} href="/demande-consultant">Demander ou suivre mon accès consultant</a>
  </main>;
 
@@ -271,7 +271,7 @@ export default function LeadFactoryPage(){
   </dialog>}
   <a href="/consultant" style={{display:"inline-block",marginBottom:16}}>← Retour à l’espace Consultant</a>
   <div className={styles.hero}>
-   <div><div className={styles.eyebrow}>TESAMI · Espace consultant</div><h1>LeadFactory</h1><p>Développe ton réseau local, découvre tes prospects et prépare des prises de contact professionnelles avec les bons outils.</p></div>
+   <div><div className={styles.eyebrow}>TESAMI · Espace consultant</div><h1>Trouver des clients</h1><p>Développe ton réseau local, découvre tes prospects et prépare des prises de contact professionnelles avec les bons outils.</p></div>
    <div className={styles.heroBadge}>✦ Prospection de proximité <button type="button" className={styles.heroDemoButton} onClick={()=>setDemo(v=>!v)}>{demo?"Fermer la démo":"Essayer la démo"}</button></div>
   </div>
   <div className={styles.stats}>
@@ -288,15 +288,15 @@ export default function LeadFactoryPage(){
    <p>« Bonjour, je suis conseiller(ère) indépendant(e) CHOGAN dans votre région. Vous aviez commencé une commande de produits CHOGAN il y a quelque temps sans la finaliser. Je me permets de vous proposer mon aide si vous avez des questions ou souhaitez des renseignements. Si vous ne souhaitez pas être recontacté(e), dites-le-moi simplement. Belle journée ! »</p>
   </section>
   {actionError&&!contactReveal&&<p role="alert" className={styles.panel}>{actionError}</p>}
-  {state.loading&&<div className={styles.panel} role="status">Chargement de ton espace LeadFactory…</div>}
+  {state.loading&&<div className={styles.panel} role="status">Chargement de tes contacts…</div>}
   {state.error&&<div className={styles.alert} role="alert"><p>{state.error}</p><button type="button" className={styles.button} onClick={load}>Réessayer le chargement</button>{state.error.includes("Connecte-toi")&&<a className={styles.loginLink} href="/login?next=%2Fleadfactory">Se connecter à TESAMI</a>}</div>}
   {state.limited&&<div className={styles.betaNotice} role="status"><strong>Bienvenue dans la bêta publique !</strong><p>Tu peux tester gratuitement les dix contacts fictifs, les conseils de prospection et l’interface. Les vrais contacts CHOGAN et professionnels ne sont pas accessibles aux comptes bêta non autorisés.</p><a href="/login?next=%2Fleadfactory">Gérer mon compte</a></div>}
   {(s||state.limited)&&<div className={styles.layout}>
    <div className={styles.panel+" "+styles.sectorPanel} data-lead-kind={sectorTab}>
     <h2>📍 Choisir mon secteur</h2><p className={styles.muted}>Choisis une commune et un rayon pour retrouver tes prospects professionnels et tes contacts clients CHOGAN au même endroit. Les contacts non attribués restent privés.</p>
     <div role="tablist" aria-label="Type de prospects" className={styles.sectorTabs}>
-      <button type="button" role="tab" aria-selected={sectorTab==="professional"} className={styles.sectorTab+" "+styles.buttonSecondary} data-lead-kind="professional" onClick={()=>setSectorTab("professional")}>🏢 Prospects professionnels</button>
       <button type="button" role="tab" aria-selected={sectorTab==="klaviyo"} className={styles.sectorTab+" "+styles.buttonSecondary} data-lead-kind="klaviyo" onClick={()=>setSectorTab("klaviyo")}>👤 Clients CHOGAN</button>
+      <button type="button" role="tab" aria-selected={sectorTab==="professional"} className={styles.sectorTab+" "+styles.buttonSecondary} data-lead-kind="professional" onClick={()=>setSectorTab("professional")}>🏢 Prospects professionnels</button>
     </div>
     <p className={styles.muted}>{sectorTab==="professional"?"Recherche des professionnels dans le rayon sélectionné.":"Recherche des clients CHOGAN dans le rayon sélectionné. Le premier affichage d’un numéro compte dans ton quota."}</p>
     <label className={styles.label} htmlFor="lf-city">Ville ou code postal</label>
