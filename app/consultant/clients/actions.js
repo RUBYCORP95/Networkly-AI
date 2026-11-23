@@ -45,10 +45,32 @@ export async function saveClient(form) {
 
   const values = { name, email, phone, birth_date, ...(lead_note !== undefined && { lead_note }),
     birthday_notification: !!birth_date && form.get("birthday_notification") === "on" };
-  const operation = id ? client.from("crm_clients").update(values).eq("id", id) :
+  const operation = id ? client.from("crm_clients").update(values).eq("id", id).is("archived_at", null) :
     client.from("crm_clients").insert(values);
   const { data, error } = await operation.select("id").single();
   finish(error || !data ? "error" : "client", data?.id);
+}
+
+export async function deleteClient(form) {
+  const db = await consultantClient();
+  const id = form.get("id");
+  const adminView = form.get("view") === "manage";
+  const params = new URLSearchParams();
+  if (adminView) {
+    params.set("view", "manage");
+    const search = form.get("q");
+    if (typeof search === "string" && search) params.set("q", search.slice(0, 120));
+  }
+
+  if (typeof id !== "string" || !uuid.test(id)) {
+    params.set("result", "invalid");
+  } else {
+    const { data, error } = await db.rpc("archive_crm_client", { p_client_id: id });
+    params.set("result", error || !data ? "delete_error" : "deleted");
+    if (!adminView && (error || !data) && form.get("from") === "detail") params.set("client", id);
+    if (data && !error) revalidatePath(path);
+  }
+  redirect(path + "?" + params);
 }
 
 export async function addFollowup(form) {
@@ -180,7 +202,7 @@ export async function createOrderLink(form) {
   const shipping = parseCents(form.get("shipping")) ?? 0;
   if (!uuid.test(id) || Number.isNaN(shipping)) return { error: "Vérifie les frais de livraison." };
 
-  const { data: customer } = await client.from("crm_clients").select("email").eq("id", id).maybeSingle();
+  const { data: customer } = await client.from("crm_clients").select("email").eq("id", id).is("archived_at", null).maybeSingle();
   if (!customer?.email) return { error: "Ajoute l’e-mail du client à sa fiche avant de partager le bon." };
   const { data: seller } = await client.from("crm_seller_profiles").select("name").maybeSingle();
   if (!seller) return { error: "Enregistre d’abord tes coordonnées professionnelles." };

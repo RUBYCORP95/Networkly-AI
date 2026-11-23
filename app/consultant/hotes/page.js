@@ -156,7 +156,7 @@ export default async function HostsPage({ searchParams }) {
   const [sessions, seller, clients] = await Promise.all([
     db.from("crm_host_sessions").select("id,kind,host_name,starts_on,status").eq("kind", kind).order("starts_on", { ascending: false }).order("id"),
     db.from("crm_seller_profiles").select("name").maybeSingle(),
-    db.from("crm_clients").select("id,name").order("name").order("id"),
+    db.from("crm_clients").select("id,name").is("archived_at", null).order("name").order("id"),
   ]);
   const { data: session } = id ? await db.from("crm_host_sessions")
     .select("id,kind,host_name,host_client_id,starts_on,ends_on,venue,guests,status,shipping_cents,grouped_shipping_cents,individual_shipping_cents,delivery_mode,delivery_address,order_token,tracking_token").eq("id", id).eq("kind", kind).maybeSingle() : {};

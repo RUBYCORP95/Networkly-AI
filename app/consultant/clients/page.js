@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { Bell, Mail, Package, Settings, Users } from "lucide-react";
 import { createServerSupabase } from "../../../lib/supabase/server";
+import { createAdminSupabase } from "../../../lib/supabase/admin";
+import { requireConsultant } from "../../../lib/auth/consultant";
 import { formatEuros } from "../../../lib/crm/money.mjs";
 import { formatDate, isDate, nextBirthday, parisDate } from "../../../lib/crm/dates.mjs";
 import { addFollowup, editOrder, saveClient, saveSeller, updateFollowup, updateOrder } from "./actions";
 import { orderFields, orderStatuses, paymentStatuses, receiptNumber, receiptEmailText, sellerFields } from "../../../lib/crm/order-receipt.mjs";
 import CustomerList from "./CustomerList";
+import DeleteClient from "./DeleteClient";
 import OrderReceipt from "./OrderReceipt";
 import ShareOrder from "./ShareOrder";
 import ShareRegistration from "./ShareRegistration";
@@ -20,6 +23,8 @@ const notices = new Map([
   ["invalid", "Vérifie les informations saisies."],
   ["error", "L’opération a échoué. Réessaie dans un instant."],
   ["client", "Fiche client enregistrée."],
+  ["deleted", "Client retiré du fichier actif. Ses commandes et factures sont conservées."],
+  ["delete_error", "Impossible de supprimer cette fiche client. Vérifie qu’elle est toujours disponible."],
   ["followup", "Relance programmée."],
   ["catalogue", "Un produit ou un prix du catalogue est indisponible. Relance la recherche."],
   ["invalid_payment", "Renseigne un nom et un lien HTTPS valide pour chaque moyen de paiement."],
@@ -37,7 +42,7 @@ const notices = new Map([
   ["updated", "Relance mise à jour."],
 ]);
 
-const clientFields = "id,name,email,phone,birth_date,birthday_notification,lead_source,lead_location,lead_note";
+const clientFields = "id,name,email,phone,birth_date,birthday_notification,lead_source,lead_location,lead_note,archived_at";
 
 function CustomerForm({ customer, today }) {
   return <form action={saveClient} className={styles.form}>
@@ -258,16 +263,67 @@ async function ClientInvoices({ db, clientId, today, params }) {
 
 export const metadata = { title: "Mes clients et rappels · TESAMI" };
 
+async function OtherConsultantsClients({ params, owner }) {
+  const search = typeof params.q === "string" ? params.q.trim().slice(0, 120) : "";
+  const page = /^[1-9][0-9]{0,5}$/.test(params.page) ? Number(params.page) : 1;
+  const size = 30;
+  const from = (page - 1) * size;
+  let query = createAdminSupabase().from("crm_clients").select("id,name,email", { count: "exact" })
+    .neq("owner_id", owner).is("archived_at", null);
+  if (search) {
+    const name = search.replace(/[\\%_*]/g, "\\$&");
+    query = query.ilike("name", "%" + name + "%");
+  }
+  const { data, error, count } = await query.order("name").order("id").range(from, from + size - 1);
+  const pageLink = number => "?" + new URLSearchParams({ view: "manage", q: search, page: number });
+
+  return <main className={`${styles.page} ${styles.crmPage}`}>
+    <Link className={styles.crmAction} href="/consultant/clients">← Mes clients</Link>
+    <h1>Clients des autres consultants</h1>
+    {notices.has(params.result) && <p className={styles.notice} role="status">{notices.get(params.result)}</p>}
+    <form method="get" className={styles.form}>
+      <input type="hidden" name="view" value="manage" />
+      <label>Nom du client<input name="q" type="search" defaultValue={search} maxLength={120} /></label>
+      <button>Rechercher</button>
+    </form>
+    {error ? <p role="alert">Le fichier clients est temporairement indisponible.</p> : <>
+      <p role="status">{count} fiche(s) active(s)</p>
+      <ul className={styles.crmClientList}>
+        {data.map(customer => <li key={customer.id} className={styles.crmClientRow}>
+          <span className={styles.crmManagedClient}><strong>{customer.name}</strong>{customer.email && <small>{customer.email}</small>}</span>
+          <DeleteClient customer={customer} adminSearch={search} />
+        </li>)}
+      </ul>
+      <nav className={styles.orderNavigation} aria-label="Pages des clients">
+        {page > 1 && <Link className={styles.crmAction} href={pageLink(page - 1)}>Page précédente</Link>}
+        {count > from + size && <Link className={styles.crmAction} href={pageLink(page + 1)}>Page suivante</Link>}
+      </nav>
+    </>}
+  </main>;
+}
+
 export default async function ClientsPage({ searchParams }) {
   const params = await searchParams;
   const today = parisDate();
   const db = await createServerSupabase();
   if (params.view === "orders") return <AllOrders db={db} params={params} />;
+  const access = await requireConsultant(db);
+  const isAdmin = access.ok && access.profile.is_admin === true;
+  if (params.view === "manage" && isAdmin) return <OtherConsultantsClients params={params} owner={access.user.id} />;
+  if (params.view === "archived") {
+    const { data, error } = await db.from("crm_clients").select("id,name,email").not("archived_at", "is", null).order("name").order("id");
+    return <main className={`${styles.page} ${styles.crmPage}`}>
+      <Link className={styles.crmAction} href="/consultant/clients">← Mes clients</Link>
+      {error ? <p role="alert">Les clients supprimés sont temporairement indisponibles.</p> :
+        <CustomerList customers={data} archived />}
+    </main>;
+  }
   const [customers, seller, reminders, activeFollowups, orderCount, customerInvite] = await Promise.all([
-    db.from("crm_clients").select(clientFields, { count: "exact" }).order("name").order("id"),
+    db.from("crm_clients").select(clientFields, { count: "exact" }).is("archived_at", null).order("name").order("id"),
     db.from("crm_seller_profiles").select("name,business,email,phone,address,registration,payment_links,order_prefix,order_namespace").maybeSingle(),
     db.from("crm_followups").select("id,client_id,due_date,notification,completed_at").order("due_date"),
-    db.from("crm_followups").select("id", { count: "exact", head: true }).is("completed_at", null),
+    db.from("crm_followups").select("id,crm_clients!inner()", { count: "exact", head: true })
+      .is("completed_at", null).is("crm_clients.archived_at", null),
     db.from("crm_orders").select("id", { count: "exact", head: true }),
     db.from("crm_customer_invites").select("token").maybeSingle(),
   ]);
@@ -278,8 +334,9 @@ export default async function ClientsPage({ searchParams }) {
     const { data } = await db.from("crm_clients").select(clientFields).eq("id", params.client).maybeSingle();
     selected = data;
   }
-  const history = selected && params.view === "history";
   const invoices = selected && params.view === "invoices";
+  const archived = Boolean(selected?.archived_at);
+  const history = selected && !invoices && (archived || params.view === "history");
   const orders = history ? await db.from("crm_orders")
     .select(orderFields + ",host_session_id").eq("client_id", selected.id)
     .order("order_date", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }) : null;
@@ -298,7 +355,7 @@ export default async function ClientsPage({ searchParams }) {
     <Link className={styles.crmAction} href="/consultant">← Espace Consultant</Link>
     <header className={styles.crmHeader}>
       <h1>{settings ? "Paramètres du CRM" : selected?.name ?? "Mes clients"}</h1>
-      {settings || selected ? <Link className={styles.crmAction} href="/consultant/clients">← Tous les clients</Link> :
+      {settings || selected ? <Link className={styles.crmAction} href={archived ? "?view=archived" : "/consultant/clients"}>{archived ? "← Clients supprimés" : "← Tous les clients"}</Link> :
         <Link className={styles.crmAction} href="?view=settings"><Settings size={17} aria-hidden="true" /> Paramètres</Link>}
     </header>
     {notices.has(params.result) && <p className={styles.notice} role="status">{notices.get(params.result)}</p>}
@@ -323,6 +380,10 @@ export default async function ClientsPage({ searchParams }) {
             <dt>{label === "Commandes" ? <Link className={styles.orderCardLink} href={ordersUrl()}>Commandes</Link> : label}</dt><dd>{count ?? "—"}</dd>
           </div>)}
         </dl>
+        <nav className={styles.orderNavigation} aria-label="Gestion des fiches clients">
+          <Link className={styles.crmAction} href="?view=archived">Clients supprimés</Link>
+          {isAdmin && <Link className={styles.crmAction} href="?view=manage">Clients des autres consultants</Link>}
+        </nav>
         <CustomerList customers={clients.map(({ id, name, email }) => ({ id, name, email }))} />
       </>}
       {!selected && <div className={styles.crmReminders}>
@@ -330,15 +391,19 @@ export default async function ClientsPage({ searchParams }) {
       <FollowupTable title="Aujourd’hui" rows={rows.filter(item => item.date === today)} today={today} />
       <FollowupTable title="À venir" rows={rows.filter(item => item.date > today)} today={today} />
       </div>}
-      {selected && <p><Link className={styles.crmAction} href="?view=settings">Paramètres professionnels</Link></p>}
+      {selected && !archived && <div className={styles.orderNavigation}>
+        <Link className={styles.crmAction} href="?view=settings">Paramètres professionnels</Link>
+        <DeleteClient customer={{ id: selected.id, name: selected.name }} detail />
+      </div>}
       {selected && <section id="fiche" key={selected.id}>
-        {selected.lead_source && <p>
+        {archived && <p className={styles.notice}>Ce client a été retiré du fichier actif.</p>}
+        {!archived && selected.lead_source && <p>
           <strong>{selected.lead_note || "Client issu de LeadFactory"}</strong>
           {" · "}{selected.lead_source === "klaviyo" ? "Klaviyo" : "Prospect professionnel"}
           {selected.lead_location && " · " + selected.lead_location}
         </p>}
         <nav className={styles.orderNavigation} aria-label="Sections de la fiche client">
-          <Link className={styles.crmAction} href={"?client=" + selected.id} aria-current={!history && !invoices ? "page" : undefined}>Fiche client</Link>
+          {!archived && <Link className={styles.crmAction} href={"?client=" + selected.id} aria-current={!history && !invoices ? "page" : undefined}>Fiche client</Link>}
           <Link className={styles.crmAction} href={"?client=" + selected.id + "&view=history"} aria-current={history ? "page" : undefined}>Historique des commandes</Link>
           <Link className={styles.crmAction} href={"?client=" + selected.id + "&view=invoices"} aria-current={invoices ? "page" : undefined}>Factures</Link>
         </nav>

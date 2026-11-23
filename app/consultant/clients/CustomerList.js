@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ChevronRight, Search } from "lucide-react";
+import DeleteClient from "./DeleteClient";
 import styles from "../consultant.module.css";
 
 function normalize(value) {
   return value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 }
 
-export default function CustomerList({ customers }) {
+export default function CustomerList({ customers, archived = false }) {
   const [search, setSearch] = useState("");
   const words = normalize(search).trim().split(/\s+/).filter(Boolean);
   const results = customers.filter(({ name, email }) => {
@@ -17,7 +18,7 @@ export default function CustomerList({ customers }) {
     return words.every(word => value.includes(word));
   });
   return <section className={styles.crmDirectory} aria-labelledby="customer-list-title">
-    <h2 id="customer-list-title">Fichier clients</h2>
+    <h2 id="customer-list-title">{archived ? "Clients supprimés" : "Fichier clients"}</h2>
     <label className={styles.crmSearch}>
       <span>Rechercher un client</span>
       <span><Search size={18} aria-hidden="true" />
@@ -29,12 +30,13 @@ export default function CustomerList({ customers }) {
     {results.length > 0 && <ul className={styles.crmClientList}>
       {results.map(customer => {
         const initials = customer.name.trim().split(/\s+/).slice(0, 2).map(word => Array.from(word)[0]).join("").toUpperCase();
-        return <li key={customer.id}>
-          <Link href={"?client=" + customer.id} className={styles.crmClient}>
+        return <li className={styles.crmClientRow} key={customer.id}>
+          <Link href={"?client=" + customer.id + (archived ? "&view=history" : "")} className={styles.crmClient}>
             <span className={styles.crmAvatar} aria-hidden="true">{initials}</span>
             <span><strong>{customer.name}</strong>{customer.email && <small>{customer.email}</small>}</span>
             <ChevronRight size={19} aria-hidden="true" />
           </Link>
+          {!archived && <DeleteClient customer={customer} />}
         </li>;
       })}
     </ul>}
