@@ -85,6 +85,7 @@ test("applique les paliers Chogan, les plafonds et l’ouverture du différentie
   assert.equal(initial.personalCommission, 560);
   assert.equal(initial.teamCommission, 2800);
   assert.equal(initial.commission, 3360);
+  assert.deepEqual(initial.turnover, { personal: 14000, team: 70000, total: 84000 });
   assert.equal(initial.next.label, "Junior Leader");
   assert.equal(initial.missingPoints, 660);
 
@@ -104,7 +105,9 @@ test("applique les paliers Chogan, les plafonds et l’ouverture du différentie
 
   const solo = teamEstimate(100, 0, 0, settings);
   assert.equal(solo.tier.label, "Partner");
-  assert.equal(solo.personalCommission, 3600);
+  assert.equal(solo.personalCommission, 5600);
+  assert.equal(solo.turnover.personal, 140000);
+  assert.equal(solo.missingPoints, 600);
   assert.equal(teamEstimate(7, 5, 10, settings).commission, 0);
   assert.deepEqual(validateSettings({ ...settings, enabled: true, default_access: true, expenses: [],
     presentation: "Chogan", video_url: "" }).tiers, choganTiers);

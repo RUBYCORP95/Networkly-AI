@@ -98,12 +98,16 @@ export default function Simulator({ simulation, slug }) {
         <Metric label="Points de l’équipe">{team.teamPoints}</Metric>
         <Metric label="Points cumulés">{team.total}</Metric>
         <Metric label="Marge sur ventes personnelles">{money(team.personal.monthly)}</Metric>
+        {team.turnover && <Metric label="Chiffre d’affaires total HT"
+          detail={`1 point = ${money(settings.point_value_cents)} HT`}>{money(team.turnover.total)}</Metric>}
         {team.commission !== null && <>
           <Metric label="Commission sur ventes personnelles"
-            detail={`${team.eligiblePersonalPoints} points retenus × ${rate(team.tier?.bps ?? 0)}`}>
+            detail={`${money(team.turnover.personal)} HT × ${rate(team.tier?.bps ?? 0)}`}>
             {money(team.personalCommission)}
           </Metric>
-          <Metric label="Commission d’équipe">{money(team.teamCommission)}</Metric>
+          <Metric label="Commission d’équipe" detail={`${money(team.turnover.team)} HT × ${rate(team.teamRate)}`}>
+            {money(team.teamCommission)}
+          </Metric>
           <Metric label="Commission mensuelle indicative">{money(team.commission)}</Metric>
         </>}
       </div>
