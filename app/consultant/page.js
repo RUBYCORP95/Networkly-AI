@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Briefcase, ChartNoAxesCombined, CalendarDays, FileText, GraduationCap, MapPin, Sparkles, Users } from "lucide-react";
+import { Briefcase, ChartNoAxesCombined, CalendarDays, FileText, Gift, GraduationCap, MapPin, Sparkles, Users } from "lucide-react";
 import { createServerSupabase } from "../../lib/supabase/server";
 import styles from "./consultant.module.css";
 
@@ -18,6 +18,9 @@ const sections = [
     ["/consultant/recrutement", "Recrutement intelligent", "Crée et suis des simulations personnalisées pour tes prospects.", Sparkles],
     ["/leadfactory", "Trouver des clients", "Recherche des clients CHOGAN et des prospects professionnels.", Users],
     ["/consultant/rendez-vous", "Calendrier des rendez-vous", "Planifie tes échanges avec tes prospects.", CalendarDays],
+  ] },
+  { title: "Merch", links: [
+    ["/consultant/merch", "Objets personnalisables", "Découvre les vêtements et accessoires à personnaliser avec ton logo ou ton prénom.", Gift],
   ] },
   { title: "Ressources", links: [
     ["/documents", "Documents", "Consulte les documents partagés par ton équipe.", FileText],
