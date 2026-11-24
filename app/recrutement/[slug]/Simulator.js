@@ -44,7 +44,7 @@ export default function Simulator({ simulation, slug }) {
   return <main className={styles.publicPage}>
     <header className={styles.hero}>
       <img src="/tesami-logo.svg" alt="TESAMI" width="72" height="52" />
-      <p>Bonjour {simulation.first_name}</p>
+      <p>{simulation.first_name ? `Bonjour ${simulation.first_name}` : "Bonjour"}</p>
       <h1>Et si tu changeais ton quotidien ?</h1>
       <div className={styles.sponsor}>
         {simulation.photo_url && <img src={simulation.photo_url} width="56" height="56" alt="" referrerPolicy="no-referrer" />}

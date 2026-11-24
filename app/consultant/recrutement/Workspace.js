@@ -11,7 +11,7 @@ const indicators = {
   follow_up: "À relancer", registered: "Inscrits", archived: "Archivés",
 };
 const identity = [
-  ["first_name", "Prénom du prospect", 60, "text", true],
+  ["first_name", "Prénom du prospect (facultatif)", 60, "text", false],
   ["consultant_name", "Ton nom affiché", 100, "text", true],
   ["join_url", "Code sponsor Chogan", 1000, "text", false],
   ["whatsapp", "Numéro WhatsApp professionnel (format international)", 30, "tel", false],
@@ -26,9 +26,10 @@ const volumes = [
 function Record({ row, select, setMessage }) {
   const href = `/recrutement/${row.slug}`;
   const share = typeof window === "undefined" ? "" : new URL(href, window.location.origin).href;
-  const message = encodeURIComponent(`Bonjour ${row.first_name}, voici ta simulation TESAMI : ${share}`);
+  const greeting = row.first_name ? `Bonjour ${row.first_name}` : "Bonjour";
+  const message = encodeURIComponent(`${greeting}, voici ta simulation TESAMI : ${share}`);
   return <article className={styles.record}>
-    <h3>{row.first_name} · {statuses[row.status]}</h3>
+    <h3>{row.first_name || "Prospect sans prénom"} · {statuses[row.status]}</h3>
     <p>{row.visits} visite(s) · {row.whatsapp_clicks} clic(s) WhatsApp · {row.join_clicks} clic(s) inscription</p>
     <p className={styles.muted}>Créée le {new Date(row.created_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })} · Modifiée le {new Date(row.updated_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}</p>
     <div className={styles.actions}>

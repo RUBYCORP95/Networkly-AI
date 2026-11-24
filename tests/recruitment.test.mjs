@@ -112,3 +112,12 @@ test("applique les paliers Chogan, les plafonds et l’ouverture du différentie
   assert.deepEqual(validateSettings({ ...settings, enabled: true, default_access: true, expenses: [],
     presentation: "Chogan", video_url: "" }).tiers, choganTiers);
 });
+
+test("permet d’enregistrer une simulation sans prénom", () => {
+  const input = { consultant_name: "TESAMI", join_url: "", whatsapp: "", notes: "", status: "active",
+    quantity: 30, team_size: 5, per_member: 10, personal_sales: 10, expenses: [] };
+  assert.equal(validateSimulation(input).first_name, "");
+  assert.equal(validateSimulation({ ...input, first_name: "   " }).first_name, "");
+  assert.equal(validateSimulation({ ...input, first_name: " Léa " }).first_name, "Léa");
+  assert.throws(() => validateSimulation({ ...input, first_name: "a".repeat(61) }));
+});
