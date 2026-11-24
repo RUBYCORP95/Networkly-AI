@@ -9,6 +9,7 @@
   color: var(--ink);
   overflow-wrap: anywhere;
 }
+.consultantWorkspace { width: min(100% - clamp(2rem, 6vw, 6rem), 84rem); }
 .publicPage { width: min(100% - 2rem, 48rem); }
 .workspace h1, .publicPage h1 { line-height: 1.15; font-size: clamp(2rem, 6vw, 3rem); margin: .5rem 0 1rem; }
 .workspace h2, .publicPage h2 { line-height: 1.25; margin: 0 0 1rem; }
@@ -19,6 +20,14 @@
 .panel { background: #fff; border: 1px solid var(--line); border-radius: 1.25rem; margin: 1.1rem 0; padding: clamp(1rem, 4vw, 1.8rem); }
 .presentation { white-space: pre-line; }
 .fields, .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: .75rem; margin: .8rem 0; }
+.dashboardMetrics {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: .65rem;
+  margin: .9rem 0;
+}
+.dashboardMetrics .metric { min-width: 0; gap: .2rem; padding: .7rem .8rem; }
+.dashboardMetrics .metric span { font-size: .875rem; }
 .metric { display: grid; align-content: start; gap: .3rem; background: #f7f2fd; border-radius: .85rem; padding: .9rem; }
 .metric span, .muted, .legal { color: var(--muted); }
 .metric strong, .highlight { color: #4b278b; font-size: 1.45rem; font-weight: 750; margin: 0; }
@@ -50,3 +59,9 @@
 .legal { font-size: .9rem; padding: .5rem; }
 @media (max-width: 420px) { .budgetRow { grid-template-columns: 1fr; } }
 .workspace fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+@media (max-width: 960px) {
+  .dashboardMetrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .dashboardMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

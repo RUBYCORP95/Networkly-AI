@@ -94,8 +94,8 @@ export default function Workspace() {
     {message && <p className={styles.notice} role="status">{message}</p>}
     {!data && !error && <p role="status">Chargement des simulations…</p>}
     {data && <>
-      <div className={styles.metrics}>{Object.entries(indicators).map(([key, label]) =>
-        <div className={styles.metric} key={key}><span>{label}</span><strong>{data.metrics[key]}</strong></div>)}</div>
+      <section className={styles.dashboardMetrics} aria-label="Statistiques de recrutement">{Object.entries(indicators).map(([key, label]) =>
+        <div className={styles.metric} key={key}><span>{label}</span><strong>{data.metrics[key]}</strong></div>)}</section>
       <div className={styles.actions}>
         <button type="button" onClick={() => edit(null)}>Créer une simulation</button>
         <button type="button" className={styles.secondary} onClick={() => { setError(""); setRefresh(n => n + 1); }}>Actualiser les statistiques</button>
