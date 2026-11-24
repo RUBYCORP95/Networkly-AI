@@ -93,15 +93,21 @@ export default function Simulator({ simulation, slug }) {
         <Metric label="Points de l’équipe">{team.teamPoints}</Metric>
         <Metric label="Points cumulés">{team.total}</Metric>
         <Metric label="Marge sur ventes personnelles">{money(team.personal.monthly)}</Metric>
-        {team.commission !== null && <Metric label="Commission mensuelle indicative">{money(team.commission)}</Metric>}
+        {team.commission !== null && <>
+          <Metric label="Commission sur ventes personnelles">{money(team.personalCommission)}</Metric>
+          <Metric label="Commission d’équipe">{money(team.teamCommission)}</Metric>
+          <Metric label="Commission mensuelle indicative">{money(team.commission)}</Metric>
+        </>}
       </div>
       {settings.tiers.length > 0 ? <>
-        <p>{team.tier ? `Palier atteint · ${team.tier.label} (${rate(team.tier.bps)})` : "Aucun palier atteint."}</p>
-        {settings.differential && <p>Taux estimé par consultant · {rate(team.memberRate)}. L’équipe est modélisée sur un seul niveau.</p>}
-        {team.next && <p>Prochain palier · {team.next.label} ({rate(team.next.bps)}). Il manque {team.missingPoints} points cumulés, {team.missingPersonal} points personnels et {team.missingConsultants} consultants.</p>}
+        <p>{team.tier ? `Palier estimé · ${team.tier.label} (${rate(team.tier.bps)})` : "Aucun palier atteint."}</p>
+        {settings.differential && <p>Différentiel estimé par branche · {rate(team.teamRate)}. La simulation suppose des consultants directs avec le même volume de ventes.</p>}
+        {team.next && <p>Prochain palier · {team.next.label} ({rate(team.next.bps)}). Il manque {team.missingPoints} points retenus pour la qualification, {team.missingPersonal} points personnels et {team.missingConsultants} consultants.</p>}
         {team.commission === null && <p>Valeur du point en euros à renseigner pour estimer une commission.</p>}
         <details><summary>Voir les conditions du barème</summary>
-          <ul>{settings.tiers.map(tier => <li key={tier.points}>{tier.label} ({rate(tier.bps)}) · {tier.points} points cumulés, {tier.personalPoints} points personnels et {tier.consultants} consultants.</li>)}</ul>
+          <ul>{settings.tiers.map(tier => <li key={tier.points}>{tier.label} ({rate(tier.bps)}) · {tier.points} points cumulés, {tier.personalPoints} points personnels et {tier.consultants} consultants directs
+            {tier.branchCap != null && ` · plafond de ${tier.branchCap} points retenus par branche`}
+            {tier.solo && " · possible avec les seuls points personnels"}.</li>)}</ul>
         </details>
       </> : <p>Le barème de commission n’est pas encore renseigné.</p>}
     </section>

@@ -1,3 +1,4 @@
+import { choganPointValueCents, choganTiers } from "../lib/recruitment/chogan.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { allocateBudget, httpsUrl, referralInput, sales, teamEstimate, validateSimulation, validateSettings } from "../lib/recruitment/model.mjs";
@@ -75,4 +76,36 @@ test("construit le lien Chogan à partir du code sponsor et omet les médias abs
   for (const join_url of ["javascript:alert(1)", "//exemple.com", "exemple.com@autre.com", "code avec espaces", "http://exemple.com"]) {
     assert.throws(() => validateSimulation({ ...input, join_url }), /parrainage/);
   }
+});
+
+test("applique les paliers Chogan, les plafonds et l’ouverture du différentiel", () => {
+  const settings = { margin_cents: 1750, points: 14, point_value_cents: choganPointValueCents, differential: true, tiers: choganTiers };
+  const initial = teamEstimate(10, 5, 10, settings);
+  assert.equal(initial.tier.label, "Partner");
+  assert.equal(initial.personalCommission, 560);
+  assert.equal(initial.teamCommission, 2800);
+  assert.equal(initial.commission, 3360);
+  assert.equal(initial.next.label, "Junior Leader");
+  assert.equal(initial.missingPoints, 660);
+
+  const oneBranch = teamEstimate(36, 1, 20, settings);
+  assert.equal(oneBranch.tier.label, "Partner");
+  assert.equal(oneBranch.personalCommission, 2016);
+  assert.equal(oneBranch.teamCommission, 0);
+
+  const capped = teamEstimate(8, 2, 100, settings);
+  assert.equal(capped.total, 2912);
+  assert.equal(capped.tier.label, "Junior Leader");
+  assert.equal(capped.memberRate, 400);
+  assert.equal(capped.teamCommission, 11200);
+  assert.equal(capped.missingPoints, 588);
+  assert.equal(capped.missingPersonal, 38);
+  assert.equal(capped.missingConsultants, 1);
+
+  const solo = teamEstimate(100, 0, 0, settings);
+  assert.equal(solo.tier.label, "Partner");
+  assert.equal(solo.personalCommission, 3600);
+  assert.equal(teamEstimate(7, 5, 10, settings).commission, 0);
+  assert.deepEqual(validateSettings({ ...settings, enabled: true, default_access: true, expenses: [],
+    presentation: "Chogan", video_url: "" }).tiers, choganTiers);
 });

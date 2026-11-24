@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { choganPlanUrl, choganPointValueCents, choganTiers } from "../../../lib/recruitment/chogan.mjs";
 import { ExpenseFields, fetchRecruitment, NumberField } from "../../recrutement/Fields";
 import styles from "../../recrutement/recruitment.module.css";
 
@@ -10,6 +11,9 @@ const tierFields = [
   ["personalPoints", "Points personnels", 1000000, 1],
   ["consultants", "Consultants minimum", 1000, 1],
   ["bps", "Taux (%)", 10000, 100],
+  ["branchCap", "Plafond de points par branche", 100000000, 1, true],
+  ["personalCap", "Plafond de points personnels", 1000000, 1, true],
+  ["commissionMinConsultants", "Branches requises pour le différentiel", 1000, 1, true],
 ];
 
 export default function Settings() {
@@ -66,11 +70,20 @@ export default function Settings() {
           <label>URL HTTPS de la vidéo par défaut<input type="url" maxLength={1000} value={settings.video_url} onChange={event => set("video_url", event.target.value)} /></label>
           <h3>Paliers de commission</h3>
           <p>Renseigne les seuils, les conditions et les taux vérifiés pour le plan applicable. La commission en euros s’affiche quand la valeur d’un point est renseignée.</p>
+          {settings.tiers.length === 0 && <div className={styles.actions}>
+            <button type="button" className={styles.secondary} onClick={() => setSettings(current => ({
+              ...current, tiers: choganTiers, differential: true,
+              point_value_cents: current.point_value_cents ?? choganPointValueCents,
+            }))}>Charger les paliers Chogan</button>
+            <a href={choganPlanUrl} target="_blank" rel="noreferrer">Plan de carrière Chogan (PDF)</a>
+          </div>}
           <label className={styles.check}><input type="checkbox" checked={settings.differential} onChange={event => set("differential", event.target.checked)} />Appliquer le différentiel sur les ventes de l’équipe</label>
           {settings.tiers.map((item, index) => <div className={styles.line} key={index}>
             <label>Libellé du palier {index + 1}<input required maxLength={80} value={item.label} onChange={event => tier(index, "label", event.target.value)} /></label>
-            {tierFields.map(([field, label, max, scale]) => <NumberField key={field} label={label} max={max} scale={scale} value={item[field]}
+            {tierFields.map(([field, label, max, scale, optional]) => <NumberField key={field} label={label} max={max} scale={scale} optional={optional} value={item[field] ?? null}
               onChange={value => tier(index, field, value)} />)}
+            <label className={styles.check}><input type="checkbox" checked={item.solo === true}
+              onChange={event => tier(index, "solo", event.target.checked)} />Accessible avec les points personnels seuls</label>
             <button type="button" className={styles.secondary} aria-label={`Retirer le palier ${index + 1}`}
               onClick={() => set("tiers", settings.tiers.filter((_, i) => i !== index))}>Retirer</button>
           </div>)}
