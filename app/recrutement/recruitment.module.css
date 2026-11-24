@@ -19,12 +19,14 @@
 .hero > p { margin-bottom: .2rem; font-weight: 650; }
 .sponsor, .actions { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
 .sponsor img { border-radius: 50%; object-fit: cover; }
-.panel { background: #fff; border: 1px solid var(--line); border-radius: 1.25rem; margin: 1.1rem 0; padding: clamp(1rem, 4vw, 1.8rem); }
+.panel { max-width: none; background: #fff; border: 1px solid var(--line); border-radius: 1.25rem; margin: 1.1rem 0; padding: clamp(1rem, 4vw, 1.8rem); }
 .presentation { white-space: pre-line; }
 .fields, .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: .75rem; margin: .8rem 0; }
 .dashboardMetrics {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
+  max-width: none;
+  padding: 0;
   gap: .65rem;
   margin: .9rem 0;
 }
