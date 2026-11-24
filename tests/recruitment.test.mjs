@@ -55,3 +55,19 @@ test("valide les réglages et élimine les attributs réservés au serveur", () 
   assert.equal(Object.hasOwn(row, "slug"), false);
   assert.equal(Object.hasOwn(row, "visits"), false);
 });
+
+test("accepte le parrainage sans préfixe HTTPS et omet les médias absents", () => {
+  const input = { first_name: "Camille", consultant_name: "TESAMI", whatsapp: "", notes: "",
+    status: "active", quantity: 30, team_size: 5, per_member: 10, personal_sales: 10, expenses: [] };
+  const destination = "https://exemple.com/parrainage?ref=camille";
+  for (const url of [destination, " exemple.com/parrainage?ref=camille "]) {
+    const simulation = validateSimulation({ ...input, join_url: url });
+    assert.equal(simulation.join_url, destination);
+    assert.equal(Object.hasOwn(simulation, "photo_url"), false);
+    assert.equal(Object.hasOwn(simulation, "video_url"), false);
+  }
+  assert.equal(validateSimulation({ ...input, join_url: "" }).join_url, "");
+  for (const join_url of ["javascript:alert(1)", "//exemple.com", "exemple.com@autre.com", "parrainage", "http://exemple.com"]) {
+    assert.throws(() => validateSimulation({ ...input, join_url }), /parrainage/);
+  }
+});
