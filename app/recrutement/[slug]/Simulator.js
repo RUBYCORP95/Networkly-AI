@@ -10,7 +10,7 @@ function Metric({ label, children }) {
 
 function Quantity({ label, value, onChange, max = 100 }) {
   return <label className={styles.quantity}>
-    <span>{label} <strong>{value}</strong></span>
+    <span><span>{label}</span><strong>{value}</strong></span>
     <input type="range" min="0" max={max} value={value} onChange={event => onChange(Number(event.target.value))} />
     <small><span>0</span><span>{max / 2}</span><span>{max}</span></small>
   </label>;

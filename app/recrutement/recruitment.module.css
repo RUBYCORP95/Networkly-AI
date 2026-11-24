@@ -51,8 +51,15 @@
 .workspace :is(input, select, textarea), .publicPage input[type="number"] { width: 100%; min-width: 0; padding: .62rem; border: 1px solid #b9accb; border-radius: .55rem; color: var(--ink); background: #fff; font: inherit; font-weight: 400; }
 .workspace input[type="checkbox"] { width: auto; accent-color: var(--accent); }
 .workspace .check { display: flex; align-items: center; }
-.quantity { margin: .9rem 0; }
-.quantity > span, .quantity > small { display: flex; justify-content: space-between; gap: .5rem; }
+.quantity { grid-template-rows: 1fr auto auto; margin: .9rem 0; }
+.quantity > span {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: start;
+  gap: .75rem;
+}
+.quantity > span > strong { min-width: 4ch; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.quantity > small { display: flex; justify-content: space-between; gap: .5rem; }
 .quantity input { width: 100%; accent-color: var(--accent); }
 .budgetRow { border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; align-items: end; padding: .65rem 0; margin-bottom: .65rem; }
 .budgetRow div { display: grid; gap: .2rem; }
