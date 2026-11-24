@@ -4,15 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { allocateBudget, legal, money, sales, teamEstimate } from "../../../lib/recruitment/model.mjs";
 import styles from "../recruitment.module.css";
 
-function Metric({ label, children }) {
-  return <div className={styles.metric}><span>{label}</span><strong>{children}</strong></div>;
+function Metric({ label, children, detail }) {
+  return <div className={styles.metric}><span>{label}</span><strong>{children}</strong>{detail && <small>{detail}</small>}</div>;
 }
 
-function Quantity({ label, value, onChange, max = 100 }) {
+function Quantity({ label, value, onChange, min = 0, max = 100 }) {
   return <label className={styles.quantity}>
-    <span>{label} <strong>{value}</strong></span>
-    <input type="range" min="0" max={max} value={value} onChange={event => onChange(Number(event.target.value))} />
-    <small><span>0</span><span>{max / 2}</span><span>{max}</span></small>
+    <span><span>{label}</span><strong aria-hidden="true">{value}</strong></span>
+    <input type="range" min={min} max={max} value={value} onChange={event => onChange(Number(event.target.value))} />
+    <small aria-hidden="true"><span>{min}</span><span>{Math.floor((min + max) / 2)}</span><span>{max}</span></small>
   </label>;
 }
 
@@ -20,7 +20,7 @@ const rate = bps => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 })
 
 export default function Simulator({ simulation, slug }) {
   const [quantity, setQuantity] = useState(simulation.quantity);
-  const [teamSize, setTeamSize] = useState(simulation.team_size);
+  const [teamSize, setTeamSize] = useState(() => Math.min(100, Math.max(1, simulation.team_size)));
   const [perMember, setPerMember] = useState(simulation.per_member);
   const [personalSales, setPersonalSales] = useState(simulation.personal_sales);
   const [expenses, setExpenses] = useState(simulation.expenses);
@@ -31,6 +31,11 @@ export default function Simulator({ simulation, slug }) {
     sent.current = slug;
     fetch(`/api/recrutement/${slug}/evenement?type=visit`, { method: "POST", keepalive: true }).catch(() => {});
   }, [slug]);
+  function updateMonthlySales(value) {
+    setQuantity(value);
+    setPersonalSales(value);
+  }
+
   const { settings } = simulation;
   const individual = sales(quantity, settings);
   const budget = allocateBudget(individual.monthly, expenses);
@@ -57,7 +62,7 @@ export default function Simulator({ simulation, slug }) {
         <Metric label="Complément mensuel">{money(individual.monthly)}</Metric>
         <Metric label="Complément annuel">{money(individual.yearly)}</Metric>
       </div>
-      <Quantity label="Parfums vendus par mois" value={quantity} onChange={setQuantity} />
+      <Quantity label="Parfums vendus par mois" value={quantity} onChange={updateMonthlySales} />
       <div className={styles.metrics}>
         <Metric label="Marge indicative par parfum">{money(settings.margin_cents)}</Metric>
         <Metric label="Points générés mensuellement">{individual.points} points</Metric>
@@ -84,7 +89,7 @@ export default function Simulator({ simulation, slug }) {
     <section className={styles.panel}>
       <h2>Simule le développement de ton équipe</h2>
       <div className={styles.fields}>
-        <Quantity label="Nombre de consultants dans l’équipe" value={teamSize} onChange={setTeamSize} max={1000} />
+        <Quantity label="Nombre de consultants dans l’équipe" value={teamSize} onChange={setTeamSize} min={1} />
         <Quantity label="Parfums vendus par consultant" value={perMember} onChange={setPerMember} />
         <Quantity label="Ventes personnelles" value={personalSales} onChange={setPersonalSales} />
       </div>
@@ -94,7 +99,10 @@ export default function Simulator({ simulation, slug }) {
         <Metric label="Points cumulés">{team.total}</Metric>
         <Metric label="Marge sur ventes personnelles">{money(team.personal.monthly)}</Metric>
         {team.commission !== null && <>
-          <Metric label="Commission sur ventes personnelles">{money(team.personalCommission)}</Metric>
+          <Metric label="Commission sur ventes personnelles"
+            detail={`${team.eligiblePersonalPoints} points retenus × ${rate(team.tier?.bps ?? 0)}`}>
+            {money(team.personalCommission)}
+          </Metric>
           <Metric label="Commission d’équipe">{money(team.teamCommission)}</Metric>
           <Metric label="Commission mensuelle indicative">{money(team.commission)}</Metric>
         </>}
