@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { statuses } from "../../../lib/recruitment/model.mjs";
+import { referralInput, statuses } from "../../../lib/recruitment/model.mjs";
 import { ExpenseFields, fetchRecruitment, NumberField } from "../../recrutement/Fields";
 import styles from "../../recrutement/recruitment.module.css";
 
@@ -13,9 +13,7 @@ const indicators = {
 const identity = [
   ["first_name", "Prénom du prospect", 60, "text", true],
   ["consultant_name", "Ton nom affiché", 100, "text", true],
-  ["photo_url", "URL HTTPS de ta photo publique", 1000, "url", false],
-  ["video_url", "URL HTTPS de la vidéo (facultatif)", 1000, "url", false],
-  ["join_url", "Lien HTTPS de parrainage", 1000, "url", false],
+  ["join_url", "Code sponsor Chogan", 1000, "text", false],
   ["whatsapp", "Numéro WhatsApp professionnel (format international)", 30, "tel", false],
 ];
 const volumes = [
@@ -67,8 +65,9 @@ export default function Workspace() {
   }, [filter, refresh]);
 
   function edit(row) {
-    setForm(row ?? { ...data.defaults, first_name: "", photo_url: "", whatsapp: "", video_url: "", notes: "",
-      status: "active", quantity: 30, team_size: 5, per_member: 10, personal_sales: 10 });
+    const { photo_url, video_url, ...fields } = row ?? { ...data.defaults, first_name: "", whatsapp: "", notes: "",
+      status: "active", quantity: 30, team_size: 5, per_member: 10, personal_sales: 10 };
+    setForm({ ...fields, join_url: referralInput(fields.join_url) });
     requestAnimationFrame(() => editor.current?.scrollIntoView({ block: "start" }));
   }
 
@@ -95,8 +94,8 @@ export default function Workspace() {
     {message && <p className={styles.notice} role="status">{message}</p>}
     {!data && !error && <p role="status">Chargement des simulations…</p>}
     {data && <>
-      <div className={styles.metrics}>{Object.entries(indicators).map(([key, label]) =>
-        <div className={styles.metric} key={key}><span>{label}</span><strong>{data.metrics[key]}</strong></div>)}</div>
+      <section className={styles.dashboardMetrics} aria-label="Statistiques de recrutement">{Object.entries(indicators).map(([key, label]) =>
+        <div className={styles.metric} key={key}><span>{label}</span><strong>{data.metrics[key]}</strong></div>)}</section>
       <div className={styles.actions}>
         <button type="button" onClick={() => edit(null)}>Créer une simulation</button>
         <button type="button" className={styles.secondary} onClick={() => { setError(""); setRefresh(n => n + 1); }}>Actualiser les statistiques</button>
@@ -107,11 +106,13 @@ export default function Workspace() {
           <fieldset disabled={saving}>
             <div className={styles.fields}>
               {identity.map(([field, label, max, type, required]) => <label key={field}>{label}
-                <input required={required} type={type} maxLength={max} value={form[field]} onChange={event => set(field, event.target.value)} />
+                <input required={required} type={type} maxLength={max} value={form[field]}
+                  autoCapitalize={field === "join_url" ? "none" : undefined}
+                  onChange={event => set(field, event.target.value)} />
               </label>)}
               {volumes.map(([field, label, max]) => <NumberField key={field} label={label} max={max} value={form[field]} onChange={value => set(field, value)} />)}
             </div>
-            <p className={styles.muted}>Le prénom, ton nom et la photo renseignée sont visibles par toute personne disposant du lien. Le numéro WhatsApp sert au contact.</p>
+            <p className={styles.muted}>Le prénom et ton nom sont visibles par toute personne disposant du lien. Le numéro WhatsApp sert au contact.</p>
             <h3>Dépenses proposées</h3>
             <ExpenseFields expenses={form.expenses} onChange={value => set("expenses", value)} />
             <div className={styles.fields}>

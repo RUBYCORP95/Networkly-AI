@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { allocateBudget, httpsUrl, sales, teamEstimate, validateSimulation, validateSettings } from "../lib/recruitment/model.mjs";
+import { allocateBudget, httpsUrl, referralInput, sales, teamEstimate, validateSimulation, validateSettings } from "../lib/recruitment/model.mjs";
 
 const tiers = [
   { label: "Premier", points: 140, personalPoints: 0, consultants: 0, bps: 500 },
@@ -54,4 +54,25 @@ test("valide les réglages et élimine les attributs réservés au serveur", () 
   assert.equal(Object.hasOwn(row, "owner_id"), false);
   assert.equal(Object.hasOwn(row, "slug"), false);
   assert.equal(Object.hasOwn(row, "visits"), false);
+});
+
+test("construit le lien Chogan à partir du code sponsor et omet les médias absents", () => {
+  const input = { first_name: "Camille", consultant_name: "TESAMI", whatsapp: "", notes: "",
+    status: "active", quantity: 30, team_size: 5, per_member: 10, personal_sales: 10, expenses: [] };
+  const registration = "https://www.chogangroupspa.com/registration_consultant/";
+  assert.equal(validateSimulation({ ...input, join_url: " AbC123-4 " }).join_url, registration + "AbC123-4");
+  assert.equal(referralInput(registration + "AbC123-4"), "AbC123-4");
+  assert.equal(referralInput(registration + "AbC123-4/"), "AbC123-4");
+  assert.equal(referralInput("https://exemple.com/parrainage"), "exemple.com/parrainage");
+  const destination = "https://exemple.com/parrainage?ref=camille";
+  for (const url of [destination, " exemple.com/parrainage?ref=camille "]) {
+    const simulation = validateSimulation({ ...input, join_url: url });
+    assert.equal(simulation.join_url, destination);
+    assert.equal(Object.hasOwn(simulation, "photo_url"), false);
+    assert.equal(Object.hasOwn(simulation, "video_url"), false);
+  }
+  assert.equal(validateSimulation({ ...input, join_url: "" }).join_url, "");
+  for (const join_url of ["javascript:alert(1)", "//exemple.com", "exemple.com@autre.com", "code avec espaces", "http://exemple.com"]) {
+    assert.throws(() => validateSimulation({ ...input, join_url }), /parrainage/);
+  }
 });
