@@ -60,7 +60,7 @@
 }
 .quantity > span > strong { min-width: 4ch; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .quantity > small { display: flex; justify-content: space-between; gap: .5rem; }
-.quantity input { width: 100%; accent-color: var(--accent); }
+.quantity input { width: 100%; margin: 0; accent-color: var(--accent); }
 .budgetRow { border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; align-items: end; padding: .65rem 0; margin-bottom: .65rem; }
 .budgetRow div { display: grid; gap: .2rem; }
 .budgetRow div span { color: var(--muted); font-size: .9rem; }
