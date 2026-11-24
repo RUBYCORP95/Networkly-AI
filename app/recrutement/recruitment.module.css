@@ -3,6 +3,8 @@
   --ink: #241b36;
   --muted: #574e64;
   --line: #e7dff0;
+  display: block;
+  min-height: 0;
   width: min(100% - 2rem, 66rem);
   margin: 2rem auto;
   padding-bottom: 2rem;
@@ -17,17 +19,19 @@
 .hero > p { margin-bottom: .2rem; font-weight: 650; }
 .sponsor, .actions { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
 .sponsor img { border-radius: 50%; object-fit: cover; }
-.panel { background: #fff; border: 1px solid var(--line); border-radius: 1.25rem; margin: 1.1rem 0; padding: clamp(1rem, 4vw, 1.8rem); }
+.panel { max-width: none; background: #fff; border: 1px solid var(--line); border-radius: 1.25rem; margin: 1.1rem 0; padding: clamp(1rem, 4vw, 1.8rem); }
 .presentation { white-space: pre-line; }
 .fields, .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: .75rem; margin: .8rem 0; }
 .dashboardMetrics {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
+  max-width: none;
+  padding: 0;
   gap: .65rem;
   margin: .9rem 0;
 }
 .dashboardMetrics .metric { min-width: 0; gap: .2rem; padding: .7rem .8rem; }
-.dashboardMetrics .metric span { font-size: .875rem; }
+.dashboardMetrics .metric span { font-size: .875rem; line-height: 1.35; overflow-wrap: normal; }
 .metric { display: grid; align-content: start; gap: .3rem; background: #f7f2fd; border-radius: .85rem; padding: .9rem; }
 .metric span, .muted, .legal { color: var(--muted); }
 .metric strong, .highlight { color: #4b278b; font-size: 1.45rem; font-weight: 750; margin: 0; }
@@ -59,7 +63,7 @@
 .legal { font-size: .9rem; padding: .5rem; }
 @media (max-width: 420px) { .budgetRow { grid-template-columns: 1fr; } }
 .workspace fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-@media (max-width: 960px) {
+@media (max-width: 1100px) {
   .dashboardMetrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
