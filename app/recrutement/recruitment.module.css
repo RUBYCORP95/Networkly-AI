@@ -15,8 +15,20 @@
 .publicPage { width: min(100% - 2rem, 48rem); }
 .workspace h1, .publicPage h1 { line-height: 1.15; font-size: clamp(2rem, 6vw, 3rem); margin: .5rem 0 1rem; }
 .workspace h2, .publicPage h2 { line-height: 1.25; margin: 0 0 1rem; }
-.hero { padding: clamp(1.5rem, 6vw, 3rem); border-radius: 1.5rem; color: #271746; background: linear-gradient(145deg, #f1e8ff, #faf6ff); }
-.hero > p { margin-bottom: .2rem; font-weight: 650; }
+.hero {
+  display: block;
+  margin: 0;
+  padding: clamp(1.5rem, 5vw, 3rem);
+  border: 1px solid #e9dcf9;
+  border-radius: 1.5rem;
+  color: #271746;
+  background: linear-gradient(135deg, #f3ebff, #fcfaff);
+}
+.hero > img { display: block; margin-bottom: 1.25rem; }
+.hero > p { margin: 0; color: #5b398b; font-weight: 650; }
+.hero > h1 { max-width: 20ch; margin: .4rem 0 1.25rem; text-wrap: balance; }
+.hero .sponsor { color: var(--muted); font-size: .95rem; }
+.hero .sponsor strong { color: #271746; }
 .sponsor, .actions { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
 .sponsor img { border-radius: 50%; object-fit: cover; }
 .panel { max-width: none; background: #fff; border: 1px solid var(--line); border-radius: 1.25rem; margin: 1.1rem 0; padding: clamp(1rem, 4vw, 1.8rem); }

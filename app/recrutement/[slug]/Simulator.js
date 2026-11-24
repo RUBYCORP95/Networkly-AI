@@ -38,7 +38,7 @@ export default function Simulator({ simulation, slug }) {
 
   return <main className={styles.publicPage}>
     <header className={styles.hero}>
-      <img src="/tesami-logo.svg" alt="TESAMI" width="92" height="66" />
+      <img src="/tesami-logo.svg" alt="TESAMI" width="72" height="52" />
       <p>Bonjour {simulation.first_name}</p>
       <h1>Et si tu changeais ton quotidien ?</h1>
       <div className={styles.sponsor}>
@@ -84,10 +84,7 @@ export default function Simulator({ simulation, slug }) {
     <section className={styles.panel}>
       <h2>Simule le développement de ton équipe</h2>
       <div className={styles.fields}>
-        <label>Nombre de consultants dans l’équipe
-          <input type="number" min="0" max="1000" value={teamSize}
-            onChange={event => setTeamSize(Math.trunc(Math.max(0, Math.min(1000, Number(event.target.value)))))} />
-        </label>
+        <Quantity label="Nombre de consultants dans l’équipe" value={teamSize} onChange={setTeamSize} max={1000} />
         <Quantity label="Parfums vendus par consultant" value={perMember} onChange={setPerMember} />
         <Quantity label="Ventes personnelles" value={personalSales} onChange={setPersonalSales} />
       </div>
