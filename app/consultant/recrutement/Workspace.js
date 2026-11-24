@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { statuses } from "../../../lib/recruitment/model.mjs";
+import { referralInput, statuses } from "../../../lib/recruitment/model.mjs";
 import { ExpenseFields, fetchRecruitment, NumberField } from "../../recrutement/Fields";
 import styles from "../../recrutement/recruitment.module.css";
 
@@ -13,7 +13,7 @@ const indicators = {
 const identity = [
   ["first_name", "Prénom du prospect", 60, "text", true],
   ["consultant_name", "Ton nom affiché", 100, "text", true],
-  ["join_url", "Lien de parrainage", 1000, "text", false],
+  ["join_url", "Code sponsor Chogan", 1000, "text", false],
   ["whatsapp", "Numéro WhatsApp professionnel (format international)", 30, "tel", false],
 ];
 const volumes = [
@@ -67,7 +67,7 @@ export default function Workspace() {
   function edit(row) {
     const { photo_url, video_url, ...fields } = row ?? { ...data.defaults, first_name: "", whatsapp: "", notes: "",
       status: "active", quantity: 30, team_size: 5, per_member: 10, personal_sales: 10 };
-    setForm({ ...fields, join_url: fields.join_url.replace(/^https:\/\//i, "") });
+    setForm({ ...fields, join_url: referralInput(fields.join_url) });
     requestAnimationFrame(() => editor.current?.scrollIntoView({ block: "start" }));
   }
 
@@ -107,8 +107,7 @@ export default function Workspace() {
             <div className={styles.fields}>
               {identity.map(([field, label, max, type, required]) => <label key={field}>{label}
                 <input required={required} type={type} maxLength={max} value={form[field]}
-                  inputMode={field === "join_url" ? "url" : undefined}
-                  placeholder={field === "join_url" ? "exemple.com/parrainage" : undefined}
+                  autoCapitalize={field === "join_url" ? "none" : undefined}
                   onChange={event => set(field, event.target.value)} />
               </label>)}
               {volumes.map(([field, label, max]) => <NumberField key={field} label={label} max={max} value={form[field]} onChange={value => set(field, value)} />)}
