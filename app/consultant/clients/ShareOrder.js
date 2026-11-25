@@ -37,6 +37,11 @@ export default function ShareOrder({ clientId }) {
       <p>Lien valable 24 heures et utilisable une fois.</p>
       {share.qr && <img src={share.qr} width={240} height={240} alt="QR code du bon de commande" style={{ maxWidth: "100%", height: "auto" }} />}
       <p><a className={styles.crmAction} href={share.url}>Ouvrir le bon de commande</a></p>
+      <div className={styles.orderActions}>
+        <a className={styles.crmAction} href={"https://wa.me/?text=" + encodeURIComponent("Voici ton bon de commande : " + share.url)} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        <a className={styles.crmAction} href={"mailto:?subject=" + encodeURIComponent("Ton bon de commande") + "&body=" + encodeURIComponent(share.url)}>E-mail</a>
+        {share.qr && <a className={styles.crmAction} href={share.qr} download="tesami-bon-de-commande.png">Télécharger le QR code</a>}
+      </div>
       <button type="button" onClick={async () => {
         try { await navigator.clipboard.writeText(share.url); setMessage("Lien copié."); }
         catch { setMessage("Sélectionne le lien affiché pour le copier."); }
