@@ -38,8 +38,9 @@ export default function Simulator({ simulation, slug }) {
 
   const { settings } = simulation;
   const individual = sales(quantity, settings);
-  const budget = allocateBudget(individual.monthly, expenses);
   const team = teamEstimate(personalSales, teamSize, perMember, settings);
+  const totalMonthly = team.commission === null ? null : team.personal.monthly + team.commission;
+  const budget = allocateBudget(totalMonthly ?? team.personal.monthly, expenses);
 
   return <main className={styles.publicPage}>
     <header className={styles.hero}>
@@ -71,7 +72,7 @@ export default function Simulator({ simulation, slug }) {
     </section>
     <section className={styles.panel}>
       <h2>Simulation du budget mensuel</h2>
-      <p className={styles.highlight}>{money(individual.monthly)} disponibles</p>
+      <p className={styles.highlight}>{money(totalMonthly ?? team.personal.monthly)} disponibles {totalMonthly === null ? "(marge personnelle uniquement, commissions non calculables)" : "(marge et commissions cumulées)"}</p>
       {!budget.rows.length && <p>Aucune dépense proposée pour cette simulation.</p>}
       {budget.rows.map((expense, index) => <div className={styles.budgetRow} key={index}>
         <label>{expense.label}
@@ -91,7 +92,7 @@ export default function Simulator({ simulation, slug }) {
       <div className={styles.fields}>
         <Quantity label="Nombre de consultants dans l’équipe" value={teamSize} onChange={setTeamSize} min={1} />
         <Quantity label="Parfums vendus par consultant" value={perMember} onChange={setPerMember} />
-        <Quantity label="Ventes personnelles" value={personalSales} onChange={setPersonalSales} />
+        <Quantity label="Ventes personnelles" value={personalSales} onChange={updateMonthlySales} />
       </div>
       <div className={styles.metrics} aria-live="polite">
         <Metric label="Points personnels">{team.personal.points}</Metric>
@@ -108,7 +109,9 @@ export default function Simulator({ simulation, slug }) {
           <Metric label="Commission d’équipe" detail={`${money(team.turnover.team)} HT × ${rate(team.teamRate)}`}>
             {money(team.teamCommission)}
           </Metric>
-          <Metric label="Commission mensuelle indicative">{money(team.commission)}</Metric>
+          <Metric label="Total des commissions mensuelles">{money(team.commission)}</Metric>
+          <Metric label="Revenu mensuel total" detail="Marge personnelle + commissions personnelles et équipe">{money(totalMonthly)}</Metric>
+          <Metric label="Revenu annuel total" detail="Projection sur 12 mois avant charges et impôts">{money(totalMonthly * 12)}</Metric>
         </>}
       </div>
       {settings.tiers.length > 0 ? <>
