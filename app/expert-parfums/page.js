@@ -11,7 +11,7 @@ export default async function ExpertPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const { catalogue, unavailable } = await loadCatalogue(supabase);
   const { data: history, error } = user
-    ? await supabase.from("expert_parfums_historique").select("id,created_at,public_cible,preferences,resultats,reference_depart")
+    ? await supabase.from("expert_parfums_historique").select("id,created_at,public_cible,preferences,resultats,reference_depart,parfum_depart")
       .eq("user_id", user.id).order("created_at", { ascending: false }).limit(30)
     : { data: [], error: null };
   const { data: profile } = user ? await supabase.from("profiles").select("is_admin").eq("id", user.id).maybeSingle() : { data: null };
