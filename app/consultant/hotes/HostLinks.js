@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import styles from "../consultant.module.css";
 
@@ -20,6 +20,7 @@ function ShareLink({ path, label }) {
     } catch { setStatus("Impossible de générer le QR code. Le lien reste disponible."); }
     finally { setBusy(false); }
   }
+  useEffect(() => { generate(); }, [path]);
   async function copy() {
     try { await navigator.clipboard.writeText(url()); setStatus("Lien copié."); }
     catch { setStatus("Ouvre le lien puis copie son adresse."); }
@@ -28,7 +29,7 @@ function ShareLink({ path, label }) {
     <a href={path} className={styles.crmAction}>{label}</a>
     <div className={styles.orderActions}>
       <button type="button" onClick={copy}>Copier le lien</button>
-      <button type="button" disabled={busy} onClick={generate}>{busy ? "Création…" : "QR code et partage"}</button>
+      <button type="button" disabled={busy} onClick={generate}>{busy ? "Création…" : "Régénérer le QR code"}</button>
     </div>
     {share && <>
       {share.qr && <img src={share.qr} width={240} height={240} alt={"QR code : " + label} style={{maxWidth:"100%",height:"auto"}} />}
