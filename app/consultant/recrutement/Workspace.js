@@ -1,5 +1,6 @@
 "use client";
 
+import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
 import { referralInput, statuses } from "../../../lib/recruitment/model.mjs";
 import { ExpenseFields, fetchRecruitment, NumberField } from "../../recrutement/Fields";
@@ -25,13 +26,16 @@ const volumes = [
 
 function Record({ row, select, setMessage }) {
   const href = `/recrutement/${row.slug}`;
-  const share = typeof window === "undefined" ? "" : new URL(href, window.location.origin).href;
+  const [share,setShare]=useState("");
+  const [qr,setQr]=useState("");
+  useEffect(()=>{let active=true;const url=new URL(href,window.location.origin).href;setShare(url);setQr("");if(row.status!=="archived") QRCode.toDataURL(url,{width:200,margin:4}).then(value=>{if(active)setQr(value)}).catch(()=>{});return ()=>{active=false};},[href,row.status]);
   const greeting = row.first_name ? `Bonjour ${row.first_name}` : "Bonjour";
   const message = encodeURIComponent(`${greeting}, voici ta simulation TESAMI : ${share}`);
   return <article className={styles.record}>
     <h3>{row.first_name || "Prospect sans prénom"} · {statuses[row.status]}</h3>
     <p>{row.visits} visite(s) · {row.whatsapp_clicks} clic(s) WhatsApp · {row.join_clicks} clic(s) inscription</p>
     <p className={styles.muted}>Créée le {new Date(row.created_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })} · Modifiée le {new Date(row.updated_at).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}</p>
+    {row.status !== "archived" && qr && <div><img src={qr} width={200} height={200} alt="QR code de la simulation" style={{maxWidth:"100%",height:"auto"}}/><p><a className={styles.secondary} href={qr} download="tesami-simulation.png">Télécharger le QR code</a></p></div>}
     <div className={styles.actions}>
       <button type="button" onClick={() => select(row)}>Modifier</button>
       {row.status !== "archived" && <>
