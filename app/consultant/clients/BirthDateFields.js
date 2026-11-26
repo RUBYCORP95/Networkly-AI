@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useFormStatus } from "react-dom";
 import styles from "../consultant.module.css";
 
 const months = [
@@ -29,7 +28,6 @@ export default function BirthDateFields({ name, defaultValue = "", max, required
     day <= daysInMonth && formatted <= max;
   const filled = Boolean(date.year || date.month || date.day);
   const error = filled && !valid;
-  const { pending } = useFormStatus();
 
   return <fieldset className={styles.birthDateFields}>
     <legend>Date de naissance{required ? " *" : ""}</legend>
@@ -59,7 +57,7 @@ export default function BirthDateFields({ name, defaultValue = "", max, required
     <input type="hidden" name={name} value={valid ? formatted : ""} />
     <input className={styles.birthDateValidity} aria-label="Date de naissance complète"
       type="text" tabIndex={-1} autoComplete="off" value={valid || (!required && !filled) ? "ok" : ""}
-      readOnly required disabled={pending} />
+      readOnly required />
     {error && <small role="alert">Indique une date de naissance valide, sans dépasser aujourd’hui.</small>}
   </fieldset>;
 }
