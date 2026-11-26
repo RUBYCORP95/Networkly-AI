@@ -45,3 +45,29 @@ test("product lookup keeps SKU prefixes, Chogan codes and direct product links",
   assert.equal(handle, caseProduct.handle);
   assert.deepEqual(await getVariants(handle), [catalogue[0]]);
 });
+
+test("catalogue uses the live 30 ml perfume variant when the bulk feed still says 35 ml", async t => {
+  const perfume = product(131, "Parfum CHOGAN n°131", { sku: "3131A", price: "25.50" });
+  perfume.variants[0].title = "35 ml";
+  const other = product(132, "Parfum CHOGAN n°132", { sku: "3132A", price: "23.50" });
+  other.variants[0].title = "35 ml";
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async url => {
+    const path = new URL(url).pathname;
+    calls.push(path);
+    if (path === "/products.json") return Response.json({ products: [perfume, other] });
+    const entry = path === "/products/product-131.js" ? perfume : other;
+    return Response.json({
+      ...entry,
+      variants: entry.variants.map(variant => ({
+        ...variant, title: entry === perfume ? "30 ml" : "35 ml", price: Number(variant.price) * 100,
+      })),
+    });
+  });
+
+  const items = await loadCatalogueItems();
+  assert.deepEqual(calls, ["/products.json", "/products/product-131.js", "/products/product-132.js"]);
+  assert.deepEqual(items.map(({ format, reference, unit_cents }) => ({ format, reference, unit_cents })),
+    [{ format: "30 ml", reference: "3131A", unit_cents: 2550 }]);
+  assert.deepEqual(await getVariants(other.handle), []);
+});
