@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { audiences, levels, normalize, findPerfumes } from "../../lib/parfums/expert.mjs";
+import { audiences, levels, normalize, findPerfumes, olfazetaLabel } from "../../lib/parfums/expert.mjs";
 import Fiche from "./Fiche";
 import { recommend, searchExternalPerfumes } from "./actions";
 import styles from "./parfums.module.css";
@@ -62,7 +62,7 @@ export default function Expert({ catalogue, history, historyUnavailable, signedI
   function useBasis(perfume) {
     setBasis(perfume);
     setExternal(null);
-    setWorn(perfume.inspiration);
+    setWorn(olfazetaLabel(perfume));
     setAudience(perfume.public_cible);
     const seen = new Map(Object.keys(levels).flatMap(level => perfume[level]).map(note => [normalize(note), note]));
     setNotes([...seen.keys()].slice(0, 12).map(key => availableNotes.get(key)));
@@ -125,7 +125,7 @@ export default function Expert({ catalogue, history, historyUnavailable, signedI
               <p>Aucun parfum trouvé. Essaie le nom seul, ou choisis directement les notes que tu aimes.</p>}
           </div>}
           {!basis && !external && suggestions.length > 0 && <ul className={styles.suggestions}>{suggestions.map(perfume =>
-            <li key={perfume.reference}><button type="button" onClick={() => useBasis(perfume)}>{perfume.inspiration} · Olfazeta {perfume.reference}</button></li>)}</ul>}
+            <li key={perfume.reference}><button type="button" onClick={() => useBasis(perfume)}>{olfazetaLabel(perfume)}</button></li>)}</ul>}
           {basis && <p>Les notes de la référence {basis.reference} ont été présélectionnées. Garde celles que tu apprécies le plus. <Link href={`/expert-parfums/${basis.reference}`}>Voir la fiche Olfazeta</Link></p>}
           {external && <div className={styles.match}>
             <strong>{[external.name, external.house, external.concentration, external.year].filter(Boolean).join(" · ")}</strong>
