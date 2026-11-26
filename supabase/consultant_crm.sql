@@ -92,7 +92,7 @@ create table public.crm_order_links (
   client_id uuid not null,
   shipping_cents integer not null default 0 check (shipping_cents between 0 and 99999999),
   seller jsonb not null default '{}'::jsonb,
-  expires_at timestamptz not null default (now() + interval '24 hours'),
+  expires_at timestamptz not null default (now() + interval '168 hours'),
   used_at timestamptz,
   foreign key (owner_id, client_id) references public.crm_clients(owner_id, id) on delete cascade
 );
