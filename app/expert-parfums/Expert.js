@@ -174,7 +174,7 @@ export default function Expert({ catalogue, history, historyUnavailable, signedI
       {!past.length && !historyUnavailable && <p>Tes prochaines recherches apparaîtront ici.</p>}
       {past.map(entry => <article key={entry.id} className={styles.card}>
         <small>{formatDate.format(new Date(entry.created_at))} · {audiences[entry.public_cible]}</small>
-        {entry.reference_depart && <p>Parfum de départ · {entry.reference_depart}</p>}
+        <p><strong>Parfum recherché : </strong>{entry.parfum_depart || (entry.reference_depart ? `Olfazeta ${entry.reference_depart}` : "Non renseigné (recherche par notes ou ancien historique)")}</p>
         <p>{entry.preferences.join(" · ")}</p>
         {entry.resultats.length ? <ul>{entry.resultats.map(({ reference, nom, score }) =>
           <li key={reference}>{catalogue.some(perfume => perfume.reference === reference) ?
