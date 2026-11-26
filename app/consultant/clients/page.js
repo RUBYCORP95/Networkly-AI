@@ -17,6 +17,7 @@ import CustomerAccountLink from "./CustomerAccountLink";
 import PaymentLinksForm from "./PaymentLinksForm";
 import OrderForm from "./OrderForm";
 import InvoiceUpload from "./InvoiceUpload";
+import BirthDateFields from "./BirthDateFields";
 import styles from "../consultant.module.css";
 
 const notices = new Map([
@@ -50,7 +51,7 @@ function CustomerForm({ customer, today }) {
     <label>Nom<input name="name" maxLength={120} defaultValue={customer?.name} required /></label>
     <label>E-mail<input name="email" type="email" maxLength={254} defaultValue={customer?.email ?? ""} /></label>
     <label>Téléphone<input name="phone" type="tel" maxLength={40} defaultValue={customer?.phone ?? ""} /></label>
-    <label>Date de naissance<input name="birth_date" type="date" max={today} defaultValue={customer?.birth_date ?? ""} /></label>
+    <BirthDateFields name="birth_date" max={today} defaultValue={customer?.birth_date ?? ""} />
     <label>Notification annuelle d’anniversaire<input type="checkbox" name="birthday_notification" defaultChecked={customer?.birthday_notification ?? false} /></label>
     {customer?.lead_source && <label>Annotation LeadFactory
       <textarea name="lead_note" maxLength={500} defaultValue={customer.lead_note ?? ""} />
