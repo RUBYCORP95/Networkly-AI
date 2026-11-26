@@ -34,7 +34,7 @@ export default function ShareOrder({ clientId }) {
       <button disabled={busy}>{busy ? "Création…" : "Créer le lien et le QR code"}</button>
     </form>
     {share && <div className={styles.panel}>
-      <p>Lien valable 24 heures et utilisable une fois.</p>
+      <p>Lien valable 7 jours et utilisable une fois.</p>
       {share.qr && <img src={share.qr} width={240} height={240} alt="QR code du bon de commande" style={{ maxWidth: "100%", height: "auto" }} />}
       <p><a className={styles.crmAction} href={share.url}>Ouvrir le bon de commande</a></p>
       <div className={styles.orderActions}>
