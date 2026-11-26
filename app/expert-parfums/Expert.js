@@ -112,7 +112,7 @@ export default function Expert({ catalogue, history, historyUnavailable, signedI
         <fieldset disabled={pending}>
           <legend>Quel parfum portes-tu déjà ?</legend>
           <label className={styles.field}>Nom du parfum ou référence Olfazeta (facultatif)
-            <input type="search" value={worn} onChange={event => { setWorn(event.target.value); setBasis(null); setExternal(null); setExternalSearch(null); setNotes([]); setResults(null); }} placeholder="Ex. Sauvage ou 094M" />
+            <input type="search" value={worn} onChange={event => { setWorn(event.target.value); setBasis(null); setExternal(null); setExternalSearch(null); setNotes([]); setResults(null); }} placeholder="Ex. Sauvage" />
           </label>
           {!basis && !external && canSearchExternal && <div aria-live="polite">
             {!externalResult && <p>Recherche dans le catalogue multimarque…</p>}
