@@ -254,5 +254,3 @@ main.crmPage {
 .birthDateGrid :is(select, input) { width: 100%; min-width: 0; padding: 9px; border: 1px solid #b8adc9; border-radius: 8px; color: #201740; background: white; }
 .birthDateFields small { display: block; margin-top: 6px; color: #991b1b; }
 @media (max-width: 400px) { .birthDateGrid { grid-template-columns: 1fr 1.4fr 1.1fr; gap: 5px; } }
-
-.birthDateValidity { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; opacity: 0; pointer-events: none; }

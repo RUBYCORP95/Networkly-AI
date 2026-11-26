@@ -43,7 +43,13 @@ const notices = new Map([
   ["updated", "Relance mise à jour."],
 ]);
 
-const clientFields = "id,name,email,phone,birth_date,birthday_notification,lead_source,lead_location,lead_note,archived_at";
+const clientFields = "id,name,email,phone,birth_date,birth_month,birth_day,birthday_notification,lead_source,lead_location,lead_note,archived_at";
+
+function customerBirthday(customer) {
+  if (customer?.birth_date) return customer.birth_date;
+  if (!customer?.birth_month || !customer.birth_day) return "";
+  return [customer.birth_month, customer.birth_day].map(part => String(part).padStart(2, "0")).join("-");
+}
 
 function CustomerForm({ customer, today }) {
   return <form action={saveClient} className={styles.form}>
@@ -51,7 +57,7 @@ function CustomerForm({ customer, today }) {
     <label>Nom<input name="name" maxLength={120} defaultValue={customer?.name} required /></label>
     <label>E-mail<input name="email" type="email" maxLength={254} defaultValue={customer?.email ?? ""} /></label>
     <label>Téléphone<input name="phone" type="tel" maxLength={40} defaultValue={customer?.phone ?? ""} /></label>
-    <BirthDateFields name="birth_date" max={today} defaultValue={customer?.birth_date ?? ""} />
+    <BirthDateFields name="birth_date" max={today} defaultValue={customerBirthday(customer)} />
     <label>Notification annuelle d’anniversaire<input type="checkbox" name="birthday_notification" defaultChecked={customer?.birthday_notification ?? false} /></label>
     {customer?.lead_source && <label>Annotation LeadFactory
       <textarea name="lead_note" maxLength={500} defaultValue={customer.lead_note ?? ""} />
@@ -356,9 +362,9 @@ export default async function ClientsPage({ searchParams }) {
     .order("order_date", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }) : null;
   const active = (reminders.data ?? []).filter(item => !item.completed_at && names.has(item.client_id))
     .map(item => ({...item, name: names.get(item.client_id), date: item.due_date}));
-  const birthdays = clients.filter(customer => customer.birth_date)
+  const birthdays = clients.filter(customerBirthday)
     .map(customer => ({ id: "birthday-" + customer.id, client_id: customer.id, name: customer.name,
-      date: nextBirthday(customer.birth_date, today), birthday: true, notification: customer.birthday_notification }));
+      date: nextBirthday(customerBirthday(customer), today), birthday: true, notification: customer.birthday_notification }));
   const rows = [...active, ...birthdays].sort((a, b) => a.date.localeCompare(b.date));
   const dueNotifications = rows.filter(item => item.notification && item.date <= today).length;
 

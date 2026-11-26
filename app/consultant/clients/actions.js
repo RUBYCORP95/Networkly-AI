@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { requireConsultant } from "../../../lib/auth/consultant";
 import { createServerSupabase } from "../../../lib/supabase/server";
 import { financePath } from "../../../lib/crm/finance.mjs";
-import { isDate, parisDate } from "../../../lib/crm/dates.mjs";
+import { isBirthday, isDate, parisDate } from "../../../lib/crm/dates.mjs";
 import { orderTotals, readDiscount } from "../../../lib/crm/order-pricing.mjs";
 import { priceOrder, readLines } from "../../../lib/crm/order";
 import { randomBytes, createHash } from "node:crypto";
@@ -36,15 +36,22 @@ export async function saveClient(form) {
   const name = String(form.get("name") ?? "").trim();
   const email = String(form.get("email") ?? "").trim() || null;
   const phone = String(form.get("phone") ?? "").trim() || null;
-  const birth_date = form.get("birth_date") || null;
+  const birthday = form.get("birth_date") || "";
   const lead_note = id && form.has("lead_note") ? String(form.get("lead_note") ?? "").trim() || null : undefined;
 
   if ((id && !uuid.test(id)) || !name || name.length > 120 || phone?.length > 40 || lead_note?.length > 500 ||
       (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) ||
-      (birth_date && (!isDate(birth_date) || birth_date > parisDate()))) finish("invalid");
+      (birthday && !isBirthday(birthday, parisDate()))) finish("invalid");
 
-  const values = { name, email, phone, birth_date, ...(lead_note !== undefined && { lead_note }),
-    birthday_notification: !!birth_date && form.get("birthday_notification") === "on" };
+  const partial = birthday.length === 5;
+  const values = {
+    name, email, phone,
+    birth_date: !partial && birthday ? birthday : null,
+    birth_month: partial ? Number(birthday.slice(0, 2)) : null,
+    birth_day: partial ? Number(birthday.slice(3)) : null,
+    ...(lead_note !== undefined && { lead_note }),
+    birthday_notification: !!birthday && form.get("birthday_notification") === "on",
+  };
   const operation = id ? client.from("crm_clients").update(values).eq("id", id).is("archived_at", null) :
     client.from("crm_clients").insert(values);
   const { data, error } = await operation.select("id").single();

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { isBirthday } from "../../../lib/crm/dates.mjs";
 import styles from "../consultant.module.css";
 
 const months = [
@@ -9,31 +10,25 @@ const months = [
 ];
 
 function parts(date) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(date || "")
-    ? { year: date.slice(0, 4), month: String(Number(date.slice(5, 7))), day: String(Number(date.slice(8, 10))) }
-    : { year: "", month: "", day: "" };
+  if (!date) return { year: "", month: "", day: "" };
+  const [month, day] = date.slice(-5).split("-");
+  return { year: date.length === 10 ? date.slice(0, 4) : "", month: String(Number(month)), day: String(Number(day)) };
 }
 
 export default function BirthDateFields({ name, defaultValue = "", max, required = false }) {
   const [date, setDate] = useState(() => parts(defaultValue));
-  const year = Number(date.year);
-  const month = Number(date.month);
-  const day = Number(date.day);
-  const maxYear = Number(max?.slice(0, 4)) || new Date().getFullYear();
-  const daysInMonth = year >= 1900 && month >= 1 && month <= 12
-    ? new Date(Date.UTC(year, month, 0)).getUTCDate() : 31;
-  const formatted = date.year.length === 4 && date.month && date.day
-    ? `${date.year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}` : "";
-  const valid = formatted && year >= 1900 && year <= maxYear && day >= 1 &&
-    day <= daysInMonth && formatted <= max;
+  const monthDay = `${date.month.padStart(2, "0")}-${date.day.padStart(2, "0")}`;
+  const formatted = date.year ? `${date.year}-${monthDay}` : monthDay;
   const filled = Boolean(date.year || date.month || date.day);
-  const error = filled && !valid;
+  const valid = Boolean(date.day && date.month && isBirthday(formatted, max));
+  const error = Boolean(date.day && date.month && !valid);
+  const message = "Indique une date de naissance valide, sans dépasser aujourd’hui.";
 
   return <fieldset className={styles.birthDateFields}>
     <legend>Date de naissance{required ? " *" : ""}</legend>
     <div className={styles.birthDateGrid}>
       <label>Jour
-        <select aria-label="Jour de naissance" value={date.day} required={required || filled}
+        <select ref={input => input?.setCustomValidity(error ? message : "")} aria-label="Jour de naissance" value={date.day} required={required || filled}
           onChange={event => setDate(current => ({ ...current, day: event.target.value }))}>
           <option value="">Jour</option>
           {Array.from({ length: 31 }, (_, index) => index + 1).map(value =>
@@ -47,17 +42,14 @@ export default function BirthDateFields({ name, defaultValue = "", max, required
           {months.map((label, index) => <option key={label} value={index + 1}>{label}</option>)}
         </select>
       </label>
-      <label>Année
-        <input aria-label="Année de naissance" type="number" inputMode="numeric"
-          min="1900" max={maxYear} step="1" placeholder="Ex. 1985"
-          value={date.year} required={required || filled}
+      <label>Année (facultatif)
+        <input type="text" inputMode="numeric" autoComplete="bday-year"
+          pattern="[0-9]{4}" maxLength={4} placeholder="Ex. 1985"
+          value={date.year}
           onChange={event => setDate(current => ({ ...current, year: event.target.value }))} />
       </label>
     </div>
-    <input type="hidden" name={name} value={valid ? formatted : ""} />
-    <input className={styles.birthDateValidity} aria-label="Date de naissance complète"
-      type="text" tabIndex={-1} autoComplete="off" value={valid || (!required && !filled) ? "ok" : ""}
-      readOnly required />
-    {error && <small role="alert">Indique une date de naissance valide, sans dépasser aujourd’hui.</small>}
+    <input type="hidden" name={name} value={valid ? formatted : filled ? "invalid" : ""} />
+    {error && <small role="alert">{message}</small>}
   </fieldset>;
 }
