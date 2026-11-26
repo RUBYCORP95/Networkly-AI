@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { findPerfumes, rankPerfumes, whatsappLink } from "../lib/parfums/expert.mjs";
+import { findPerfumes, rankPerfumes, whatsappLink, olfazetaLabel } from "../lib/parfums/expert.mjs";
 
 const catalogue = [
   { reference: "055W", nom: "Olfazeta n°055", inspiration: "Black Opium · Yves Saint Laurent",
@@ -31,4 +31,10 @@ test("partage les trois niveaux et conserve les caractères français", () => {
   const url = new URL(whatsappLink(catalogue[1]));
   assert.equal(url.host, "wa.me");
   assert.match(url.searchParams.get("text"), /Cœur · Citron, Muguet\nFond · Non documenté/);
+});
+
+
+test("masque le nom d’inspiration dans les suggestions Olfazeta", () => {
+  assert.equal(olfazetaLabel({ reference: "016M", inspiration: "Le Male" }), "Olfazeta 016M");
+  assert.equal(olfazetaLabel(catalogue[0]), "Olfazeta 055W");
 });
