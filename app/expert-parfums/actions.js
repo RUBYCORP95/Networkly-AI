@@ -33,11 +33,13 @@ export async function recommend(audience, notes, startingReference, externalId) 
   if (unavailable) return { error: "Le catalogue est temporairement indisponible." };
   const known = new Map(catalogue.flatMap(perfume => Object.keys(levels).flatMap(stage => perfume[stage]))
     .map(note => [normalize(note), note]));
+  let externalLabel = null;
   if (externalId) {
     if (typeof externalId !== "string" || externalId.length > 160) return { error: "Choisis à nouveau le parfum de départ." };
     try {
       const perfume = (await loadScento()).find(row => row.id === externalId);
       if (!perfume) return { error: "Ce parfum de départ est introuvable." };
+      externalLabel = [perfume.name, perfume.house, perfume.concentration, perfume.year].filter(Boolean).join(" · ").slice(0,500);
       for (const note of perfume.notes) {
         if (!known.has(normalize(note))) known.set(normalize(note), note);
       }
@@ -56,9 +58,9 @@ export async function recommend(audience, notes, startingReference, externalId) 
   }
   if (!user) return { results, entry: null, warning: null };
   const { data: entry, error } = await supabase.from("expert_parfums_historique").insert({
-    user_id: user.id, public_cible: audience, preferences, reference_depart: basis?.reference,
+    user_id: user.id, public_cible: audience, preferences, reference_depart: basis?.reference, parfum_depart: externalLabel,
     resultats: results.map(({ perfume, score }) => ({ reference: perfume.reference, nom: perfume.nom, score })),
-  }).select("id,created_at,public_cible,preferences,resultats,reference_depart").single();
+  }).select("id,created_at,public_cible,preferences,resultats,reference_depart,parfum_depart").single();
 
   return { results, entry, warning: error ? "La recherche a réussi, mais son historique n’a pas été enregistré." : null };
 }
