@@ -1,10 +1,13 @@
+import { unstable_cache } from "next/cache";
 import { createServerSupabase } from "../../../../lib/supabase/server";
 import { requireConsultant } from "../../../../lib/auth/consultant";
-import { findProducts, getVariants, matchesArticleCode, requireEuroCatalogue } from "../../../../lib/crm/catalogue";
+import { catalogueHandle, getVariants, loadCatalogueItems, requireEuroCatalogue, searchCatalogueItems } from "../../../../lib/crm/catalogue";
 
 import { availableSharedOrder } from "../../../../lib/crm/host-public";
 import { hostUuid } from "../../../../lib/crm/hosts.mjs";
 import { availableOrderLink } from "../../../../lib/crm/order-link";
+
+const cachedCatalogueItems = unstable_cache(loadCatalogueItems, ["order-catalogue-items"], { revalidate: 60 });
 
 function rankByArticleCode(items, query) {
   const code = query.toUpperCase();
@@ -34,14 +37,13 @@ export async function GET(request) {
   if (!query || query.length > 240) return Response.json({ error: "Recherche invalide." }, { status: 400 });
 
   try {
-    const [handles] = await Promise.all([findProducts(query, mode), requireEuroCatalogue()]);
-    const variants = await Promise.allSettled(handles.map(getVariants));
-    const items = variants.flatMap(result => result.status === "fulfilled" ? result.value : []);
-    const matches = mode === "code" ? items.filter(item => matchesArticleCode(item, query)) : items;
-    if (!matches.length && variants.some(result => result.status === "rejected")) throw new Error("Recherche incomplète");
-    return Response.json({ items: mode === "code"
-      ? rankByArticleCode(matches, query)
-      : mode === "name" ? items : rankByArticleCode(items, query) }, { headers: { "Cache-Control": "no-store" } });
+    const handle = mode === "code" ? null : catalogueHandle(query);
+    const [items] = await Promise.all([
+      handle ? getVariants(handle) : cachedCatalogueItems().then(catalogue => searchCatalogueItems(catalogue, query, mode)),
+      requireEuroCatalogue(),
+    ]);
+    return Response.json({ items: mode === "name" ? items : rankByArticleCode(items, query) },
+      { headers: { "Cache-Control": "no-store" } });
   } catch {
     return Response.json({ error: "Le catalogue Parfum Inspiration est indisponible." }, { status: 502 });
   }
