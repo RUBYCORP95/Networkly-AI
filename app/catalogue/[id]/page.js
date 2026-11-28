@@ -29,23 +29,19 @@ export default async function Page({ params, searchParams }) {
 
   const { seller, context } = catalogue;
   return <main className={styles.store}>
-    <header className={styles.header}>
-      <a href="#produits" className={styles.wordmark}>TESAMI</a>
-      <a href="#contact">Contact</a>
-      <a href="#panier">Panier</a>
-    </header>
-    <section className={styles.hero}>
-      <p>{context?.kind === "meeting" ? "Catalogue de la réunion" : context?.kind === "case" ? "Catalogue de la mallette" : "CHOGAN"}</p>
-      <h1>Le catalogue de {seller.name}</h1>
-      <p>Parfums, beauté, bien-être et maison</p>
-    </section>
     <Storefront key={id + (token ?? "")} id={id} token={token} products={products}
-      meeting={context?.kind === "meeting"} />
+      consultant={seller.name} context={context?.kind} />
     <footer id="contact" className={styles.footer}>
-      <h2>Contacter {seller.name}</h2>
-      {seller.business && <p>{seller.business}</p>}
-      <a href={"mailto:" + encodeURIComponent(seller.email)}>{seller.email}</a>
-      {seller.phone && <a href={"tel:" + seller.phone.replace(/[^+0-9]/g, "")}>{seller.phone}</a>}
+      <div className={styles.footerInner}>
+        <div>
+          <h2>Contacter {seller.name}</h2>
+          {seller.business && <p>{seller.business}</p>}
+        </div>
+        <div className={styles.footerLinks}>
+          <a href={"mailto:" + encodeURIComponent(seller.email)}>{seller.email}</a>
+          {seller.phone && <a href={"tel:" + seller.phone.replace(/[^+0-9]/g, "")}>{seller.phone}</a>}
+        </div>
+      </div>
     </footer>
   </main>;
 }
