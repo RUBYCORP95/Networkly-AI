@@ -21,12 +21,13 @@ async function downloadOrder({ id }, archive) {
   if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id)) {
     return new Response(null, { status: 404 });
   }
-  const { data: order, error } = await db.from("crm_orders").select(orderFields + ",client_id,delivery_address,host_session_id,crm_host_sessions(kind,delivery_mode)").eq("id", id).maybeSingle();
+  const { data: order, error } = await db.from("crm_orders").select(orderFields + ",client_id,catalogue_request_id,delivery_address,host_session_id,crm_host_sessions(kind,delivery_mode)").eq("id", id).maybeSingle();
   if (error) return new Response(null, { status: 500 });
   if (!order) return new Response(null, { status: 404 });
 
   const mode = order.meeting_delivery_mode ?? order.crm_host_sessions?.delivery_mode;
-  const address = mode === "individual" ? order.delivery_address : null;
+  const address = mode === "individual" || (order.catalogue_request_id && mode !== "grouped")
+    ? order.delivery_address : null;
   const { rewards, error: rewardsError } = order.crm_host_sessions?.kind === "meeting"
     ? await loadHostRewards(db, access.user.id, order.host_session_id) : { rewards: [] };
   if (rewardsError) return new Response(null, { status: 500 });

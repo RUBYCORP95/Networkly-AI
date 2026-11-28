@@ -110,6 +110,7 @@ function orderEmailDraft(order, recipient, paymentLinks) {
 function OrderControls({ order, clientId, clientEmail, returnFilter, dates, paymentLinks }) {
   return <>
     <OrderReceipt order={order} />
+    {order.catalogue_request_id && order.delivery_address && <p>Adresse de livraison · {order.delivery_address}</p>}
     <div className={styles.orderActions}>
       <Link className={styles.crmAction} href={"?" + new URLSearchParams({ client: clientId, view: "history", edit: order.id })}>Modifier le bon</Link>
       <Link className={styles.crmAction} href={order.host_session_id ? "/consultant/hotes" : "/consultant/hotes?order=" + order.id}>
@@ -134,6 +135,11 @@ function OrderControls({ order, clientId, clientEmail, returnFilter, dates, paym
         {paymentStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select></label>
       <label>Livraison (€)<input name="shipping" type="number" min={0} max={999999.99} step="0.01" defaultValue={(order.shipping_cents / 100).toFixed(2)} /></label>
+      {order.catalogue_request_id && <>
+        <label>Cadeau offert<input name="gift_product" maxLength={220} defaultValue={order.gift_product ?? ""} /></label>
+        <label>Quantité du cadeau<input name="gift_quantity" type="number" min={1} max={999}
+          defaultValue={order.gift_quantity ?? 1} /></label>
+      </>}
       <button>Mettre à jour</button>
     </form>
   </>;
@@ -165,7 +171,7 @@ async function AllOrders({ db, params }) {
   const parsedPage = Number(params.page);
   const page = Number.isSafeInteger(parsedPage) && parsedPage > 0 && parsedPage <= 1000000 ? parsedPage : 1;
   const size = 20;
-  const query = db.from("crm_orders").select(orderFields + ",host_session_id,client_id,crm_clients(name,email)", { count: "exact" })
+  const query = db.from("crm_orders").select(orderFields + ",host_session_id,catalogue_request_id,delivery_address,client_id,crm_clients(name,email)", { count: "exact" })
     .order("order_date", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).range((page - 1) * size, page * size - 1);
   const [orders, pending, processed] = await Promise.all([
     filterOrders(filterOrderDates(query, dates), filter),
@@ -351,7 +357,7 @@ export default async function ClientsPage({ searchParams }) {
   const archived = Boolean(selected?.archived_at);
   const history = selected && !invoices && (archived || params.view === "history");
   const orders = history ? await db.from("crm_orders")
-    .select(orderFields + ",host_session_id").eq("client_id", selected.id)
+    .select(orderFields + ",host_session_id,catalogue_request_id,delivery_address").eq("client_id", selected.id)
     .order("order_date", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }) : null;
   const active = (reminders.data ?? []).filter(item => !item.completed_at && names.has(item.client_id))
     .map(item => ({...item, name: names.get(item.client_id), date: item.due_date}));
