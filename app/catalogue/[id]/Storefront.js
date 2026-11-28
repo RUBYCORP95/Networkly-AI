@@ -12,7 +12,7 @@ import ProductDetails from "./ProductDetails";
 const universes = [
   { id: "parfums", label: "Parfums", description: "Extraits Olfazeta et notes olfactives", icon: Flower2,
     categories: ["parfums"] },
-  { id: "beaute", label: "Soins & bien-être", description: "Visage, corps, cheveux et solaires", icon: Sun,
+  { id: "beaute", label: "Soins & bien‑être", description: "Visage, corps, cheveux et solaires", icon: Sun,
     categories: ["visage", "corps", "cheveux", "bien-etre", "hygiene", "solaires"] },
   { id: "maquillage", label: "Maquillage", description: "La collection LOLÛM", icon: Sparkles,
     categories: ["maquillage"] },

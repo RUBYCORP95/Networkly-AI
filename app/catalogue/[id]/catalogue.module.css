@@ -111,6 +111,7 @@
   line-height: .86;
   letter-spacing: -.035em;
 }
+.hero .kicker { color: #f5bf91; }
 .hero h1 em { display: block; color: #f5bf91; }
 .coverByline { margin: 1.75rem 0 1.35rem; color: #f1d5c5; }
 .coverByline a { color: #fff1df; font-weight: 650; }
