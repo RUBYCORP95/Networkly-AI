@@ -177,8 +177,18 @@ export async function updateOrder(form) {
   if (!uuid.test(id) || Number.isNaN(shipping) || !["pending", "paid", "later"].includes(payment_status) ||
       !["pending", "confirmed", "completed", "cancelled"].includes(status)) finish("invalid");
 
-  const { data, error } = await client.from("crm_orders").update({ status, payment_status, shipping_cents: shipping }).eq("id", id)
-    .select("client_id").single();
+  const values = { status, payment_status, shipping_cents: shipping };
+  const hasGift = form.has("gift_product");
+  if (hasGift) {
+    const product = String(form.get("gift_product") ?? "").trim();
+    const quantity = String(form.get("gift_quantity") ?? "");
+    if (product && (product.length > 220 || !/^[1-9][0-9]{0,2}$/.test(quantity))) finish("invalid");
+    values.gift_product = product || null;
+    values.gift_quantity = product ? Number(quantity) : null;
+  }
+  let update = client.from("crm_orders").update(values).eq("id", id);
+  if (hasGift) update = update.not("catalogue_request_id", "is", null);
+  const { data, error } = await update.select("client_id").single();
   const result = error || !data ? "error" : "order";
   if (result === "order") revalidatePath(financePath);
   const filter = form.get("order_filter");

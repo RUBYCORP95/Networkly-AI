@@ -57,3 +57,11 @@ Klaviyo est nécessaire pour la synchronisation marketing des inscriptions.
 ## Sécurité
 
 Les secrets API et clés privées restent exclusivement côté serveur. Les comptes suspendus ne peuvent pas créer, programmer, approuver ou relancer des publications. Le moteur de publication automatique exclut également les comptes suspendus.
+
+### Catalogue Chogan public
+
+Appliquer `supabase/migrations/20261128120000_public_catalogue.sql` après les migrations CRM, notamment celles des sessions hôtes, du choix de livraison et de l’archivage des clients, avant de déployer cette version.
+
+Dans **Administration → Catalogue Chogan**, saisir les références éligibles avec leurs tarifs TTC réels et un visuel HTTPS autorisé. Pour un parfum, une référence publiée dans Expert Parfums peut préremplir les notes et leur source. Compléter la fiche avec le format, le prix et le visuel de la référence, puis documenter les droits d’utilisation avant de cocher la vérification et la visibilité. Pour Olfazeta, conserver à l’identique les flacons de référence noir homme et blanc femme, avec un décor propre aux notes de la référence et sans nom d’inspiration. Les fiches visibles peuvent rester indisponibles à la commande. Les codes promotionnels généraux sont configurés dans le même écran. Les codes de réunion existants restent réservés à leur réunion.
+
+Dans **Espace Consultant → Mon catalogue**, renseigner les coordonnées professionnelles, créer le lien permanent, télécharger le QR code en PNG ou PDF et fixer les frais de livraison. Les liens contextuels reprennent les règles de disponibilité et de livraison de leur réunion ou mallette. Les commandes apparaissent en attente dans **Mes clients et rappels → Toutes les commandes**. Le consultant peut les modifier, télécharger le PDF et préparer l’e-mail avec les liens de paiement configurés. Les statistiques comptent les ouvertures par session de navigateur et les commandes transmises, agrégées par jour sans données client ni adresse IP dans la table de statistiques.

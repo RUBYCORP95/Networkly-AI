@@ -7,6 +7,7 @@ export const metadata = { title: "Espace Consultant · TESAMI" };
 
 const sections = [
   { title: "Clients", links: [
+    ["/consultant/catalogue", "Mon catalogue", "Partage ton catalogue Chogan et suis ses commandes.", Gift],
     ["/consultant/clients", "Mes clients et rappels", "Gère tes fiches, anniversaires et relances.", Users],
     ["/consultant/factures", "Toutes mes factures", "Importe, classe et exporte tes factures.", FileText],
     ["/consultant/analytique", "Analytique & Finances", "Suis tes ventes, tes dépenses et tes commissions Chogan.", ChartNoAxesCombined],
